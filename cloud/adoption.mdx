@@ -1,0 +1,69 @@
+---
+title: Choose an adoption path
+description: Decide between managed routing, custom providers, and a staged RPC rollout
+---
+
+# Choose an adoption path
+
+Lasso can sit in front of a managed provider pool, an existing set of provider
+accounts, or a mixture of public, commercial, and self-hosted infrastructure.
+Choose the smallest first step that tests the property you care about.
+
+## Managed profile
+
+Use a managed profile when you want to evaluate Lasso without moving upstream
+credentials. Replace one RPC URL in a non-critical workload, choose an explicit
+routing strategy, and compare correctness, latency, and failure behavior with
+the current endpoint.
+
+This path answers: “Does Lasso improve this request path?” It does not answer
+whether your existing provider contracts should become part of the pool.
+
+## Custom profile
+
+Use a custom profile when you already pay for Alchemy, QuickNode, Infura, run
+your own nodes, or depend on a specialized provider. A custom profile stores
+those upstream endpoints in Lasso and makes the resulting pool addressable by a
+profile-specific route.
+
+A mixed pool can improve different properties:
+
+- **failure independence:** avoid a single upstream account, deployment, or
+  provider becoming the only path;
+- **quota headroom:** move attempts away from an upstream that is throttling;
+- **latency:** let regional measurements prefer different providers for
+  different methods;
+- **coverage:** route a method or historical query only to providers whose
+  declared capabilities satisfy it;
+- **cost control:** use contracts you already own while keeping an alternate
+  route available.
+
+These benefits depend on real independence and capability overlap. Two URLs
+backed by the same account, region, or infrastructure may not remove the failure
+mode you care about.
+
+## Stage the rollout
+
+1. Inventory chains, critical methods, HTTP and WebSocket use, current
+   providers, request volume, and correctness requirements.
+2. Select one stateless read path with an observable success criterion.
+3. Make the strategy explicit in the URL during evaluation.
+4. Compare request results and routing evidence; do not infer redundancy from
+   provider count alone.
+5. Add historical, write, filter, and subscription workloads only after reading
+   their specific boundaries in [RPC workload behavior](rpc-behavior).
+6. Expand traffic gradually and retain the previous endpoint as an application
+   rollback until the integration is accepted.
+
+## What to measure
+
+- successful response rate and error classification;
+- latency by method and region, not only a global average;
+- which provider served a request and how many attempts were required;
+- behavior during upstream throttling and failure;
+- method, archive, log-range, and WebSocket coverage;
+- quota or spend in each upstream provider's own dashboard.
+
+The dashboard is an operational view, not a durable request ledger. Use request
+IDs and your existing telemetry when the evaluation needs incident-grade
+correlation.

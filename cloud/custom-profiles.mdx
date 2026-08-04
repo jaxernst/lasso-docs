@@ -1,0 +1,82 @@
+---
+title: Custom profiles and provider probes
+description: Build account-owned provider pools and interpret capability probe evidence
+---
+
+# Custom profiles and provider probes
+
+A custom profile is an account-owned pool of upstream providers. It uses the
+same routing engine as a managed profile while keeping its membership,
+credentials, billing lifecycle, and route identity separate.
+
+## Operator journey
+
+1. Create a draft and choose its display name. Review the generated slug before
+   activation because the slug becomes part of the RPC route.
+2. Add a chain and one or more provider URLs. Credentials remain server-side and
+   must not appear in screenshots, issue comments, client errors, or logs.
+3. Optionally probe each provider. A probe spends upstream quota because it
+   makes representative JSON-RPC and WebSocket calls.
+4. Review method categories, archive behavior, request limits, latency, and
+   WebSocket results. Correct false assumptions before activation.
+5. Activate the profile, then send a harmless request such as `eth_chainId`
+   through its profile route.
+6. Observe traffic and provider health. Add, remove, or update providers as the
+   upstream stack changes; active edits propagate across the running cluster.
+
+An unprobed provider can be activated and routed with conservative defaults.
+That is useful when probe cost or provider quotas matter, but it provides less
+evidence for capability-aware routing.
+
+For HTTP, use an account key authorized for the account-owned profile:
+
+```bash
+curl -sS \
+  -H "x-lasso-api-key: $LASSO_KEY" \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' \
+  "https://lasso.sh/rpc/profile/<slug>/load-balanced/<chain>"
+```
+
+The corresponding WebSocket route is
+`wss://lasso.sh/ws/rpc/profile/<slug>/<strategy>/<chain>?key=$LASSO_KEY`. See the
+[live OpenAPI contract](https://lasso.sh/openapi.json) for profile-scoped HTTP,
+WebSocket, and authentication details. A key from another account is not
+authorized merely because it knows the profile slug.
+
+## Interpret probe results
+
+A category result summarizes representative method calls; it is not a verdict
+on the provider as a whole.
+
+- **Supported:** the representative methods tested successfully.
+- **Partial:** some methods succeeded and others failed or were unavailable.
+  Inspect the failed methods and compare them with the application's workload.
+- **Blocked:** the endpoint or plan rejected the representative behavior. This
+  can be a provider policy or plan boundary rather than a node failure.
+- **Not served:** Lasso intentionally does not forward the category, so no
+  upstream test is meaningful.
+
+For example, failure of legacy uncle methods can make the core category partial
+without affecting ordinary Ethereum reads. `eth_createAccessList` can make state
+queries partial even when `eth_call`, balances, code, and storage work. Event
+filters may be blocked while direct `eth_getLogs` or WebSocket subscriptions
+remain the right application path. Judge the individual methods you need.
+
+## Historical results
+
+Archive support is not one boolean in the upstream ecosystem. A provider can
+serve old blocks, state, and logs differently, and plan-gated access can look
+like pruning. Lasso records the probe's evidence but current routing uses a
+conservative archive capability model. Validate the exact historical queries
+and ranges your application depends on rather than assuming “reported archival”
+means unlimited history for every method.
+
+## Safe editing model
+
+Profile configuration is database-backed. Successful edits invalidate and
+rebuild the relevant runtime configuration across regions; request routing does
+not query Postgres on every call. Operators are expected to test provider URLs
+and intended behavior before applying changes. The normal recovery path for a
+bad provider is to correct or remove it while the remaining eligible providers
+continue to serve traffic where possible.

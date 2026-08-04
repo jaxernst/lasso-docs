@@ -1,0 +1,92 @@
+---
+title: Routing and usage evidence
+description: Correlate JSON-RPC requests with headers, metadata, dashboard state, and telemetry
+---
+
+# Routing and usage evidence
+
+Lasso keeps the default response compatible with JSON-RPC. Evidence comes from
+baseline response headers, opt-in metadata, the dashboard, and server-side
+telemetry; those surfaces have different retention and audience boundaries.
+
+## Baseline headers
+
+| Header | Current boundary |
+| --- | --- |
+| `x-lasso-profile` | Authorized profile identity on authenticated profile routes. |
+| `x-lasso-downgraded` | Present when account policy moved a request to public service. |
+| `x-lasso-effective-strategy` | Present when the requested strategy was normalized to a different allowed strategy. |
+| `x-lasso-cu`, `x-lasso-usd`, `x-lasso-strategy` | Per-request method-price evidence for anonymous-key responses and paid sessions. Account-key usage is recorded but these headers are not currently added to account-key responses. |
+| `x-lasso-balance-warning` | Present when the applicable key or downgrade policy is near/exhausting its balance. |
+
+Operational fallback between system profiles preserves the authorized service
+profile's `x-lasso-profile` identity. Internal routing metadata can separately
+describe the attempt that served the request.
+
+## Opt-in metadata
+
+Use `?include_meta=headers` or `X-Lasso-Include-Meta: headers` to preserve the
+JSON-RPC body and receive:
+
+- `x-lasso-request-id`;
+- `x-lasso-meta`, a base64url-encoded JSON routing record when it fits within
+  the header limit.
+
+```bash
+curl -sS -D /tmp/lasso-headers.txt \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}' \
+  "https://lasso.sh/rpc/k/$LASSO_KEY/fastest/ethereum?include_meta=headers"
+
+python - <<'PY'
+import base64, json, pathlib
+
+headers = pathlib.Path("/tmp/lasso-headers.txt").read_text().splitlines()
+encoded = next(
+    line.split(":", 1)[1].strip()
+    for line in headers
+    if line.lower().startswith("x-lasso-meta:")
+)
+encoded += "=" * (-len(encoded) % 4)
+print(json.dumps(json.loads(base64.urlsafe_b64decode(encoded)), indent=2))
+PY
+```
+
+Use `include_meta=body` only when the client accepts a changed response shape.
+That mode adds a top-level `lasso_meta` object; it does not add `x-lasso-meta`.
+
+The metadata record exposes the request ID, strategy, chain, transport,
+candidate and selected providers, selection/upstream/end-to-end latency,
+Lasso overhead, retry count, and circuit state when those fields are available.
+Profile identity remains in `x-lasso-profile`; client metadata does not include
+per-attempt error details. Treat the live OpenAPI response and actual record as
+authoritative because optional fields depend on the request path and outcome.
+
+WebSocket callers can add `"lasso_meta":"notify"` to a JSON-RPC request to ask
+for a follow-up `lasso_meta` notification.
+
+## Operational workflow
+
+1. Capture the request ID at the client boundary.
+2. Compare the requested route with `x-lasso-profile` and, when present,
+   `x-lasso-effective-strategy`.
+3. Decode opt-in metadata to identify the serving provider, transport, latency,
+   and retry count.
+4. Check the dashboard's regional provider state and recent activity.
+5. Correlate the request ID with application and service telemetry for a durable
+   incident record.
+
+The dashboard's recent activity is a bounded live presentation stream, not a
+durable request ledger. A connected LiveView receives relevant PubSub updates;
+the RPC request hot path does not render dashboard state or query Postgres for
+each viewer.
+
+## Common status signals
+
+| Signal | Meaning |
+| --- | --- |
+| `401` | API key is missing or invalid. |
+| `402` | Anonymous balance or a session payment is exhausted. |
+| `403` | The key is not authorized for the requested profile. |
+| `429` | A Lasso or upstream limit was reached. |
+| `503` | No eligible provider attempt served the request. |

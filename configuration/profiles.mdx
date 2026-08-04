@@ -1,0 +1,301 @@
+---
+title: Profile Configuration
+description: Configure profile metadata, chain settings, and routing parameters
+---
+
+Profiles define how Lasso routes requests across blockchain networks and providers. Each profile specifies chains, monitoring settings, provider selection rules, and rate limits.
+
+## Frontmatter
+
+The frontmatter section contains profile-level metadata and rate limiting configuration.
+
+<ParamField path="name" type="string" required>
+  Human-readable profile name displayed in the dashboard and logs.
+  
+  ```yaml
+  name: "Production RPC"
+  ```
+</ParamField>
+
+<ParamField path="slug" type="string" required>
+  URL-safe identifier used in request paths. Must be unique across all profiles.
+  
+  ```yaml
+  slug: "production"
+  ```
+  
+  Accessed via: `/rpc/profile/production/:chain`
+</ParamField>
+
+<ParamField path="rps_limit" type="integer" default="100">
+  Per-API-key requests per second limit. Uses token bucket rate limiting.
+  
+  ```yaml
+  rps_limit: 100
+  ```
+</ParamField>
+
+<ParamField path="burst_limit" type="integer" default="500">
+  Token bucket burst capacity. Allows short traffic spikes above `rps_limit`.
+  
+  ```yaml
+  burst_limit: 500
+  ```
+</ParamField>
+
+### Example Frontmatter
+
+```yaml
+---
+name: "Lasso Public"
+slug: "default"
+rps_limit: 100
+burst_limit: 500
+---
+```
+
+## Chain Configuration
+
+Each chain is defined under the `chains:` key with a unique identifier (e.g., `ethereum`, `base`, `arbitrum`).
+
+### Basic Fields
+
+<ParamField path="chain_id" type="integer" required>
+  EIP-155 chain ID. Used for request validation and multi-chain routing.
+  
+  ```yaml
+  chain_id: 1  # Ethereum Mainnet
+  ```
+</ParamField>
+
+<ParamField path="name" type="string">
+  Display name for the chain. Defaults to the chain key if omitted.
+  
+  ```yaml
+  name: "Ethereum Mainnet"
+  ```
+</ParamField>
+
+<ParamField path="block_time_ms" type="integer">
+  Average block time in milliseconds. Used for optimistic lag calculation and timeout defaults.
+  
+  ```yaml
+  block_time_ms: 12000  # 12 seconds for Ethereum
+  ```
+  
+  **Typical values:**
+  - Ethereum: 12000
+  - Base: 2000
+  - Arbitrum: 250
+</ParamField>
+
+### Monitoring
+
+Controls health probe frequency and lag alerting.
+
+<ParamField path="monitoring.probe_interval_ms" type="integer" default="12000">
+  Interval between health checks in milliseconds. Set to approximately 1x block time for L1 chains, 2.5x for L2 chains.
+  
+  ```yaml
+  monitoring:
+    probe_interval_ms: 12000
+  ```
+</ParamField>
+
+<ParamField path="monitoring.lag_alert_threshold_blocks" type="integer" default="5">
+  Log a warning when a provider lags this many blocks behind consensus.
+  
+  ```yaml
+  monitoring:
+    lag_alert_threshold_blocks: 5
+  ```
+</ParamField>
+
+### Selection
+
+Controls provider eligibility filtering during request routing.
+
+<ParamField path="selection.max_lag_blocks" type="integer" default="1">
+  Exclude providers lagging more than this many blocks behind the highest known block.
+  
+  ```yaml
+  selection:
+    max_lag_blocks: 1  # L1: 1-2, L2: 3-10
+  ```
+  
+  **Recommendations:**
+  - L1 chains (Ethereum): 1-2 blocks
+  - Fast L2 chains (Arbitrum): 10 blocks
+  - Standard L2 chains (Base): 5 blocks
+</ParamField>
+
+<ParamField path="selection.archival_threshold" type="integer" default="128">
+  Number of blocks before data is considered "archival". Requests for blocks older than `head - threshold` are only routed to providers marked as `archival: true`.
+  
+  ```yaml
+  selection:
+    archival_threshold: 128  # ~25 minutes on Ethereum
+  ```
+</ParamField>
+
+### WebSocket
+
+Controls upstream WebSocket subscription behavior for real-time block tracking.
+
+<ParamField path="websocket.subscribe_new_heads" type="boolean" default="true">
+  Subscribe to `newHeads` events for real-time block tracking. Enables sub-second lag detection.
+  
+  ```yaml
+  websocket:
+    subscribe_new_heads: true
+  ```
+</ParamField>
+
+<ParamField path="websocket.new_heads_timeout_ms" type="integer" default="35000">
+  Timeout before marking a subscription as stale. Set to approximately 3x block time.
+  
+  ```yaml
+  websocket:
+    new_heads_timeout_ms: 35000
+  ```
+</ParamField>
+
+<ParamField path="websocket.failover.max_backfill_blocks" type="integer" default="100">
+  Maximum number of blocks to fetch via HTTP during subscription failover to prevent gaps.
+  
+  ```yaml
+  websocket:
+    failover:
+      max_backfill_blocks: 100
+  ```
+</ParamField>
+
+<ParamField path="websocket.failover.backfill_timeout_ms" type="integer" default="30000">
+  Timeout for backfill HTTP requests during failover.
+  
+  ```yaml
+  websocket:
+    failover:
+      backfill_timeout_ms: 30000
+  ```
+</ParamField>
+
+### UI Topology
+
+Dashboard visualization settings for the topology view.
+
+<ParamField path="ui-topology.color" type="string">
+  Hex color code for the chain node in the dashboard topology view.
+  
+  ```yaml
+  ui-topology:
+    color: "#627EEA"  # Ethereum blue
+  ```
+</ParamField>
+
+<ParamField path="ui-topology.size" type="string" default="md">
+  Node size in the topology view. Options: `sm`, `md`, `lg`, `xl`.
+  
+  ```yaml
+  ui-topology:
+    size: xl
+  ```
+</ParamField>
+
+## Complete Example
+
+Here's a complete chain configuration for Ethereum Mainnet:
+
+```yaml
+chains:
+  ethereum:
+    chain_id: 1
+    name: "Ethereum Mainnet"
+    block_time_ms: 12000
+
+    monitoring:
+      probe_interval_ms: 12000
+      lag_alert_threshold_blocks: 5
+
+    selection:
+      max_lag_blocks: 1
+      archival_threshold: 128
+
+    websocket:
+      subscribe_new_heads: true
+      new_heads_timeout_ms: 35000
+      failover:
+        max_backfill_blocks: 100
+        backfill_timeout_ms: 30000
+
+    ui-topology:
+      color: "#627EEA"
+      size: xl
+
+    providers:
+      # See Provider Configuration page
+```
+
+## L2 Chain Example
+
+L2 chains have different timing characteristics:
+
+```yaml
+chains:
+  base:
+    chain_id: 8453
+    name: "Base Mainnet"
+    block_time_ms: 2000  # 2 second blocks
+
+    monitoring:
+      probe_interval_ms: 5000  # 2.5x block time
+      lag_alert_threshold_blocks: 5
+
+    selection:
+      max_lag_blocks: 5  # More tolerant for L2
+      archival_threshold: 750  # ~25 minutes
+
+    websocket:
+      subscribe_new_heads: true
+      new_heads_timeout_ms: 20000  # Shorter timeout
+      failover:
+        max_backfill_blocks: 100
+        backfill_timeout_ms: 30000
+
+    ui-topology:
+      color: "#0052FF"
+      size: lg
+
+    providers:
+      # ...
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Match probe intervals to block time">
+    Set `probe_interval_ms` to 1x block time for L1 chains and 2.5x for L2 chains. This balances responsiveness with overhead.
+  </Accordion>
+
+  <Accordion title="Adjust lag tolerance for chain speed">
+    Fast L2 chains produce many blocks quickly. Increase `max_lag_blocks` to 5-10 to avoid false positives from temporary sync delays.
+  </Accordion>
+
+  <Accordion title="Calculate archival threshold by time">
+    Use the ~25 minute rule: `archival_threshold = (25 * 60 * 1000) / block_time_ms`. This ensures consistent historical data access across chains.
+  </Accordion>
+
+  <Accordion title="Enable WebSocket subscriptions when available">
+    WebSocket subscriptions provide real-time block tracking with sub-second lag detection. Disable only if providers don't support it or stability is an issue.
+  </Accordion>
+
+  <Accordion title="Use descriptive chain keys">
+    Chain keys (e.g., `ethereum`, `base-sepolia`) appear in URLs and logs. Use canonical names that clearly identify the network.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<Card title="Provider Configuration" icon="server" href="/configuration/providers">
+  Learn how to configure providers for your chains
+</Card>

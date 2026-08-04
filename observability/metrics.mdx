@@ -1,0 +1,488 @@
+---
+title: 'Metrics & Benchmarking'
+description: 'BenchmarkStore, provider leaderboards, and telemetry metrics for RPC performance tracking'
+---
+
+## Overview
+
+Lasso tracks RPC performance metrics passively by recording every request's latency and result. These metrics power intelligent routing decisions, provider leaderboards, and cluster-wide dashboards.
+
+## BenchmarkStore
+
+**BenchmarkStore** is a GenServer that maintains per-chain ETS tables tracking RPC call performance.
+
+**Storage model:**
+- **RPC table** (bag): Raw call data with dual timestamps (monotonic + system)
+- **Score table** (set): Aggregated metrics per `{provider_id, method, :rpc}` key
+
+### Recording RPC Calls
+
+Every RPC request records its performance:
+
+```elixir
+BenchmarkStore.record_rpc_call(
+  "default",              # profile
+  "ethereum",            # chain
+  "ethereum_llamarpc",   # provider_id
+  "eth_getLogs",         # method
+  245,                   # duration_ms
+  :success               # result
+)
+```
+
+**Result categories:**
+- `:success` - Request completed successfully
+- `:error` - RPC error response
+- `:timeout` - Request timeout
+- `:network_error` - Connection failure
+- `:rate_limit` - Rate limit error
+
+### Dual Timestamp Design
+
+All metrics use both monotonic and system timestamps:
+
+```elixir
+# Captured atomically when record_rpc_call/6 is called
+monotonic_ts = System.monotonic_time(:millisecond)
+system_ts = System.system_time(:millisecond)
+```
+
+**Benefits:**
+- **Monotonic time**: Accurate intervals immune to clock adjustments
+- **System time**: Wall-clock correlation for display and exports
+
+### ETS Table Structure
+
+**RPC metrics table** (`:rpc_metrics_{profile}_{chain}`):
+
+```elixir
+# Table type: :bag (multiple entries per key)
+{monotonic_ts, system_ts, provider_id, method, duration_ms, result}
+```
+
+**Provider scores table** (`:provider_scores_{profile}_{chain}`):
+
+```elixir
+# Table type: :set (one entry per key)
+{{provider_id, method, :rpc}, successes, total, avg_duration, recent_latencies, monotonic_ts, system_ts}
+```
+
+**Example entry:**
+
+```elixir
+{{"ethereum_llamarpc", "eth_getLogs", :rpc}, 
+ 950,                    # successes
+ 1000,                   # total calls
+ 125.5,                  # avg_duration_ms
+ [120, 130, 115, ...],   # recent_latencies (last 100)
+ 1234567890,             # monotonic_ts (last update)
+ 1678901234567}          # system_ts (last update)
+```
+
+### Score Calculation
+
+Provider scores combine success rate, latency, and call volume:
+
+```elixir
+def calculate_rpc_provider_score(success_rate, avg_latency_ms, total_calls) do
+  confidence_factor = :math.log10(max(total_calls, 1))
+  latency_factor = if avg_latency_ms > 0, do: 1000 / (1000 + avg_latency_ms), else: 1.0
+  success_rate * latency_factor * confidence_factor
+end
+```
+
+**Formula breakdown:**
+- `success_rate`: 0.0 to 1.0 (e.g., 0.99 = 99% success)
+- `latency_factor`: 1000 / (1000 + latency), favors lower latency
+- `confidence_factor`: log10(calls), reduces variance from low-volume providers
+
+**Example scores:**
+
+| Provider | Success | Latency | Calls | Score |
+|----------|---------|---------|-------|-------|
+| llamarpc | 99% | 100ms | 1000 | 2.97 |
+| alchemy  | 99% | 150ms | 1000 | 2.91 |
+| infura   | 95% | 120ms | 100  | 1.93 |
+
+## Provider Leaderboard
+
+Get provider rankings sorted by performance:
+
+```elixir
+BenchmarkStore.get_provider_leaderboard("default", "ethereum")
+# => [
+#   %{
+#     provider_id: "ethereum_llamarpc",
+#     total_calls: 5000,
+#     success_rate: 0.99,
+#     avg_latency_ms: 120,
+#     p50_latency: 100,
+#     p95_latency: 180,
+#     p99_latency: 250,
+#     score: 2.97,
+#     source_node_id: "us-east-1",
+#     source_node: :node1@host
+#   },
+#   %{
+#     provider_id: "ethereum_alchemy",
+#     total_calls: 4500,
+#     success_rate: 0.99,
+#     avg_latency_ms: 150,
+#     score: 2.91,
+#     ...
+#   }
+# ]
+```
+
+### Percentile Calculation
+
+Latency percentiles computed from `recent_latencies` (last 100 samples):
+
+```elixir
+def calculate_percentiles(latencies) do
+  sorted = Enum.sort(latencies)
+  count = length(sorted)
+  
+  %{
+    p50: Enum.at(sorted, round(count * 0.5) - 1),
+    p90: Enum.at(sorted, round(count * 0.9) - 1),
+    p95: Enum.at(sorted, round(count * 0.95) - 1),
+    p99: Enum.at(sorted, round(count * 0.99) - 1)
+  }
+end
+```
+
+## Method-Specific Performance
+
+Get performance metrics for a specific RPC method:
+
+```elixir
+BenchmarkStore.get_rpc_method_performance_with_percentiles(
+  "default",
+  "ethereum",
+  "ethereum_llamarpc",
+  "eth_getLogs"
+)
+# => %{
+#   provider_id: "ethereum_llamarpc",
+#   method: "eth_getLogs",
+#   success_rate: 0.98,
+#   total_calls: 1500,
+#   avg_duration_ms: 245,
+#   percentiles: %{p50: 200, p90: 350, p95: 450, p99: 600},
+#   last_updated: 1678901234567,
+#   source_node_id: "us-east-1",
+#   source_node: :node1@host
+# }
+```
+
+### Bulk Method Performance
+
+Get all method performance data for a chain:
+
+```elixir
+BenchmarkStore.get_all_method_performance("default", "ethereum")
+# => [
+#   %{
+#     provider_id: "ethereum_llamarpc",
+#     method: "eth_getLogs",
+#     success_rate: 0.98,
+#     total_calls: 1500,
+#     avg_duration_ms: 245,
+#     percentiles: %{p50: 200, p95: 450, p99: 600},
+#     node_count: 3,
+#     stats_by_node: [
+#       %{node_id: "us-east-1", avg_duration_ms: 220, total_calls: 800},
+#       %{node_id: "eu-west-1", avg_duration_ms: 270, total_calls: 700}
+#     ]
+#   },
+#   ...
+# ]
+```
+
+## Cluster Aggregation
+
+In clustered deployments, MetricsStore aggregates metrics from all nodes.
+
+### Weighted Averages
+
+Metrics are weighted by call volume to prevent skew:
+
+```elixir
+def weighted_average(entries, field, total_weight) do
+  entries
+  |> Enum.map(fn entry ->
+    calls = entry.total_calls
+    value = Map.get(entry, field)
+    value * calls
+  end)
+  |> Enum.sum()
+  |> safe_divide(total_weight)
+end
+```
+
+**Example:**
+
+```elixir
+# Node 1: 800 calls, 220ms avg
+# Node 2: 700 calls, 270ms avg
+# Weighted avg = (800 * 220 + 700 * 270) / 1500 = 243ms
+```
+
+### Per-Node Breakdown
+
+Cluster metrics include per-node latency comparison:
+
+```elixir
+%{
+  provider_id: "ethereum_llamarpc",
+  avg_latency_ms: 243,      # Weighted average across nodes
+  total_calls: 1500,
+  node_count: 2,
+  latency_by_node: %{
+    "us-east-1" => %{
+      node_id: "us-east-1",
+      node: :node1@host,
+      p50: 200,
+      p95: 400,
+      p99: 550,
+      avg: 220,
+      success_rate: 0.99,
+      total_calls: 800
+    },
+    "eu-west-1" => %{
+      node_id: "eu-west-1",
+      node: :node2@host,
+      p50: 240,
+      p95: 480,
+      p99: 650,
+      avg: 270,
+      success_rate: 0.97,
+      total_calls: 700
+    }
+  }
+}
+```
+
+### Minimum Call Threshold
+
+Providers need ≥10 calls to be included in aggregated metrics:
+
+```elixir
+@min_calls_threshold 10
+
+def aggregate_provider_entries(provider_id, entries, all_entries) do
+  # Filter to entries with sufficient calls
+  entries_for_aggregates = Enum.filter(entries, &(&1.total_calls >= @min_calls_threshold))
+  
+  # Fall back to all entries if none meet threshold
+  entries_for_aggregates = if entries_for_aggregates == [], do: entries, else: entries_for_aggregates
+  
+  # Compute weighted averages...
+end
+```
+
+**Benefits:**
+- Prevents skew from nodes that just started
+- Ensures statistical significance
+- Cold-start indicator when threshold not met
+
+## Telemetry Metrics
+
+Lasso emits telemetry events for all operational metrics.
+
+### Metric Definitions
+
+Defined in `Lasso.Telemetry.metrics/0` for LiveDashboard:
+
+```elixir
+# RPC request duration distribution
+distribution("lasso.rpc.request.duration",
+  event_name: [:lasso, :rpc, :request, :stop],
+  measurement: :duration,
+  unit: {:native, :millisecond},
+  tags: [:chain, :method, :provider_id, :transport, :status],
+  reporter_options: [
+    buckets: [10, 25, 50, 100, 250, 500, 1000, 2000, 5000, 10_000]
+  ]
+)
+
+# RPC request counts
+counter("lasso.rpc.request.count",
+  event_name: [:lasso, :rpc, :request, :stop],
+  tags: [:chain, :method, :provider_id, :transport, :status]
+)
+
+# Circuit breaker admission latency
+distribution("lasso.circuit_breaker.admit.latency",
+  event_name: [:lasso, :circuit_breaker, :admit],
+  measurement: :admit_call_ms,
+  tags: [:instance_id, :transport, :decision],
+  reporter_options: [
+    buckets: [1, 2, 5, 10, 25, 50, 100, 250, 500, 1000]
+  ]
+)
+
+# HTTP transport I/O latency
+distribution("lasso.http.request.io.latency",
+  event_name: [:lasso, :http, :request, :io],
+  measurement: :io_ms,
+  tags: [:provider_id, :method],
+  reporter_options: [
+    buckets: [10, 25, 50, 100, 250, 500, 1000, 2000, 5000]
+  ]
+)
+```
+
+### Event Emission
+
+Events emitted at key points in request lifecycle:
+
+```elixir
+# Circuit breaker admission
+:telemetry.execute(
+  [:lasso, :circuit_breaker, :admit],
+  %{admit_call_ms: duration},
+  %{instance_id: instance_id, transport: :http, decision: :allow}
+)
+
+# HTTP I/O latency
+:telemetry.execute(
+  [:lasso, :http, :request, :io],
+  %{io_ms: duration},
+  %{provider_id: provider_id, method: method}
+)
+
+# RPC request completion
+:telemetry.execute(
+  [:lasso, :rpc, :request, :stop],
+  %{duration: duration},
+  %{chain: chain, method: method, provider_id: provider_id, transport: :http, status: :success}
+)
+```
+
+### Custom Telemetry Handlers
+
+Attach custom handlers to route metrics to external systems:
+
+```elixir
+:telemetry.attach(
+  "my-metrics-handler",
+  [:lasso, :rpc, :request, :stop],
+  &MyApp.Metrics.handle_rpc_request/4,
+  nil
+)
+
+defmodule MyApp.Metrics do
+  def handle_rpc_request(_event, measurements, metadata, _config) do
+    # Send to Prometheus, Datadog, etc.
+    MyApp.Monitoring.record(
+      "rpc.request.duration",
+      measurements.duration,
+      tags: [
+        chain: metadata.chain,
+        method: metadata.method,
+        provider: metadata.provider_id
+      ]
+    )
+  end
+end
+```
+
+## Data Retention
+
+### Automatic Cleanup
+
+BenchmarkStore cleans up old data periodically:
+
+```elixir
+@max_entries_per_chain 86_400  # ~1 entry/sec for 24 hours
+@cleanup_interval 3_600_000    # 1 hour
+
+# Delete entries older than 24 hours
+cutoff_time = System.monotonic_time(:millisecond) - 24 * 60 * 60 * 1000
+```
+
+**Cleanup triggers:**
+- **Periodic**: Every hour (for all chains)
+- **Size-based**: When table exceeds `@max_entries_per_chain`
+
+### Manual Cleanup
+
+Trigger cleanup manually:
+
+```elixir
+# Clean specific chain
+BenchmarkStore.cleanup_old_entries("default", "ethereum")
+
+# Clean all chains
+BenchmarkStore.cleanup_old_metrics()
+
+# Clear all metrics for a chain
+BenchmarkStore.clear_chain_metrics("default", "ethereum")
+```
+
+## Persistence (Optional)
+
+Hourly snapshots can be saved for long-term analysis:
+
+```elixir
+# Create snapshot
+snapshot = BenchmarkStore.create_hourly_snapshot("default", "ethereum")
+# => %{
+#   profile: "default",
+#   chain_name: "ethereum",
+#   hour_timestamp: 1678896000,
+#   providers: ["ethereum_llamarpc", "ethereum_alchemy"],
+#   snapshot_data: [
+#     %{
+#       provider_id: "ethereum_llamarpc",
+#       rpc_method: "eth_getLogs",
+#       rpc_calls: 1500,
+#       rpc_avg_duration_ms: 245,
+#       rpc_success_rate: 0.98
+#     },
+#     ...
+#   ]
+# }
+
+# Snapshots are saved automatically by Lasso.Benchmarking.Persistence
+```
+
+## Performance Characteristics
+
+### Memory Usage
+
+```elixir
+BenchmarkStore.get_memory_usage()
+# => %{
+#   total_entries: 25000,
+#   chains_tracked: 3,
+#   memory_mb: 25.0,
+#   memory_estimate_mb: 25.0
+# }
+```
+
+**Per-entry overhead:** ~1KB (compressed ETS)
+
+### Query Performance
+
+| Operation | Complexity | Latency |
+|-----------|-----------|----------|
+| Record call | O(1) | &lt;1ms |
+| Get leaderboard | O(providers) | &lt;5ms |
+| Get method perf | O(1) | &lt;1ms |
+| Get all methods | O(providers × methods) | &lt;10ms |
+| Cleanup | O(entries) | &lt;100ms |
+
+## Summary
+
+Lasso's metrics system provides:
+
+- **Passive benchmarking** via BenchmarkStore (no active probing)
+- **Method-specific metrics** with percentiles (p50, p90, p95, p99)
+- **Provider leaderboards** sorted by composite score
+- **Cluster aggregation** with weighted averages and per-node breakdown
+- **Telemetry integration** for custom monitoring
+- **Automatic cleanup** with configurable retention (24 hours default)
+- **Low overhead** (&lt;1ms per request, &lt;1KB per entry)

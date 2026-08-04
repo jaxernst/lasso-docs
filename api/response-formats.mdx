@@ -1,0 +1,482 @@
+---
+title: Response Formats
+description: JSON-RPC response structure and Lasso metadata format
+---
+
+Lasso returns all responses in standard JSON-RPC 2.0 format with optional observability metadata.
+
+## Standard Response Format
+
+All successful responses follow the JSON-RPC 2.0 specification:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": "0x8471c9a"
+}
+```
+
+### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `jsonrpc` | string | Always `"2.0"` |
+| `id` | number \| string \| null | Matches the request `id` (type and value preserved) |
+| `result` | any | Method-specific result data |
+
+<Info>
+The `id` field exactly echoes the request ID's type and value. If you send `{"id": "abc"}`, you receive `{"id": "abc"}` in the response.
+</Info>
+
+## Common Response Types
+
+### Block Number
+
+**Request:**
+```json
+{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": "0x8471c9a"
+}
+```
+
+### Block by Number
+
+**Request:**
+```json
+{
+  "jsonrpc":"2.0",
+  "method":"eth_getBlockByNumber",
+  "params":["latest", false],
+  "id":1
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "number": "0x8471c9a",
+    "hash": "0x1234...",
+    "parentHash": "0x5678...",
+    "timestamp": "0x65a1b2c3",
+    "gasLimit": "0x1c9c380",
+    "gasUsed": "0x9896a0",
+    "transactions": ["0xabc...", "0xdef..."]
+  }
+}
+```
+
+### Transaction Receipt
+
+**Request:**
+```json
+{
+  "jsonrpc":"2.0",
+  "method":"eth_getTransactionReceipt",
+  "params":["0xabc123..."],
+  "id":1
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "transactionHash": "0xabc123...",
+    "transactionIndex": "0x1",
+    "blockHash": "0x1234...",
+    "blockNumber": "0x8471c9a",
+    "from": "0x742d35...",
+    "to": "0xa0b86...",
+    "cumulativeGasUsed": "0x33bc",
+    "gasUsed": "0x4dc",
+    "contractAddress": null,
+    "logs": [...],
+    "status": "0x1"
+  }
+}
+```
+
+### Logs Query
+
+**Request:**
+```json
+{
+  "jsonrpc":"2.0",
+  "method":"eth_getLogs",
+  "params":[{
+    "fromBlock": "0x8471c9a",
+    "toBlock": "0x8471caa",
+    "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+    "topics": ["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"]
+  }],
+  "id":1
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": [
+    {
+      "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "topics": [
+        "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+        "0x000000000000000000000000742d35cc6634c0532925a3b844bc9e7595f0beb",
+        "0x000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+      ],
+      "data": "0x0000000000000000000000000000000000000000000000000000000005f5e100",
+      "blockNumber": "0x8471c9a",
+      "transactionHash": "0xabc123...",
+      "transactionIndex": "0x1",
+      "blockHash": "0x1234...",
+      "logIndex": "0x0",
+      "removed": false
+    }
+  ]
+}
+```
+
+## Batch Response Format
+
+Batch requests return an array of responses in the same order as requests:
+
+**Request:**
+```json
+[
+  {"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1},
+  {"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":2},
+  {"jsonrpc":"2.0","method":"eth_gasPrice","params":[],"id":3}
+]
+```
+
+**Response:**
+```json
+[
+  {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": "0x8471c9a"
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "result": "0x1"
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 3,
+    "result": "0x3b9aca00"
+  }
+]
+```
+
+<Warning>
+Batch requests are limited to 50 requests by default. Exceeding this limit returns a `-32600` Invalid Request error.
+</Warning>
+
+## WebSocket Responses
+
+### Subscription Confirmation
+
+**Client sends:**
+```json
+{"jsonrpc":"2.0","method":"eth_subscribe","params":["newHeads"],"id":1}
+```
+
+**Server responds:**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": "0xabc123..."
+}
+```
+
+### Subscription Events
+
+**Server pushes:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "eth_subscription",
+  "params": {
+    "subscription": "0xabc123...",
+    "result": {
+      "number": "0x8471c9a",
+      "hash": "0x1234...",
+      "parentHash": "0x5678...",
+      "timestamp": "0x65a1b2c3"
+    }
+  }
+}
+```
+
+### Unsubscribe Confirmation
+
+**Client sends:**
+```json
+{"jsonrpc":"2.0","method":"eth_unsubscribe","params":["0xabc123..."],"id":2}
+```
+
+**Server responds:**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": true
+}
+```
+
+## Observability Metadata
+
+Lasso provides routing and performance metadata in two modes: **headers** and **body**.
+
+### Headers Mode
+
+Request metadata in response headers:
+
+```bash
+curl -X POST 'http://localhost:4000/rpc/ethereum?include_meta=headers' \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
+  -i
+```
+
+**Response headers:**
+```
+HTTP/1.1 200 OK
+Content-Type: application/json
+X-Request-Id: FzZLbVH5VnMAABcBADM
+X-Lasso-Request-ID: abc-123-def-456
+X-Lasso-Meta: eyJyZXF1ZXN0X2lkIjoiYWJjLTEyMy1kZWYtNDU2Iiwic3RyYXRlZ3kiOiJmYXN0ZXN0IiwiY2hhaW4iOiJldGhlcmV1bSIsInNlbGVjdGVkX3Byb3ZpZGVyIjp7ImlkIjoiZXRoZXJldW1fbGxhbWFycGMifSwidXBzdHJlYW1fbGF0ZW5jeV9tcyI6NDUsInJldHJpZXMiOjAsImNpcmN1aXRfYnJlYWtlcl9zdGF0ZSI6ImNsb3NlZCJ9
+```
+
+The `X-Lasso-Meta` header contains base64url-encoded JSON. Decoded:
+
+```json
+{
+  "request_id": "abc-123-def-456",
+  "strategy": "fastest",
+  "chain": "ethereum",
+  "selected_provider": {
+    "id": "ethereum_llamarpc"
+  },
+  "upstream_latency_ms": 45,
+  "retries": 0,
+  "circuit_breaker_state": "closed"
+}
+```
+
+### Body Mode
+
+Request metadata in response body:
+
+```bash
+curl -X POST 'http://localhost:4000/rpc/ethereum?include_meta=body' \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": "0x8471c9a",
+  "lasso_meta": {
+    "request_id": "abc-123-def-456",
+    "strategy": "fastest",
+    "chain": "ethereum",
+    "selected_provider": {
+      "id": "ethereum_llamarpc",
+      "name": "LlamaRPC",
+      "region": "us-east"
+    },
+    "upstream_latency_ms": 45,
+    "total_latency_ms": 48,
+    "retries": 0,
+    "circuit_breaker_state": "closed",
+    "timestamp": "2026-03-03T12:34:56.789Z"
+  }
+}
+```
+
+### Metadata Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `request_id` | string | Unique request tracking ID |
+| `strategy` | string | Routing strategy used (`fastest`, `load_balanced`, etc.) |
+| `chain` | string | Chain identifier |
+| `selected_provider` | object | Provider that handled the request |
+| `selected_provider.id` | string | Provider identifier |
+| `selected_provider.name` | string | Provider display name |
+| `selected_provider.region` | string | Provider region (if configured) |
+| `upstream_latency_ms` | number | Time to receive response from provider |
+| `total_latency_ms` | number | Total request processing time (body mode only) |
+| `retries` | number | Number of retry attempts |
+| `circuit_breaker_state` | string | Circuit breaker state (`closed`, `open`, `half_open`) |
+| `timestamp` | string | Request timestamp ISO 8601 (body mode only) |
+
+<Tip>
+Use **headers mode** for production monitoring to avoid modifying the response body. Use **body mode** for debugging and development.
+</Tip>
+
+### WebSocket Metadata
+
+Add `"lasso_meta": "notify"` to your WebSocket request:
+
+```json
+{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1,"lasso_meta":"notify"}
+```
+
+The server sends two frames:
+
+**1. RPC Response (unmodified):**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": "0x8471c9a"
+}
+```
+
+**2. Metadata Notification:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "lasso_meta",
+  "params": {
+    "request_id": "abc-123-def-456",
+    "strategy": "fastest",
+    "selected_provider": {
+      "id": "ethereum_llamarpc"
+    },
+    "upstream_latency_ms": 45,
+    "retries": 0,
+    "circuit_breaker_state": "closed"
+  }
+}
+```
+
+## Response Headers
+
+### Standard Headers
+
+All responses include:
+
+| Header | Value | Description |
+|--------|-------|-------------|
+| `Content-Type` | `application/json` | Response content type |
+| `X-Request-Id` | Phoenix request ID | Phoenix framework tracking ID |
+
+### Metadata Headers
+
+With `include_meta=headers`:
+
+| Header | Description |
+|--------|-------------|
+| `X-Lasso-Request-ID` | Lasso request tracking ID |
+| `X-Lasso-Meta` | Base64url-encoded JSON with routing metadata |
+
+### CORS Headers
+
+All origins are allowed:
+
+| Header | Value |
+|--------|-------|
+| `Access-Control-Allow-Origin` | `*` |
+| `Access-Control-Allow-Methods` | `GET, POST, OPTIONS` |
+| `Access-Control-Allow-Headers` | `Content-Type, Authorization, X-Requested-With, X-Lasso-Provider, X-Lasso-Transport` |
+| `Access-Control-Max-Age` | `86400` (24 hours) |
+
+## Null Results
+
+Some methods may return `null` as a valid result:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": null
+}
+```
+
+**Common cases:**
+- `eth_getTransactionReceipt` for pending/unknown transaction
+- `eth_getBlockByNumber` for future block number
+- `eth_getCode` for EOA (non-contract) address returns `"0x"`
+
+<Info>
+A `null` result is different from an error. `null` is a valid response indicating "not found" or "not applicable".
+</Info>
+
+## Binary Data Encoding
+
+All binary data (hashes, addresses, bytecode) is hex-encoded with `0x` prefix:
+
+| Type | Format | Example |
+|------|--------|----------|
+| Address | 20 bytes | `"0x742d35cc6634c0532925a3b844bc9e7595f0beb"` |
+| Block hash | 32 bytes | `"0x1234567890abcdef..."` |
+| Transaction hash | 32 bytes | `"0xabcdef1234567890..."` |
+| Bytecode | Variable | `"0x60806040..."` |
+| Topics | 32 bytes each | `"0xddf252ad1be2c89b..."` |
+| Data | Variable | `"0x0000000000000000..."` |
+
+## Block Parameter Format
+
+Methods that accept block parameters support multiple formats:
+
+### Block Tags (Strings)
+
+```json
+"latest"      // Most recent block
+"earliest"    // Genesis block
+"pending"     // Pending block (provider-dependent)
+"safe"        // Safe block (post-merge)
+"finalized"   // Finalized block (post-merge)
+```
+
+### Block Number (Hex String)
+
+```json
+"0x8471c9a"   // Block 138,707,098
+```
+
+### Block Parameter Object (EIP-1898)
+
+```json
+{
+  "blockNumber": "0x8471c9a",
+  "requireCanonical": true
+}
+```
+
+```json
+{
+  "blockHash": "0x1234567890abcdef...",
+  "requireCanonical": false
+}
+```
+
+## See Also
+
+- [Error Codes](/api/error-codes) - Understanding error responses
+- [Supported Methods](/api/supported-methods) - Available RPC methods
+- [Observability](/observability/request-metadata) - Monitoring and debugging

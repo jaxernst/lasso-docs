@@ -1,0 +1,74 @@
+---
+title: Lasso Cloud overview
+description: Managed EVM RPC routing, provider pools, failover, and operational evidence
+---
+
+# Lasso Cloud
+
+Lasso is a control layer for EVM RPC. Applications keep standard JSON-RPC
+clients while Lasso decides which upstream can serve each request, routes it,
+fails over when appropriate, and exposes evidence about the result.
+
+Use these docs to decide where Lasso belongs in an existing RPC stack and how
+to operate it. For exact request and response shapes, use the deployed
+[`/openapi.json`](https://lasso.sh/openapi.json). Fetch the live
+[`/api/v1/agent/chains`](https://lasso.sh/api/v1/agent/chains) and
+[`/api/v1/agent/pricing`](https://lasso.sh/api/v1/agent/pricing) catalogs rather
+than copying chain or pricing values into an integration.
+
+## Choose a path
+
+- **Evaluate managed routing:** start with a Lasso-managed profile and one
+  endpoint swap. This is the shortest way to test routing and failover without
+  moving provider credentials.
+- **Bring your existing providers:** build a custom profile from Alchemy,
+  QuickNode, Infura, self-hosted nodes, or other EVM endpoints. Lasso keeps the
+  credentials server-side and routes across the pool.
+- **Operate a mixed RPC stack:** combine providers to increase quota headroom,
+  regional reach, method or history coverage, and failure independence. Use
+  request evidence and provider health to refine the pool over time.
+
+Read in this order:
+
+1. [Choose an adoption path](adoption) — choose managed pools, custom providers, or a
+   staged combination.
+2. [First endpoint quickstart](quickstart) — make the first request and install the
+   endpoint safely.
+3. [Routing and failure semantics](routing) — understand selection, health tiers, attempts,
+   strategies, and fallback.
+4. [Custom profiles and provider probes](custom-profiles) — build a provider pool and
+   interpret probe evidence.
+5. [RPC workload behavior](rpc-behavior) — understand reads, historical data,
+   logs, writes, filters, and WebSocket boundaries.
+6. [Routing and usage evidence](observability) — correlate a request with routing
+   evidence and dashboard state.
+7. [Human and agent workflows](agent-flows) — collaborate with an agent without
+   handing it unnecessary authority.
+
+[Features and boundaries](features) is the compact capability and boundary reference.
+
+## Product boundary
+
+Lasso owns provider eligibility, selection, health-aware attempts, and the
+managed control plane around profiles, keys, and usage. It does not turn every
+JSON-RPC operation into an interchangeable stateless read. Transaction nonce
+management, transaction deduplication, receipt tracking, stateful filter
+affinity, and workload-specific correctness remain application concerns where
+documented.
+
+Lasso RPC Core is the open routing engine. Lasso Cloud adds identity, keys,
+billing, entitlements, account-owned profiles, the managed dashboard, and
+agent-facing setup surfaces.
+
+## Documentation surfaces
+
+- **Human product docs:** this site contains concepts, tradeoffs, workflows,
+  and operational boundaries for Lasso Cloud and RPC Core.
+- **[`/SKILL.md`](https://lasso.sh/SKILL.md):** concise instructions an agent can
+  execute after it understands the user's workload and receives approval for
+  external changes.
+- **[`/llms.txt`](https://lasso.sh/llms.txt):** a short map to the right product
+  and API resource.
+- **[`/openapi.json`](https://lasso.sh/openapi.json):** exact machine-readable
+  HTTP contracts.
+- **[`/agent.json`](https://lasso.sh/agent.json):** service discovery metadata.

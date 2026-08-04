@@ -1,0 +1,322 @@
+---
+title: HTTP Endpoints
+description: Complete reference for Lasso RPC HTTP JSON-RPC endpoints
+---
+
+## Overview
+
+All HTTP RPC endpoints accept `POST` requests with `Content-Type: application/json` and follow the JSON-RPC 2.0 specification.
+
+## Base Endpoint
+
+Routes requests using the default strategy (configurable, defaults to `load_balanced`).
+
+```
+POST /rpc/:chain
+```
+
+### Parameters
+
+- `:chain` - Chain identifier (name or numeric ID)
+  - **Chain name**: `ethereum`, `base`, `arbitrum`
+  - **Chain ID**: `1`, `8453`, `42161`
+
+### Example
+
+```bash
+curl -X POST http://localhost:4000/rpc/ethereum \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+**Response:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": "0x8471c9a"
+}
+```
+
+## Strategy Endpoints
+
+Explicitly specify the routing strategy for provider selection.
+
+### Fastest
+
+```
+POST /rpc/fastest/:chain
+```
+
+Routes all requests to the single fastest provider based on measured latency.
+
+```bash
+curl -X POST http://localhost:4000/rpc/fastest/ethereum \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+### Load Balanced
+
+```
+POST /rpc/load-balanced/:chain
+POST /rpc/round-robin/:chain
+```
+
+Randomly distributes requests across healthy providers.
+
+```bash
+curl -X POST http://localhost:4000/rpc/load-balanced/ethereum \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0x123...","latest"],"id":1}'
+```
+
+### Latency Weighted
+
+```
+POST /rpc/latency-weighted/:chain
+```
+
+Probabilistically routes requests with bias toward lower-latency providers.
+
+```bash
+curl -X POST http://localhost:4000/rpc/latency-weighted/ethereum \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_call","params":[{"to":"0x...","data":"0x..."},"latest"],"id":1}'
+```
+
+## Provider Override Endpoints
+
+Route directly to a specific provider, bypassing strategy selection.
+
+```
+POST /rpc/provider/:provider_id/:chain
+POST /rpc/:chain/:provider_id
+```
+
+### Parameters
+
+- `:provider_id` - Provider identifier (e.g., `alchemy`, `infura`, `quicknode`)
+- `:chain` - Chain identifier
+
+### Example
+
+```bash
+curl -X POST http://localhost:4000/rpc/provider/alchemy/ethereum \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+Alternative syntax:
+
+```bash
+curl -X POST http://localhost:4000/rpc/ethereum/alchemy \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+## Profile-Scoped Endpoints
+
+All routes above are available under a profile namespace for multi-tenancy.
+
+```
+POST /rpc/profile/:profile/:chain
+POST /rpc/profile/:profile/fastest/:chain
+POST /rpc/profile/:profile/load-balanced/:chain
+POST /rpc/profile/:profile/latency-weighted/:chain
+POST /rpc/profile/:profile/provider/:provider_id/:chain
+```
+
+### Parameters
+
+- `:profile` - Profile slug (e.g., `default`, `testnet`, `production`)
+
+### Example
+
+```bash
+curl -X POST http://localhost:4000/rpc/profile/testnet/fastest/base \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+<Note>
+Without an explicit profile in the URL, requests automatically use the `"default"` profile. Ensure `config/profiles/default.yml` exists at startup.
+</Note>
+
+## Supported Methods
+
+Lasso supports read-only Ethereum JSON-RPC methods:
+
+### Block Methods
+
+- `eth_blockNumber` - Latest block number
+- `eth_getBlockByNumber` - Block data by number
+- `eth_getBlockByHash` - Block data by hash
+
+### Account Methods
+
+- `eth_getBalance` - Account balance
+- `eth_getTransactionCount` - Account nonce
+- `eth_getCode` - Contract bytecode
+
+### Transaction Methods
+
+- `eth_getTransactionByHash` - Transaction details
+- `eth_getTransactionReceipt` - Transaction receipt
+
+### Call Methods
+
+- `eth_call` - Read-only contract call
+- `eth_estimateGas` - Gas estimation
+
+### State Methods
+
+- `eth_getLogs` - Historical log queries
+- `eth_getStorageAt` - Storage slot value
+
+### Gas & Fee Methods
+
+- `eth_gasPrice` - Current gas price
+- `eth_maxPriorityFeePerGas` - EIP-1559 priority fee
+- `eth_feeHistory` - Historical fee data
+
+### Metadata Methods
+
+- `eth_chainId` - Chain ID (served locally, no upstream call)
+
+## Unsupported Methods
+
+### Subscription Methods
+
+Subscription methods (`eth_subscribe`, `eth_unsubscribe`) are rejected over HTTP with a WebSocket URL hint:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32601,
+    "message": "Method not supported over HTTP. Use WebSocket connection for subscriptions.",
+    "data": {"websocket_url": "/ws/rpc/ethereum"}
+  }
+}
+```
+
+### Write Methods
+
+Write methods (`eth_sendRawTransaction`, `eth_sendTransaction`) are not currently supported.
+
+## Request Headers
+
+### Required Headers
+
+| Header | Value | Description |
+|--------|-------|-------------|
+| `Content-Type` | `application/json` | JSON request body |
+
+### Optional Headers
+
+| Header | Example | Description |
+|--------|---------|-------------|
+| `X-Lasso-Api-Key` | `lasso_abc123` | API key authentication |
+| `Authorization` | `Bearer lasso_abc123` | Bearer token authentication |
+| `X-Lasso-Provider` | `alchemy` | Override provider selection |
+| `X-Lasso-Transport` | `http` or `ws` | Force transport selection |
+| `X-Lasso-Include-Meta` | `headers` or `body` | Request observability metadata |
+
+### Provider Override Header
+
+You can specify a provider via header instead of URL path:
+
+```bash
+curl -X POST http://localhost:4000/rpc/ethereum \
+  -H 'Content-Type: application/json' \
+  -H 'X-Lasso-Provider: alchemy' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+## Query Parameters
+
+| Parameter | Values | Description |
+|-----------|--------|-------------|
+| `key` | `lasso_...` | API key for authentication |
+| `include_meta` | `headers`, `body` | Return routing metadata |
+| `transport` | `http`, `ws` | Force transport selection |
+| `provider` | provider ID | Override provider selection |
+| `strategy` | `fastest`, `load_balanced`, `latency_weighted` | Override routing strategy |
+
+### Strategy Query Parameter
+
+```bash
+curl -X POST 'http://localhost:4000/rpc/ethereum?strategy=fastest' \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+## Response Format
+
+### Success Response
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": "0x8471c9a"
+}
+```
+
+### Error Response
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32602,
+    "message": "Invalid params: unsupported chain"
+  }
+}
+```
+
+### Error Codes
+
+| Code | Meaning |
+|------|---------||
+| `-32700` | Parse error (malformed JSON) |
+| `-32600` | Invalid Request (missing fields, batch too large) |
+| `-32601` | Method not found or not supported on this transport |
+| `-32602` | Invalid params (unsupported chain, missing chain_id) |
+| `-32603` | Internal error |
+| `-32000` | Server error (rate limit, strategy access denied, quota exceeded) |
+
+## Response Headers
+
+### Standard Headers
+
+| Header | Description |
+|--------|-------------|
+| `Content-Type` | `application/json` |
+| `X-Request-Id` | Phoenix request ID |
+
+### Observability Headers
+
+With `include_meta=headers`:
+
+| Header | Description |
+|--------|-------------|
+| `X-Lasso-Request-ID` | Lasso request tracking ID |
+| `X-Lasso-Meta` | Base64url-encoded routing metadata |
+
+## CORS
+
+All origins are allowed (`*`). Allowed headers:
+
+- `Content-Type`
+- `Authorization`
+- `X-Requested-With`
+- `X-Lasso-Provider`
+- `X-Lasso-Transport`
+- `X-Lasso-Api-Key`
+
+Preflight responses are cached for 24 hours.

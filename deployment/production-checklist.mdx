@@ -1,0 +1,657 @@
+---
+title: Production Checklist
+description: Pre-launch verification for production Lasso RPC deployments
+---
+
+Complete this checklist before deploying Lasso RPC to production. Each item ensures reliability, security, and observability.
+
+## Environment Configuration
+
+### Required Variables
+
+<Steps>
+  <Step title="SECRET_KEY_BASE">
+    **Purpose**: Phoenix signing/encryption secret for session security.
+    
+    **Generate**:
+    ```bash
+    mix phx.gen.secret
+    ```
+    
+    **Requirements**:
+    - Minimum 64 bytes
+    - Keep secret (never commit to version control)
+    - Use same value across all nodes in a cluster
+    
+    **Set**:
+    ```bash
+    export SECRET_KEY_BASE="your-64-byte-secret-here"
+    ```
+    
+    **Validation**:
+    ```bash
+    echo $SECRET_KEY_BASE | wc -c
+    # Should output 64 or more
+    ```
+  </Step>
+  
+  <Step title="PHX_HOST">
+    **Purpose**: Public hostname for URL generation and CORS.
+    
+    **Set**:
+    ```bash
+    export PHX_HOST="rpc.example.com"
+    ```
+    
+    **Examples**:
+    - Single region: `rpc.example.com`
+    - Multi-region: `us-east-1.rpc.example.com`, `eu-west-1.rpc.example.com`
+    
+    **Validation**:
+    ```bash
+    curl https://$PHX_HOST/api/health
+    ```
+  </Step>
+  
+  <Step title="PHX_SERVER">
+    **Purpose**: Start the HTTP server (required for releases).
+    
+    **Set**:
+    ```bash
+    export PHX_SERVER="true"
+    ```
+    
+    **Note**: Automatically set in Dockerfile. Verify in non-Docker deployments.
+  </Step>
+  
+  <Step title="LASSO_NODE_ID">
+    **Purpose**: Unique, stable identifier for this node.
+    
+    **Set**:
+    ```bash
+    export LASSO_NODE_ID="us-east-1"
+    ```
+    
+    **Requirements**:
+    - Unique per node
+    - Stable (don't change after deployment)
+    - Convention: use region names for geo-distributed deployments
+    
+    **Examples**:
+    - `us-east-1`, `eu-west-1`, `ap-southeast-1` (cloud regions)
+    - `iad`, `lhr`, `sin` (datacenter codes)
+    - `production-1`, `staging-1` (environment-based)
+  </Step>
+  
+  <Step title="PORT (optional)">
+    **Purpose**: HTTP listener port.
+    
+    **Default**: `4000`
+    
+    **Set custom port**:
+    ```bash
+    export PORT="8080"
+    ```
+  </Step>
+</Steps>
+
+### Provider API Keys
+
+<Steps>
+  <Step title="Identify required providers">
+    Review your profile YAML files for `${ENV_VAR}` placeholders:
+    
+    ```bash
+    grep -r '${' config/profiles/
+    ```
+    
+    Example output:
+    ```yaml
+    url: "https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+    url: "https://mainnet.infura.io/v3/${INFURA_API_KEY}"
+    ```
+  </Step>
+  
+  <Step title="Set provider API keys">
+    ```bash
+    export ALCHEMY_API_KEY="your-alchemy-key"
+    export INFURA_API_KEY="your-infura-key"
+    export QUICKNODE_API_KEY="your-quicknode-key"
+    ```
+  </Step>
+  
+  <Step title="Validate startup">
+    Lasso crashes at startup if `${ENV_VAR}` placeholders are unresolved.
+    
+    Test locally:
+    ```bash
+    mix phx.server
+    # Should start without errors
+    ```
+  </Step>
+</Steps>
+
+### Clustering (Optional)
+
+<Steps>
+  <Step title="Set clustering variables (if clustering)">
+    ```bash
+    export CLUSTER_DNS_QUERY="lasso.internal"
+    export CLUSTER_NODE_BASENAME="lasso"
+    ```
+    
+    **Note**: Both must be set for clustering to activate. Omit both for standalone mode.
+  </Step>
+  
+  <Step title="Verify DNS resolution">
+    ```bash
+    dig $CLUSTER_DNS_QUERY
+    # Should return all node IPs
+    ```
+  </Step>
+  
+  <Step title="Test node connectivity">
+    ```bash
+    # Test EPMD port
+    telnet <other-node-ip> 4369
+    ```
+  </Step>
+</Steps>
+
+## Profile Configuration
+
+### Validate Profile YAML
+
+<Steps>
+  <Step title="Check profile syntax">
+    ```bash
+    # Validate YAML syntax
+    for f in config/profiles/*.yml; do
+      echo "Validating $f"
+      ruby -ryaml -e "YAML.load_file('$f')" || echo "ERROR in $f"
+    done
+    ```
+  </Step>
+  
+  <Step title="Verify required fields">
+    Each profile must have:
+    - `name`: Display name
+    - `slug`: URL-safe identifier
+    - `chains`: At least one chain with providers
+    
+    ```yaml
+    name: "Production"
+    slug: "production"
+    chains:
+      ethereum:
+        chain_id: 1
+        providers:
+          - id: "alchemy_ethereum"
+            url: "https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+    ```
+  </Step>
+  
+  <Step title="Test profile loading">
+    ```bash
+    # Start server and check logs
+    mix phx.server
+    
+    # Should see:
+    # [info] Loaded profile: production
+    ```
+  </Step>
+</Steps>
+
+### Rate Limits
+
+<Steps>
+  <Step title="Configure rate limits">
+    Set appropriate rate limits in profile frontmatter:
+    
+    ```yaml
+    # config/profiles/production.yml
+    default_rps_limit: 100    # Requests per second per client IP
+    default_burst_limit: 500  # Burst allowance
+    ```
+  </Step>
+  
+  <Step title="Test rate limiting">
+    ```bash
+    # Generate load
+    for i in {1..150}; do
+      curl http://localhost:4000/rpc/fastest/ethereum \
+        -X POST \
+        -H "Content-Type: application/json" \
+        -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' &
+    done
+    
+    # Should see 429 Too Many Requests after exceeding limit
+    ```
+  </Step>
+</Steps>
+
+## Health Checks
+
+### Configure Health Endpoint
+
+<Steps>
+  <Step title="Test health endpoint">
+    ```bash
+    curl http://localhost:4000/api/health
+    # Should return 200 OK with JSON response
+    ```
+  </Step>
+  
+  <Step title="Configure orchestrator health checks">
+    **Kubernetes**:
+    ```yaml
+    livenessProbe:
+      httpGet:
+        path: /api/health
+        port: 4000
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+    
+    readinessProbe:
+      httpGet:
+        path: /api/health
+        port: 4000
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      timeoutSeconds: 3
+      failureThreshold: 2
+    ```
+    
+    **Docker**:
+    ```dockerfile
+    HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=40s \
+      CMD curl -f http://localhost:4000/api/health || exit 1
+    ```
+    
+    **Docker Compose**:
+    ```yaml
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    ```
+  </Step>
+</Steps>
+
+## TLS/HTTPS
+
+### Terminate TLS at Load Balancer
+
+<Steps>
+  <Step title="Configure reverse proxy">
+    Lasso serves HTTP. Terminate TLS at your reverse proxy or load balancer.
+    
+    **nginx**:
+    ```nginx
+    server {
+      listen 443 ssl http2;
+      server_name rpc.example.com;
+      
+      ssl_certificate /path/to/cert.pem;
+      ssl_certificate_key /path/to/key.pem;
+      
+      location / {
+        proxy_pass http://lasso-backend:4000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+      }
+    }
+    ```
+    
+    **Cloud Load Balancers**:
+    - AWS ALB: Configure HTTPS listener with ACM certificate
+    - GCP Load Balancer: Use Google-managed certificates
+    - Azure Application Gateway: Configure SSL termination
+  </Step>
+  
+  <Step title="Set PHX_HOST to HTTPS domain">
+    ```bash
+    export PHX_HOST="rpc.example.com"
+    export PHX_SCHEME="https"  # Optional, defaults to https in prod
+    ```
+  </Step>
+  
+  <Step title="Test HTTPS">
+    ```bash
+    curl https://rpc.example.com/api/health
+    ```
+  </Step>
+</Steps>
+
+## Logging
+
+### Structured JSON Logs
+
+<Steps>
+  <Step title="Verify JSON logging">
+    Lasso emits structured JSON logs in production.
+    
+    Example log:
+    ```json
+    {
+      "event": "rpc.request.completed",
+      "request_id": "abc123",
+      "strategy": "fastest",
+      "chain": "ethereum",
+      "jsonrpc_method": "eth_blockNumber",
+      "routing": {
+        "selected_provider": {"id": "alchemy_ethereum"},
+        "retries": 0
+      },
+      "timing": {
+        "upstream_latency_ms": 120,
+        "end_to_end_latency_ms": 125
+      },
+      "timestamp": "2026-03-03T10:30:45.123Z"
+    }
+    ```
+  </Step>
+  
+  <Step title="Configure log aggregation">
+    Send logs to a centralized logging service:
+    
+    **Docker**:
+    ```yaml
+    services:
+      lasso:
+        logging:
+          driver: "json-file"
+          options:
+            max-size: "10m"
+            max-file: "3"
+    ```
+    
+    **Kubernetes**:
+    ```yaml
+    # Logs automatically collected by cluster logging (Fluentd, etc.)
+    ```
+    
+    **Systemd**:
+    ```bash
+    journalctl -u lasso -f --output=json
+    ```
+  </Step>
+  
+  <Step title="Set up log monitoring">
+    Create alerts for:
+    - High error rates
+    - Circuit breaker openings
+    - Provider failures
+    - Slow response times (P95/P99)
+  </Step>
+</Steps>
+
+## Monitoring
+
+### Dashboard Access
+
+<Steps>
+  <Step title="Verify dashboard">
+    ```bash
+    curl http://localhost:4000/dashboard
+    # Should return HTML (200 OK)
+    ```
+  </Step>
+  
+  <Step title="Secure dashboard access (production)">
+    The dashboard is public by default. Consider:
+    
+    **Option 1: Restrict via reverse proxy**
+    ```nginx
+    location /dashboard {
+      auth_basic "Lasso Dashboard";
+      auth_basic_user_file /etc/nginx/.htpasswd;
+      proxy_pass http://lasso-backend:4000;
+    }
+    ```
+    
+    **Option 2: Firewall rules**
+    Only allow dashboard access from internal IPs.
+    
+    **Option 3: VPN requirement**
+    Require VPN connection for dashboard access.
+  </Step>
+</Steps>
+
+### Metrics Collection
+
+<Steps>
+  <Step title="Enable VM metrics (if needed)">
+    VM metrics (BEAM stats) are enabled by default.
+    
+    Disable if not needed:
+    ```bash
+    export LASSO_VM_METRICS_ENABLED="false"
+    ```
+  </Step>
+  
+  <Step title="Monitor key metrics">
+    Track these metrics:
+    
+    **Request metrics**:
+    - Requests per second (total and per provider)
+    - Latency (P50, P95, P99)
+    - Error rate
+    - Circuit breaker state
+    
+    **System metrics**:
+    - CPU usage
+    - Memory usage
+    - BEAM scheduler utilization
+    - Process count
+    
+    **Provider metrics**:
+    - Provider availability
+    - Provider latency
+    - Circuit breaker trips
+    - Failover rate
+  </Step>
+</Steps>
+
+## Network & Firewall
+
+### Port Configuration
+
+<Steps>
+  <Step title="Open required ports">
+    **Single node**:
+    - 4000 (HTTP, configurable via `PORT`)
+    
+    **Clustered nodes**:
+    - 4000 (HTTP)
+    - 4369 (EPMD)
+    - 9000-9999 (Erlang distribution, configurable)
+  </Step>
+  
+  <Step title="Configure firewall rules">
+    **HTTP (4000)**:
+    - Allow: Public (or application subnets)
+    
+    **EPMD (4369) and distribution ports**:
+    - Allow: Only cluster nodes (internal network)
+    - Deny: Public internet
+  </Step>
+</Steps>
+
+## Capacity Planning
+
+### Resource Allocation
+
+<Steps>
+  <Step title="Estimate request volume">
+    Calculate expected requests per second (RPS):
+    
+    Example:
+    - 1000 users
+    - 10 requests per user per minute
+    - = 167 RPS
+    
+    Add 2x headroom: **334 RPS**
+  </Step>
+  
+  <Step title="Size compute resources">
+    **CPU**:
+    - 1 vCPU per 500 RPS (approximate)
+    - Example: 334 RPS → 2 vCPUs
+    
+    **Memory**:
+    - Base: 512MB
+    - Add 256MB per 1000 RPS
+    - Example: 334 RPS → 1GB
+    
+    **Disk**:
+    - Minimal (logs only, unless persisting metrics)
+    - 10GB should suffice
+  </Step>
+  
+  <Step title="Test under load">
+    Use load testing tools:
+    
+    ```bash
+    # Example with Apache Bench
+    ab -n 10000 -c 100 -p request.json -T application/json \
+      http://localhost:4000/rpc/fastest/ethereum
+    ```
+    
+    Monitor:
+    - Response time (P95, P99)
+    - Error rate
+    - CPU/memory usage
+  </Step>
+</Steps>
+
+## Disaster Recovery
+
+### Backup Configuration
+
+<Steps>
+  <Step title="Backup profile files">
+    ```bash
+    # Backup profiles
+    tar -czf lasso-profiles-backup.tar.gz config/profiles/
+    ```
+  </Step>
+  
+  <Step title="Document environment variables">
+    Store environment configuration in a secure secrets manager:
+    - AWS Secrets Manager
+    - HashiCorp Vault
+    - Kubernetes Secrets
+  </Step>
+</Steps>
+
+### Failover Testing
+
+<Steps>
+  <Step title="Test provider failover">
+    ```bash
+    # Simulate provider failure by blocking traffic
+    iptables -A OUTPUT -d <provider-ip> -j DROP
+    
+    # Verify requests failover to next provider
+    curl -X POST http://localhost:4000/rpc/fastest/ethereum?include_meta=body \
+      -H "Content-Type: application/json" \
+      -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+    
+    # Check lasso_meta.selected_provider.id in response
+    ```
+  </Step>
+  
+  <Step title="Test node failure (if clustered)">
+    ```bash
+    # Stop one node
+    docker stop lasso-us-east-1
+    
+    # Verify:
+    # - Dashboard shows node as :disconnected
+    # - Applications route to remaining nodes
+    # - Metrics exclude failed node
+    ```
+  </Step>
+</Steps>
+
+## Pre-Launch Checklist
+
+Complete verification before production launch:
+
+### Environment
+
+- [ ] `SECRET_KEY_BASE` set (64+ bytes)
+- [ ] `PHX_HOST` set to public hostname
+- [ ] `PHX_SERVER=true` set
+- [ ] `LASSO_NODE_ID` set to unique, stable value
+- [ ] `PORT` configured (if not using 4000)
+- [ ] Provider API keys set for all `${ENV_VAR}` in profiles
+- [ ] If clustering: `CLUSTER_DNS_QUERY` and `CLUSTER_NODE_BASENAME` set
+- [ ] If clustering: DNS resolution verified
+- [ ] If clustering: Erlang distribution ports open between nodes
+
+### Configuration
+
+- [ ] Profile YAML validated (no syntax errors)
+- [ ] Profile YAML startup tested (no unresolved `${ENV_VAR}`)
+- [ ] Rate limits configured in profile frontmatter
+- [ ] Provider capabilities defined (or defaults accepted)
+- [ ] Circuit breaker thresholds reviewed (or defaults accepted)
+
+### Infrastructure
+
+- [ ] Health check (`GET /api/health`) monitored by orchestrator/LB
+- [ ] TLS terminated at reverse proxy or load balancer
+- [ ] Firewall rules configured (4000 public, 4369/9000+ internal only)
+- [ ] Load balancer configured (if multiple nodes per region)
+- [ ] GeoDNS/anycast configured (if multi-region)
+
+### Observability
+
+- [ ] Structured JSON logs verified
+- [ ] Log aggregation configured (Fluentd, CloudWatch, etc.)
+- [ ] Dashboard access secured (auth, VPN, or internal-only)
+- [ ] Metrics monitoring configured (CPU, memory, RPS, latency)
+- [ ] Alerts configured (high error rate, circuit breaker, slow response)
+
+### Testing
+
+- [ ] Load testing completed (verify RPS capacity)
+- [ ] Provider failover tested (circuit breaker triggers correctly)
+- [ ] Rate limiting tested (429 responses after exceeding limit)
+- [ ] If clustered: Node failure tested (dashboard shows :disconnected)
+- [ ] If multi-region: Regional failover tested (GeoDNS/LB routes correctly)
+
+### Documentation
+
+- [ ] Runbook created (restart procedures, troubleshooting)
+- [ ] Environment variables documented in secrets manager
+- [ ] Profile configuration backed up
+- [ ] On-call team trained (dashboard usage, common issues)
+
+## Post-Launch Monitoring
+
+Monitor these metrics in the first 24-48 hours:
+
+1. **Request volume**: Verify within expected range
+2. **Error rate**: Should be &lt;1%
+3. **Latency**: P95/P99 within acceptable thresholds
+4. **Circuit breaker trips**: Investigate any provider issues
+5. **Memory/CPU**: Verify resources are adequate
+6. **Log errors**: Review for unexpected issues
+
+## Next Steps
+
+- [Docker Deployment](/deployment/docker) - Containerized deployment guide
+- [Clustering](/deployment/clustering) - Multi-node setup
+- [Geo-Distributed](/deployment/geo-distributed) - Multi-region architecture

@@ -1,0 +1,65 @@
+---
+title: Routing and failure semantics
+description: Understand provider eligibility, strategies, health tiers, attempts, and fallback
+---
+
+# Routing and failure semantics
+
+For each request, Lasso builds an eligible provider set and attempts providers
+in a health-aware order:
+
+1. **Capability filter:** remove providers that cannot serve the chain, method,
+   transport, coarse archival requirement, or configured request limits. The
+   current archive model does not express arbitrary provider history depth.
+2. **Strategy ranking:** order or sample the remaining providers according to
+   the requested strategy.
+3. **Health tiering:** prefer closed, non-rate-limited providers over degraded
+   tiers. Open circuits are excluded.
+4. **Execution:** try providers sequentially until one returns an acceptable
+   response or the candidates are exhausted.
+
+This order matters. A strategy chooses within the eligible, similarly healthy
+set; it does not force traffic to an unhealthy or incapable provider.
+
+## Strategies
+
+The runtime default is `load-balanced`. During an evaluation, include a strategy
+segment explicitly so the integration does not depend on an implicit default.
+
+| Strategy | Behavior | Use it when |
+| --- | --- | --- |
+| `load-balanced` | Randomizes providers within the same health tier. | Comparable providers should share first attempts and quota. |
+| `latency-weighted` | Samples probabilistically using latency, success, confidence, and exploration weight. | You want a performance bias without always selecting one provider. |
+| `fastest` | Ranks measured latency by provider, method, and transport. | Latency matters enough to accept traffic concentration. |
+
+“Load-balanced” does not guarantee an even split across all configured
+providers. If only one provider is in the healthiest tier, it can receive nearly
+all first attempts. Likewise, `fastest` can converge heavily on one provider for
+one method while choosing another provider for a different method or transport.
+
+## Failover
+
+Lasso advances to the next eligible provider for failures classified as safe to
+retry. It returns `503` when no eligible attempt can serve the request. The
+number of providers in a profile is therefore not itself a guarantee: providers
+must overlap on the requested capability and remain in usable health states.
+
+System profiles can have ordered fallback phases. Premium is designed to fall
+back to public after premium-provider exhaustion so an eligible request has the
+greatest chance to succeed. The request retains its authorized service-profile
+identity even when an internal fallback phase serves it. Custom profiles do not
+implicitly borrow a different account's providers.
+
+Provider-override routes are diagnostic: they select one explicit provider and
+do not use cross-profile fallback.
+
+## What failover does not imply
+
+Failover does not make provider-local state portable. A filter ID created by one
+provider, an application-managed transaction sequence, or a provider-specific
+extension can require affinity or application recovery. Read
+[RPC workload behavior](rpc-behavior) before treating those workloads like
+stateless reads.
+
+For implementation-level algorithms and tuning, see RPC Core's
+[provider selection](../concepts/provider-selection).

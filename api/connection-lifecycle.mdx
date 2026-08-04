@@ -1,0 +1,384 @@
+---
+title: Connection Lifecycle
+description: WebSocket connection management, heartbeats, timeouts, and session duration
+---
+
+Lasso WebSocket connections include robust lifecycle management with heartbeat monitoring, automatic timeout handling, and configurable session limits.
+
+## Connection Establishment
+
+WebSocket connections are established via standard WebSocket handshake:
+
+```bash
+wscat -c 'ws://localhost:4000/ws/rpc/ethereum?key=lasso_abc123'
+```
+
+Once connected, the connection remains open for bidirectional communication until:
+- The client closes the connection
+- The server detects inactivity (heartbeat timeout)
+- The maximum session duration is reached
+- An error occurs
+
+## Heartbeat Mechanism
+
+Lasso implements WebSocket ping/pong heartbeats to detect dead connections and ensure connection health.
+
+### Heartbeat Configuration
+
+| Parameter | Value | Description |
+|-----------|-------|-------------||
+| **Heartbeat Interval** | 30 seconds | Server sends ping every 30 seconds |
+| **Pong Timeout** | 5 seconds | Client must respond with pong within 5 seconds |
+| **Max Missed Heartbeats** | 2 | Connection closed after 2 missed pongs |
+
+### Heartbeat Flow
+
+1. **Server sends ping** (every 30 seconds)
+   ```
+   Server → Client: WebSocket PING frame
+   ```
+
+2. **Client responds with pong** (within 5 seconds)
+   ```
+   Client → Server: WebSocket PONG frame
+   ```
+
+3. **Timeout detection**
+   - If pong not received within 5 seconds, missed heartbeat counter increments
+   - After 2 missed heartbeats (10 seconds total), connection is closed
+
+4. **Connection closure**
+   ```
+   Server → Client: Close frame (code 1002: Protocol Error)
+   Reason: "Heartbeat timeout - no pong responses"
+   ```
+
+### Heartbeat Timeline
+
+```
+Time    Event
+0s      Connection established, heartbeat timer started
+30s     Server sends ping #1
+35s     Client responds with pong (success)
+60s     Server sends ping #2
+65s     Client responds with pong (success)
+90s     Server sends ping #3
+95s     No pong received - missed heartbeat count: 1
+96s     Server sends ping #4 (retry)
+101s    No pong received - missed heartbeat count: 2
+101s    Connection closed (too many missed heartbeats)
+```
+
+### Client-Initiated Pings
+
+Clients can also send ping frames to the server. Lasso responds with pong:
+
+```
+Client → Server: WebSocket PING frame
+Server → Client: WebSocket PONG frame
+```
+
+Client pings don't reset the server's heartbeat timer, but they do confirm bidirectional connectivity.
+
+## Session Duration
+
+WebSocket connections have a maximum session duration:
+
+| Parameter | Value |
+|-----------|-------|
+| **Maximum Session Duration** | 2 hours (7,200,000 ms) |
+
+### Session Timeout Behavior
+
+After 2 hours, the server closes the connection:
+
+```
+Server → Client: Close frame (code 1000: Normal Closure)
+Reason: "Session timeout"
+```
+
+Clients should reconnect and re-establish subscriptions after session timeout.
+
+## Timeout Summary
+
+| Timeout Type | Duration | Behavior |
+|--------------|----------|----------|
+| Heartbeat interval | 30s | Server sends ping |
+| Pong timeout | 5s | Wait for pong response |
+| Missed heartbeat tolerance | 2 missed pongs | Close connection |
+| Maximum session | 2 hours | Close connection |
+| Total heartbeat failure time | ~10s | Time from first missed pong to closure |
+
+## Connection Closure
+
+### Server-Initiated Closure
+
+The server closes connections in these scenarios:
+
+| Reason | WebSocket Code | Message |
+|--------|----------------|---------||
+| Heartbeat timeout | 1002 (Protocol Error) | "Heartbeat timeout - no pong responses" |
+| Session timeout | 1000 (Normal Closure) | "Session timeout" |
+| Rate limit exceeded | 1008 (Policy Violation) | "Rate limit exceeded" |
+| Internal error | 1011 (Internal Error) | Error details |
+
+### Client-Initiated Closure
+
+Clients can close connections at any time:
+
+```javascript
+webSocket.close(1000, "Client closing connection");
+```
+
+When the connection closes, all active subscriptions are automatically cleaned up.
+
+## Reconnection Strategy
+
+Clients should implement reconnection logic to handle disconnections:
+
+```javascript
+let ws;
+let reconnectAttempts = 0;
+const maxReconnectAttempts = 5;
+const reconnectDelay = 1000; // Start with 1s
+
+function connect() {
+  ws = new WebSocket('ws://localhost:4000/ws/rpc/ethereum?key=lasso_abc123');
+  
+  ws.on('open', () => {
+    console.log('Connected');
+    reconnectAttempts = 0;
+    
+    // Re-subscribe to all active subscriptions
+    resubscribe();
+  });
+  
+  ws.on('close', (code, reason) => {
+    console.log(`Disconnected: ${code} - ${reason}`);
+    
+    // Attempt reconnection with exponential backoff
+    if (reconnectAttempts < maxReconnectAttempts) {
+      const delay = reconnectDelay * Math.pow(2, reconnectAttempts);
+      reconnectAttempts++;
+      
+      console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttempts})`);
+      setTimeout(connect, delay);
+    } else {
+      console.error('Max reconnection attempts reached');
+    }
+  });
+  
+  ws.on('error', (error) => {
+    console.error('WebSocket error:', error);
+  });
+}
+
+connect();
+```
+
+## Subscription Cleanup
+
+When a connection closes, Lasso automatically:
+
+1. Unsubscribes all active subscriptions for that connection
+2. Releases upstream provider subscriptions
+3. Cleans up internal subscription tracking
+
+Clients don't need to manually unsubscribe before closing connections, but explicit unsubscription is cleaner:
+
+```javascript
+ws.on('beforeunload', async () => {
+  // Explicitly unsubscribe
+  for (const subId of activeSubscriptions) {
+    await unsubscribe(subId);
+  }
+  
+  // Then close connection
+  ws.close(1000, "Client shutdown");
+});
+```
+
+## Keepalive Best Practices
+
+### For Clients
+
+1. **Respond to pings promptly**
+   - Most WebSocket libraries handle ping/pong automatically
+   - Ensure your client doesn't block pong responses
+
+2. **Monitor connection health**
+   ```javascript
+   let lastPing = Date.now();
+   
+   ws.on('ping', () => {
+     lastPing = Date.now();
+   });
+   
+   // Detect stale connections
+   setInterval(() => {
+     if (Date.now() - lastPing > 45000) {
+       console.warn('No ping received in 45s, connection may be dead');
+       ws.close();
+       connect();
+     }
+   }, 10000);
+   ```
+
+3. **Handle session timeouts gracefully**
+   ```javascript
+   ws.on('close', (code, reason) => {
+     if (code === 1000 && reason.includes('Session timeout')) {
+       console.log('Session expired, reconnecting...');
+       connect();
+     }
+   });
+   ```
+
+### For Long-Running Connections
+
+1. **Plan for session expiration**
+   - Connections close after 2 hours
+   - Implement automatic reconnection
+   - Re-establish subscriptions on reconnect
+
+2. **Monitor heartbeat status**
+   ```javascript
+   let heartbeatsMissed = 0;
+   let heartbeatTimer;
+   
+   ws.on('ping', () => {
+     heartbeatsMissed = 0;
+     clearTimeout(heartbeatTimer);
+     
+     // Expect next ping within 35s (30s interval + 5s buffer)
+     heartbeatTimer = setTimeout(() => {
+       heartbeatsMissed++;
+       if (heartbeatsMissed >= 2) {
+         console.error('Multiple heartbeats missed, reconnecting');
+         ws.close();
+         connect();
+       }
+     }, 35000);
+   });
+   ```
+
+3. **Implement exponential backoff**
+   - Use exponential backoff for reconnection attempts
+   - Add jitter to prevent thundering herd
+   - Cap maximum delay (e.g., 30 seconds)
+
+## Connection Monitoring
+
+Monitor connection health using these indicators:
+
+### Client-Side Monitoring
+
+```javascript
+const connectionStats = {
+  connected: false,
+  lastPing: null,
+  lastPong: null,
+  missedHeartbeats: 0,
+  reconnectAttempts: 0,
+  uptime: 0,
+  connectionStartTime: null
+};
+
+ws.on('open', () => {
+  connectionStats.connected = true;
+  connectionStats.connectionStartTime = Date.now();
+  connectionStats.reconnectAttempts = 0;
+});
+
+ws.on('ping', () => {
+  connectionStats.lastPing = Date.now();
+  connectionStats.missedHeartbeats = 0;
+});
+
+ws.on('pong', () => {
+  connectionStats.lastPong = Date.now();
+});
+
+ws.on('close', () => {
+  connectionStats.connected = false;
+  connectionStats.uptime = Date.now() - connectionStats.connectionStartTime;
+});
+
+// Periodic health check
+setInterval(() => {
+  const now = Date.now();
+  const timeSinceLastPing = connectionStats.lastPing ? now - connectionStats.lastPing : null;
+  
+  if (timeSinceLastPing > 45000) {
+    console.warn('Connection appears stale');
+  }
+}, 10000);
+```
+
+### Server-Side Telemetry
+
+Lasso emits telemetry events for connection lifecycle:
+
+- `[:lasso, :websocket, :connected]` - Connection established
+- `[:lasso, :websocket, :disconnected]` - Connection closed
+- `[:lasso, :websocket, :heartbeat, :timeout]` - Heartbeat timeout
+- `[:lasso, :websocket, :session, :timeout]` - Session timeout
+
+## Error Scenarios
+
+### Network Interruption
+
+If network connectivity is lost:
+
+1. Client's TCP connection breaks
+2. Client receives connection close event
+3. Client should reconnect with exponential backoff
+
+### Firewall/Proxy Timeout
+
+Some firewalls/proxies close idle connections:
+
+- Lasso's 30-second heartbeat prevents most timeouts
+- If your proxy has a shorter timeout, connections may close unexpectedly
+- Implement reconnection logic to handle this
+
+### Server Restart
+
+During server maintenance:
+
+1. Server sends close frame (code 1001: Going Away)
+2. All connections close gracefully
+3. Clients should reconnect after a brief delay
+
+## WebSocket Frame Reference
+
+### Ping Frame
+
+```
+Frame Type: PING (0x9)
+Payload: Empty or arbitrary data
+Direction: Server → Client (or Client → Server)
+```
+
+### Pong Frame
+
+```
+Frame Type: PONG (0xA)
+Payload: Echo of ping payload
+Direction: Client → Server (or Server → Client)
+```
+
+### Close Frame
+
+```
+Frame Type: CLOSE (0x8)
+Payload: Status code (2 bytes) + reason (UTF-8 string)
+Direction: Bidirectional
+```
+
+Common close codes:
+- `1000` - Normal closure
+- `1001` - Going away (server shutdown)
+- `1002` - Protocol error
+- `1008` - Policy violation (rate limit)
+- `1011` - Internal server error

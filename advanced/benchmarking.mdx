@@ -1,0 +1,456 @@
+---
+title: 'Performance Benchmarking'
+description: 'Passive latency measurement per-chain, per-method, per-transport for intelligent provider selection'
+---
+
+## Overview
+
+Lasso's benchmarking system measures RPC performance passively by recording metrics from production traffic. The system tracks latency, success rates, and error patterns per provider, per method, and per transport to enable intelligent routing decisions.
+
+## Architecture
+
+### BenchmarkStore
+
+GenServer managing performance benchmarking data using ETS tables.
+
+Location: `Lasso.Benchmarking.BenchmarkStore`
+
+**Key Features:**
+- Per-(profile, chain) ETS tables for isolated metrics
+- Dual timestamp tracking (monotonic + system)
+- Automatic cleanup of stale data (24-hour retention)
+- Method-specific latency percentiles (P50, P90, P95, P99)
+- Profile-scoped isolation for multi-tenancy
+
+### ETS Table Structure
+
+**RPC Metrics Table** (bag table):
+
+```elixir
+# Table name: :rpc_metrics_{profile}_{chain}
+# Entry format:
+{monotonic_ts, system_ts, provider_id, method, duration_ms, result}
+
+# Example:
+{1736894871234, 1736894871000, "infura", "eth_getLogs", 150, :success}
+```
+
+**Score Table** (set table):
+
+```elixir
+# Table name: :provider_scores_{profile}_{chain}
+# Key: {provider_id, method, :rpc}
+# Value: {successes, total, avg_duration, recent_latencies, monotonic_ts, system_ts}
+
+# Example:
+{{"alchemy", "eth_getBlockByNumber", :rpc},
+ 245, 250, 125.5, [120, 130, 125, ...], 1736894871234, 1736894871000}
+```
+
+### Dual Timestamp Strategy
+
+**Monotonic Timestamp** (`System.monotonic_time(:millisecond)`):
+- For internal calculations (cleanup, time windows)
+- Not affected by NTP adjustments or clock skew
+- Guarantees monotonically increasing values
+
+**System Timestamp** (`System.system_time(:millisecond)`):
+- For display, logging, and external APIs
+- Human-readable (maps to wall-clock time)
+- May jump forward/backward due to NTP
+
+**Rationale**: Cleanup and time-window queries use monotonic timestamps to avoid bugs from clock adjustments, while system timestamps provide human-readable context.
+
+## Passive Measurement
+
+Benchmarking occurs automatically on every RPC request:
+
+```elixir
+# After request completes (success or error)
+BenchmarkStore.record_rpc_call(
+  profile,
+  chain_name,
+  provider_id,
+  method,
+  duration_ms,
+  result  # :success | :error | :timeout | :rate_limit | ...
+)
+```
+
+**Captured at call site** (timestamps synchronized):
+- `monotonic_ts = System.monotonic_time(:millisecond)`
+- `system_ts = System.system_time(:millisecond)`
+
+**Benefits:**
+- Zero test traffic overhead
+- Reflects real-world usage patterns
+- Captures method-specific performance
+- Includes all error categories
+
+## Per-Method Tracking
+
+Each `(provider_id, method)` combination is tracked independently:
+
+### Metrics Tracked
+
+**Latency Statistics:**
+- Average duration (moving average)
+- Percentiles: P50, P90, P95, P99 (from 100 most recent samples)
+
+**Success Metrics:**
+- Total calls
+- Successful calls
+- Success rate (ratio)
+
+**Error Breakdown:**
+- By category: `:timeout`, `:rate_limit`, `:network_error`, etc.
+- Error counts per category
+
+**Temporal Data:**
+- Last updated timestamp
+- Sample count
+- Hourly statistics
+
+### Score Calculation
+
+```elixir
+def calculate_rpc_provider_score(success_rate, avg_latency_ms, total_calls) do
+  confidence_factor = :math.log10(max(total_calls, 1))
+  latency_factor = if avg_latency_ms > 0, do: 1000 / (1000 + avg_latency_ms), else: 1.0
+  success_rate * latency_factor * confidence_factor
+end
+```
+
+**Components:**
+
+1. **Success Rate** (0.0 - 1.0): Higher is better
+2. **Latency Factor** (0.0 - 1.0): Asymptotic function where 0ms → 1.0, 1000ms → 0.5
+3. **Confidence Factor** (log10): More calls → higher confidence (10 calls → 1.0, 100 calls → 2.0, 1000 calls → 3.0)
+
+**Result**: Composite score balancing speed, reliability, and statistical confidence.
+
+### Percentile Calculation
+
+```elixir
+def calculate_percentiles(latencies) when is_list(latencies) do
+  sorted = Enum.sort(latencies)
+  count = length(sorted)
+  
+  p50_index = max(0, round(count * 0.5) - 1)
+  p90_index = max(0, round(count * 0.9) - 1)
+  p95_index = max(0, round(count * 0.95) - 1)
+  p99_index = max(0, round(count * 0.99) - 1)
+  
+  %{
+    p50: Enum.at(sorted, p50_index, 0),
+    p90: Enum.at(sorted, p90_index, 0),
+    p95: Enum.at(sorted, p95_index, 0),
+    p99: Enum.at(sorted, p99_index, 0)
+  }
+end
+```
+
+**Sample Window**: 100 most recent successful requests per `(provider, method)` combination.
+
+**Usage**: Provider selection strategies (`:fastest`, `:latency_weighted`) use percentiles for robust latency estimates.
+
+## Provider Selection Integration
+
+### Strategy: `:fastest`
+
+Selects provider with lowest average latency for the specific method:
+
+```elixir
+# Lookup method performance for all candidates
+performance_data = BenchmarkStore.get_all_method_performance(profile, chain)
+
+# Filter by method
+method_data = Enum.filter(performance_data, fn entry ->
+  entry.method == method
+end)
+
+# Sort by average latency (ascending)
+ranked = Enum.sort_by(method_data, & &1.avg_duration_ms)
+
+# Select top provider
+best_provider = List.first(ranked)
+```
+
+### Strategy: `:latency_weighted`
+
+Weighted random selection using inverse latency as probability:
+
+```elixir
+# Calculate weights (inverse latency)
+weights = Enum.map(providers, fn p ->
+  latency = get_avg_latency(p, method) || 1000
+  weight = 1000 / (1000 + latency)
+  {p, weight}
+end)
+
+# Weighted random selection
+selected = weighted_random_choice(weights)
+```
+
+**Benefits:**
+- Distributes load across fast providers
+- Avoids overloading single "fastest" provider
+- Naturally adapts to performance changes
+
+### Strategy: `:load_balanced`
+
+Distributes requests across healthy providers with health-aware tiering (benchmarking used for health assessment).
+
+## Automatic Cleanup
+
+### Time-Based Cleanup
+
+Periodic cleanup removes stale entries:
+
+**Interval**: 1 hour (3,600,000ms)
+
+**Retention**: 24 hours (86,400,000ms)
+
+**Implementation**:
+
+```elixir
+def cleanup_rpc_table_by_monotonic_timestamp(table_name, cutoff_time) do
+  match_spec = [
+    {{:"$1", :_, :_, :_, :_, :_}, [{:<, :"$1", cutoff_time}], [true]}
+  ]
+  
+  deleted = :ets.select_delete(table_name, match_spec)
+  Logger.debug("Cleaned up #{deleted} old RPC entries from #{table_name}")
+end
+```
+
+Uses monotonic timestamp for reliable cleanup (immune to clock adjustments).
+
+### Size-Based Cleanup
+
+Enforces maximum table size to prevent unbounded growth:
+
+**Max Entries**: 86,400 per chain (~1 entry per second for 24 hours)
+
+**Check Interval**: 10 seconds
+
+**Overflow Strategy**:
+
+```elixir
+if current_size >= @max_entries_per_chain do
+  entries_to_remove = div(@max_entries_per_chain, 10)  # Remove 10%
+  
+  # Remove oldest entries
+  oldest_entries = 
+    table_name
+    |> :ets.tab2list()
+    |> Enum.sort_by(fn {monotonic_ts, _, _, _, _, _} -> monotonic_ts end)
+    |> Enum.take(entries_to_remove)
+  
+  Enum.each(oldest_entries, &:ets.delete_object(table_name, &1))
+end
+```
+
+**Rationale**: FIFO eviction preserves recent data while preventing memory exhaustion.
+
+## Cluster-Wide Aggregation
+
+When BEAM clustering is enabled, metrics are aggregated across nodes.
+
+Location: `LassoWeb.Dashboard.MetricsStore`
+
+### Aggregation Strategy
+
+**RPC Calls**:
+
+```elixir
+# Query all responding nodes
+node_results = :rpc.multicall(
+  responding_nodes,
+  BenchmarkStore,
+  :get_calls_in_window,
+  [profile, chain, 60],
+  5_000  # 5s timeout
+)
+
+# Sum call counts across nodes
+aggregated = Enum.reduce(node_results, %{}, fn node_data, acc ->
+  Map.merge(acc, node_data, fn _k, v1, v2 -> v1 + v2 end)
+end)
+```
+
+**Latency Percentiles**:
+
+```elixir
+# Weighted average by call volume
+weighted_avg_latency = 
+  (node1_calls * node1_avg + node2_calls * node2_avg) /
+  (node1_calls + node2_calls)
+```
+
+**Percentiles**: Cannot be aggregated accurately. Dashboard shows per-node percentiles.
+
+### Stale-While-Revalidate Caching
+
+**Cache TTL**: 15 seconds
+
+**RPC Timeout**: 5 seconds
+
+**Invalidation**: Automatic on node connect/disconnect
+
+```elixir
+case cache_lookup(key) do
+  {:hit, data, age} when age < 15_000 ->
+    # Fresh cache
+    {:ok, data, stale: false}
+  
+  {:hit, stale_data, _age} ->
+    # Serve stale while refreshing in background
+    Task.start(fn -> refresh_cache(key) end)
+    {:ok, stale_data, stale: true}
+  
+  :miss ->
+    # Blocking fetch
+    data = fetch_from_cluster()
+    cache_put(key, data)
+    {:ok, data, stale: false}
+end
+```
+
+## API Reference
+
+### Recording Metrics
+
+```elixir
+BenchmarkStore.record_rpc_call(
+  profile,      # "default"
+  chain_name,   # "ethereum"
+  provider_id,  # "alchemy"
+  method,       # "eth_getLogs"
+  duration_ms,  # 150
+  result        # :success | :error | :timeout | :rate_limit
+)
+```
+
+### Querying Performance Data
+
+```elixir
+# Provider leaderboard
+BenchmarkStore.get_provider_leaderboard("default", "ethereum")
+# => [
+#   %{provider_id: "alchemy", avg_latency_ms: 125, success_rate: 0.98, score: 2.85},
+#   %{provider_id: "infura", avg_latency_ms: 150, success_rate: 0.95, score: 2.42}
+# ]
+
+# Method-specific performance
+BenchmarkStore.get_rpc_method_performance("default", "ethereum", "eth_getLogs")
+# => %{
+#   method: "eth_getLogs",
+#   providers: [
+#     %{provider_id: "alchemy", avg_duration_ms: 180, success_rate: 0.97},
+#     %{provider_id: "infura", avg_duration_ms: 210, success_rate: 0.94}
+#   ]
+# }
+
+# Percentiles for provider + method
+BenchmarkStore.get_rpc_method_performance_with_percentiles(
+  "default", "ethereum", "alchemy", "eth_getLogs"
+)
+# => %{
+#   provider_id: "alchemy",
+#   method: "eth_getLogs",
+#   avg_duration_ms: 180,
+#   success_rate: 0.97,
+#   percentiles: %{p50: 150, p90: 250, p95: 300, p99: 450},
+#   total_calls: 1523
+# }
+```
+
+### Cluster Metrics
+
+```elixir
+# RPS calculation (60-second window)
+BenchmarkStore.get_calls_in_window("default", "ethereum", 60)
+# => %{"infura" => 150, "alchemy" => 200}
+
+# Cluster-wide aggregated leaderboard
+MetricsStore.get_provider_leaderboard("default", "ethereum")
+# => %{
+#   data: [...],
+#   coverage: %{responding: 3, total: 3},
+#   stale: false,
+#   timestamp: 1736894871234
+# }
+```
+
+## Telemetry Events
+
+Benchmarking does not emit telemetry directly (passive recording). Dashboard and selection logic query BenchmarkStore synchronously.
+
+## Memory Management
+
+**Estimation**:
+
+```elixir
+# Per entry size
+entry_size = 8 (ts) + 8 (ts) + 50 (provider_id) + 30 (method) + 8 (duration) + 8 (result)
+           ≈ 112 bytes
+
+# Max entries per chain
+max_memory = 86,400 entries * 112 bytes ≈ 9.7 MB per chain
+```
+
+**Multi-chain/profile**:
+
+```elixir
+# 5 profiles, 10 chains each
+total_memory ≈ 5 * 10 * 9.7 MB ≈ 485 MB (worst case)
+```
+
+**Actual usage** (compressed ETS tables):
+- Compression ratio: ~2-3x
+- Realistic memory: 150-250 MB for large deployments
+
+## Performance Characteristics
+
+**Recording Overhead:**
+- ETS insert: &lt;0.1ms
+- Score update: &lt;0.5ms
+- Total per request: &lt;1ms
+
+**Query Performance:**
+- Single provider lookup: &lt;0.5ms
+- Leaderboard (all providers): 2-5ms
+- Method performance (all providers): 3-8ms
+- Percentile calculation: 5-10ms (sorts 100 samples)
+
+**Cleanup Performance:**
+- Time-based cleanup: 10-50ms per chain
+- Size-based cleanup: 20-100ms (sorts full table)
+
+## Best Practices
+
+### For High-Traffic Deployments
+
+1. **Monitor table sizes**: Alert if approaching 86,400 entries before cleanup
+2. **Use cluster aggregation**: Share metrics across geo-distributed nodes
+3. **Cache leaderboard queries**: Refresh every 5-10 seconds, not per request
+
+### For Multi-Tenant Deployments
+
+1. **Profile isolation**: Each profile has independent metrics (no cross-contamination)
+2. **Per-profile cleanup**: Failed profile doesn't affect others
+3. **Resource limits**: Consider per-profile memory quotas
+
+### For Debugging Performance Issues
+
+1. **Check percentiles**: P99 latency reveals tail behavior
+2. **Compare methods**: Some methods naturally slower (eth_getLogs vs eth_blockNumber)
+3. **Track error rates**: High error rate may indicate provider issues, not latency
+4. **Monitor sample counts**: Low counts (&lt;10) mean insufficient data for reliable selection
+
+## Related Documentation
+
+- [Block Sync](/advanced/block-sync) - Lag metrics used alongside latency for selection
+- [Error Classification](/advanced/error-classification) - Error categories tracked in benchmarking
+- [WebSocket Subscriptions](/advanced/websocket-subscriptions) - Provider selection for failover uses benchmarking

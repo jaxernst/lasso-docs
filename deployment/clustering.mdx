@@ -1,0 +1,408 @@
+---
+title: Multi-Node Clustering
+description: Configure Lasso RPC clustering for aggregated observability across nodes
+---
+
+Clustering connects multiple Lasso nodes using Erlang distribution for unified observability. Each node operates independently for routing, but shares metrics and health data across the cluster.
+
+## Overview
+
+### What Clustering Provides
+
+- **Dashboard aggregation**: View metrics across all nodes in a single interface
+- **Per-region drill-down**: Compare provider performance by geographic region
+- **Cluster health monitoring**: Node status, region discovery, and topology visualization
+- **Circuit breaker visibility**: See breaker states across all nodes and regions
+
+### What Clustering Does NOT Affect
+
+- **Routing decisions**: Each node routes independently based on local latency
+- **Request hot path**: No cross-node coordination during request handling
+- **Circuit breakers**: Per-node state, no shared breaker coordination
+- **Provider selection**: Based on local measurements only
+
+Clustering is **purely for observability**. A single node works standalone without clustering.
+
+## Architecture
+
+Lasso uses `libcluster` with DNS-based node discovery:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Application (US-East)                                       │
+│ └─> Lasso Node (US-East)                                   │
+│     ├─> Routes based on local latency measurements         │
+│     └─> Shares metrics with cluster via BEAM distribution  │
+├─────────────────────────────────────────────────────────────┤
+│ Application (EU-West)                                       │
+│ └─> Lasso Node (EU-West)                                   │
+│     ├─> Routes based on local latency measurements         │
+│     └─> Shares metrics with cluster via BEAM distribution  │
+├─────────────────────────────────────────────────────────────┤
+│ Cluster Aggregation                                         │
+│ ├─> Topology monitoring (node health across regions)       │
+│ ├─> Regional metrics aggregation for dashboard             │
+│ └─> No impact on routing hot path                          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Configuration
+
+### Required Environment Variables
+
+Both variables must be set for clustering to activate:
+
+| Variable | Description | Example |
+|----------|-------------|----------|
+| `CLUSTER_DNS_QUERY` | DNS name resolving to all node IPs | `lasso.internal` |
+| `CLUSTER_NODE_BASENAME` | Erlang node basename for distribution | `lasso` |
+| `LASSO_NODE_ID` | Unique node identifier (typically region name) | `us-east-1` |
+
+If either `CLUSTER_DNS_QUERY` or `CLUSTER_NODE_BASENAME` is missing, the node runs standalone.
+
+### Configuration in runtime.exs
+
+The clustering configuration is loaded from environment variables:
+
+```elixir
+# config/runtime.exs
+with dns_query when is_binary(dns_query) <- System.get_env("CLUSTER_DNS_QUERY"),
+     node_basename when is_binary(node_basename) <- System.get_env("CLUSTER_NODE_BASENAME") do
+  config :libcluster,
+    topologies: [
+      dns: [
+        strategy: Cluster.Strategy.DNSPoll,
+        config: [
+          polling_interval: 5_000,
+          query: dns_query,
+          node_basename: node_basename
+        ]
+      ]
+    ]
+end
+```
+
+Nodes poll the DNS name every 5 seconds and automatically join the cluster.
+
+## DNS Service Discovery
+
+Clustering requires a DNS name that resolves to all node IPs. This is typically provided by:
+
+- **Kubernetes**: Headless service (returns all pod IPs)
+- **Consul**: Service discovery with DNS interface
+- **Internal DNS**: Custom DNS server resolving to node IPs
+- **Cloud DNS**: AWS Route 53, GCP Cloud DNS, etc.
+
+### DNS Requirements
+
+1. **Multiple A records**: DNS query must return all node IPs
+2. **Internal network**: Nodes must reach each other on EPMD port (4369) and distribution ports
+3. **TTL**: Low TTL for fast node discovery (recommended: 5-30 seconds)
+
+## Port Requirements
+
+Erlang distribution requires open ports between nodes:
+
+| Port | Protocol | Description |
+|------|----------|-------------|
+| 4369 | TCP | EPMD (Erlang Port Mapper Daemon) |
+| Dynamic | TCP | Distribution ports (typically 9000-9999) |
+
+Configure firewall rules to allow these ports between cluster nodes.
+
+## Example Configurations
+
+### Kubernetes
+
+<Steps>
+  <Step title="Create a headless service">
+    ```yaml
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: lasso
+    spec:
+      clusterIP: None  # Headless service
+      selector:
+        app: lasso
+      ports:
+        - port: 4000
+          name: http
+        - port: 4369
+          name: epmd
+    ```
+  </Step>
+  
+  <Step title="Configure deployment with clustering">
+    ```yaml
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: lasso
+    spec:
+      replicas: 3
+      selector:
+        matchLabels:
+          app: lasso
+      template:
+        metadata:
+          labels:
+            app: lasso
+        spec:
+          containers:
+            - name: lasso
+              image: myregistry.com/lasso-rpc:latest
+              env:
+                - name: SECRET_KEY_BASE
+                  valueFrom:
+                    secretKeyRef:
+                      name: lasso-secrets
+                      key: secret-key-base
+                - name: PHX_HOST
+                  value: "rpc.example.com"
+                - name: PHX_SERVER
+                  value: "true"
+                - name: LASSO_NODE_ID
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name  # pod-name-0, pod-name-1, etc.
+                - name: CLUSTER_DNS_QUERY
+                  value: "lasso.default.svc.cluster.local"
+                - name: CLUSTER_NODE_BASENAME
+                  value: "lasso"
+              ports:
+                - containerPort: 4000
+                  name: http
+                - containerPort: 4369
+                  name: epmd
+    ```
+  </Step>
+</Steps>
+
+### Docker Compose
+
+For local testing with multiple nodes:
+
+```yaml
+version: '3.8'
+
+services:
+  lasso-us-east:
+    build: .
+    environment:
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      PHX_HOST: rpc.example.com
+      PHX_SERVER: "true"
+      LASSO_NODE_ID: us-east-1
+      CLUSTER_DNS_QUERY: lasso-cluster
+      CLUSTER_NODE_BASENAME: lasso
+    networks:
+      - lasso-cluster
+    ports:
+      - "4001:4000"
+
+  lasso-eu-west:
+    build: .
+    environment:
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      PHX_HOST: rpc.example.com
+      PHX_SERVER: "true"
+      LASSO_NODE_ID: eu-west-1
+      CLUSTER_DNS_QUERY: lasso-cluster
+      CLUSTER_NODE_BASENAME: lasso
+    networks:
+      - lasso-cluster
+    ports:
+      - "4002:4000"
+
+networks:
+  lasso-cluster:
+    driver: bridge
+```
+
+Note: Docker Compose DNS discovery requires additional configuration. For production, use Kubernetes or a proper service discovery system.
+
+### VM/Bare Metal with Consul
+
+<Steps>
+  <Step title="Register nodes with Consul">
+    ```bash
+    # On us-east-1 node
+    curl -X PUT -d '{"Name": "lasso", "Address": "10.0.1.10"}' \
+      http://localhost:8500/v1/agent/service/register
+    
+    # On eu-west-1 node
+    curl -X PUT -d '{"Name": "lasso", "Address": "10.0.2.10"}' \
+      http://localhost:8500/v1/agent/service/register
+    ```
+  </Step>
+  
+  <Step title="Configure Lasso nodes">
+    ```bash
+    # us-east-1
+    export CLUSTER_DNS_QUERY="lasso.service.consul"
+    export CLUSTER_NODE_BASENAME="lasso"
+    export LASSO_NODE_ID="us-east-1"
+    
+    # eu-west-1
+    export CLUSTER_DNS_QUERY="lasso.service.consul"
+    export CLUSTER_NODE_BASENAME="lasso"
+    export LASSO_NODE_ID="eu-west-1"
+    ```
+  </Step>
+</Steps>
+
+## Node Identity
+
+Each node requires a unique `LASSO_NODE_ID`. Convention: use geographic region names for geo-distributed deployments.
+
+### Recommended Naming
+
+| Deployment Pattern | Naming Convention | Examples |
+|-------------------|-------------------|----------|
+| Multi-region | Cloud region codes | `us-east-1`, `eu-west-1`, `ap-southeast-1` |
+| Multi-datacenter | Datacenter abbreviations | `iad`, `lhr`, `sin` |
+| Multi-AZ | Availability zones | `us-east-1a`, `us-east-1b` |
+| Development | Descriptive names | `dev-local`, `staging-1` |
+
+### Why Node ID Matters
+
+- **Metrics partitioning**: State is keyed by `{provider_id, node_id}`
+- **Regional comparison**: Dashboard groups metrics by region
+- **Circuit breaker visibility**: See which regions have open breakers
+- **Traffic analysis**: Understand request distribution across nodes
+
+## Cluster Topology
+
+The `Lasso.Cluster.Topology` module manages cluster membership:
+
+### Node States
+
+| State | Description |
+|-------|-------------|
+| `:connected` | Erlang distribution connection established |
+| `:discovering` | Region identification via RPC in progress |
+| `:responding` | Passes health checks, region known |
+| `:unresponsive` | Connected but failing health checks (3+ failures) |
+| `:disconnected` | Previously connected, now offline |
+
+### Health Checks
+
+- **Interval**: 15 seconds
+- **Timeout**: 5 seconds
+- **Failure threshold**: 3 consecutive failures → `:unresponsive`
+- **Method**: `:rpc.multicall/4` to all connected nodes
+
+### Topology Events
+
+The topology module broadcasts events via Phoenix PubSub on the `cluster:topology` topic:
+
+```elixir
+# Subscribe to cluster events
+Phoenix.PubSub.subscribe(Lasso.PubSub, "cluster:topology")
+
+# Receive events
+{:node_connected, %{node: :'lasso@us-east-1', region: "us-east-1"}}
+{:node_disconnected, %{node: :'lasso@us-east-1'}}
+{:node_state_change, %{node: :'lasso@us-east-1', from: :discovering, to: :responding}}
+```
+
+## Dashboard Integration
+
+The dashboard aggregates metrics from all responding nodes:
+
+### MetricsStore
+
+`LassoWeb.Dashboard.MetricsStore` provides cluster-wide metrics with stale-while-revalidate caching:
+
+```elixir
+# Get provider leaderboard across all nodes
+MetricsStore.get_provider_leaderboard("default", "ethereum")
+# => %{
+#   data: [...],
+#   coverage: %{responding: 3, total: 3},
+#   stale: false
+# }
+```
+
+**Cache characteristics**:
+- **TTL**: 15 seconds
+- **RPC timeout**: 5 seconds
+- **Invalidation**: Automatic on node connect/disconnect
+- **Aggregation**: Weighted averages by call volume
+
+### Regional Drill-Down
+
+The dashboard groups metrics by node_id for regional comparison:
+
+- View aggregate performance across all regions
+- Drill into specific regions to identify geographic issues
+- Compare provider performance region-by-region
+- See which regions have circuit breakers open
+
+## Troubleshooting
+
+### Nodes Not Connecting
+
+<Steps>
+  <Step title="Verify DNS resolution">
+    ```bash
+    # Test DNS query
+    dig lasso.internal
+    
+    # Should return multiple A records
+    ;; ANSWER SECTION:
+    lasso.internal. 30 IN A 10.0.1.10
+    lasso.internal. 30 IN A 10.0.2.10
+    ```
+  </Step>
+  
+  <Step title="Check EPMD connectivity">
+    ```bash
+    # Test EPMD port from another node
+    telnet 10.0.1.10 4369
+    ```
+  </Step>
+  
+  <Step title="Verify environment variables">
+    ```bash
+    # Check configuration
+    env | grep CLUSTER
+    # CLUSTER_DNS_QUERY=lasso.internal
+    # CLUSTER_NODE_BASENAME=lasso
+    ```
+  </Step>
+  
+  <Step title="Check firewall rules">
+    Ensure ports 4369 (EPMD) and distribution ports are open between nodes.
+  </Step>
+</Steps>
+
+### Nodes Becoming Unresponsive
+
+Check node health:
+
+```bash
+# View cluster topology in dashboard
+# Navigate to: http://localhost:4000/dashboard
+# Look for nodes in :unresponsive state
+```
+
+Common causes:
+- Network partitions
+- High CPU/memory usage preventing health check responses
+- Firewall blocking distribution ports
+
+## Best Practices
+
+1. **Use stable node IDs**: Don't change `LASSO_NODE_ID` after deployment
+2. **Monitor cluster health**: Watch for nodes in `:unresponsive` state
+3. **Plan for network partitions**: Nodes gracefully degrade to standalone mode
+4. **Use internal DNS**: Don't expose Erlang distribution to public internet
+5. **Test failover**: Verify dashboard still works when nodes disconnect
+
+## Next Steps
+
+- [Geo-Distributed Deployment](/deployment/geo-distributed) - Multi-region architecture
+- [Production Checklist](/deployment/production-checklist) - Pre-launch verification
+- [Architecture](/concepts/architecture) - Understand cluster design

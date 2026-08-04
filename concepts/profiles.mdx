@@ -1,0 +1,489 @@
+---
+title: 'Profiles'
+description: 'Multi-tenant routing configurations with isolated metrics and circuit breakers'
+---
+
+## Overview
+
+Profiles enable multi-tenancy in Lasso by providing isolated routing configurations with independent chains, providers, rate limits, and metrics.
+
+Each `(profile, chain)` pair runs in an isolated supervision tree while sharing provider infrastructure for efficiency.
+
+## Profile Structure
+
+Profiles are YAML files in `config/profiles/` with frontmatter metadata:
+
+```yaml
+---
+name: Lasso Public
+slug: default
+rps_limit: 100
+burst_limit: 500
+---
+
+chains:
+  ethereum:
+    chain_id: 1
+    monitoring:
+      probe_interval_ms: 12000
+    providers:
+      - id: "ethereum_llamarpc"
+        url: "https://eth.llamarpc.com"
+        ws_url: "wss://eth.llamarpc.com"
+        archival: true
+        priority: 1
+```
+
+### Frontmatter Fields
+
+**name** (required)
+- Display name for the profile
+- Used in dashboard and logs
+
+**slug** (required)
+- URL-safe identifier
+- Used in API routes: `/rpc/profile/:slug/:chain`
+- Must be unique across all profiles
+
+**rps_limit** (optional)
+- Requests per second limit
+- Default: 100
+
+**burst_limit** (optional)
+- Maximum burst size for rate limiting
+- Default: 500
+
+## Profile-Scoped Configuration
+
+Each profile can configure:
+
+### Chains
+
+Multiple blockchain networks with independent provider sets:
+
+```yaml
+chains:
+  ethereum:
+    chain_id: 1
+    name: "Ethereum Mainnet"
+    block_time_ms: 12000
+    providers: [...]
+  
+  arbitrum:
+    chain_id: 42161
+    name: "Arbitrum One"
+    block_time_ms: 250
+    providers: [...]
+```
+
+### Providers
+
+Provider configuration per chain:
+
+```yaml
+providers:
+  - id: "ethereum_drpc"
+    name: "dRPC Ethereum"
+    priority: 2
+    url: "https://eth.drpc.org"
+    ws_url: "wss://eth.drpc.org"
+    archival: true
+    subscribe_new_heads: true
+    capabilities:
+      limits:
+        max_block_range: 10000
+      error_rules:
+        - code: 30
+          message_contains: "timeout on the free tier"
+          category: rate_limit
+```
+
+**Provider Fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | string | Yes | Unique identifier within profile |
+| `name` | string | No | Display name |
+| `priority` | integer | No | Priority for priority strategy (lower = higher priority) |
+| `url` | string | Conditional | HTTP endpoint (required for HTTP transport) |
+| `ws_url` | string | No | WebSocket endpoint |
+| `archival` | boolean | No | Whether provider has archival data (default: false) |
+| `subscribe_new_heads` | boolean | No | Subscribe to newHeads for block tracking (default: false) |
+| `capabilities` | object | No | Method support and error classification |
+
+### Environment Variables
+
+Provider URLs support `${ENV_VAR}` substitution:
+
+```yaml
+providers:
+  - id: "alchemy"
+    url: "https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+```
+
+<Warning>
+Unresolved environment variables (literal `${VAR_NAME}` in URLs) will crash at startup. This prevents silent failures.
+</Warning>
+
+### Monitoring Configuration
+
+Per-chain health monitoring settings:
+
+```yaml
+monitoring:
+  probe_interval_ms: 12000  # Health check frequency
+  lag_alert_threshold_blocks: 5  # Log warning when provider lags this many blocks
+```
+
+### Selection Configuration
+
+Provider eligibility filtering:
+
+```yaml
+selection:
+  max_lag_blocks: 1  # Exclude providers lagging more than this
+  archival_threshold: 128  # Blocks before considering data "archival"
+```
+
+### WebSocket Configuration
+
+Subscription management and failover:
+
+```yaml
+websocket:
+  subscribe_new_heads: true  # Subscribe to newHeads for real-time tracking
+  new_heads_timeout_ms: 35000  # Timeout before marking subscription stale
+  failover:
+    max_backfill_blocks: 100  # Max blocks to fetch during failover
+    backfill_timeout_ms: 30000  # Timeout for backfill requests
+```
+
+## Profile Isolation
+
+Each `(profile, chain)` pair runs in an isolated supervision tree:
+
+```
+ProfileChainSupervisor
+└── ChainSupervisor {profile, chain}
+    ├── TransportRegistry (transport channel management)
+    ├── ClientSubscriptionRegistry (WebSocket fan-out)
+    ├── UpstreamSubscriptionPool (subscription multiplexing)
+    └── StreamSupervisor (per-subscription continuity)
+```
+
+### Isolated Resources
+
+**Per (profile, chain):**
+- Independent circuit breaker state
+- Isolated metrics and benchmarking
+- Separate rate limits
+- Dedicated WebSocket subscriptions
+- Independent routing decisions
+
+### Shared Resources
+
+To optimize resource usage, provider infrastructure is shared across profiles:
+
+**Shared across profiles (keyed by `instance_id`):**
+- Provider instances (same URL + chain = same instance)
+- Circuit breakers (HTTP and WebSocket)
+- WebSocket connections
+- Block height tracking
+- Health probes
+
+**Instance ID derivation:**
+```elixir
+instance_id = :crypto.hash(:sha256, "#{chain}:#{url}:#{auth_hash}") |> Base.encode16(case: :lower)
+```
+
+Two profiles using `https://eth.llamarpc.com` for Ethereum will share:
+- The same WebSocket connection
+- The same circuit breakers
+- The same block height data
+
+But maintain separate:
+- Routing policies
+- Metrics aggregation
+- Rate limits
+
+## URL Routing
+
+Profiles are accessed via URL paths:
+
+### Profile-Specific Routes
+
+```bash
+# Basic routing
+POST /rpc/profile/:profile/:chain
+
+# Strategy selection
+POST /rpc/profile/:profile/fastest/:chain
+POST /rpc/profile/:profile/load-balanced/:chain
+POST /rpc/profile/:profile/latency-weighted/:chain
+
+# Provider override
+POST /rpc/profile/:profile/provider/:provider_id/:chain
+```
+
+### Default Profile Routes
+
+Routes without `/profile/:profile` use the "default" profile:
+
+```bash
+# Uses "default" profile
+POST /rpc/:chain
+POST /rpc/fastest/:chain
+POST /rpc/provider/:provider_id/:chain
+```
+
+<Note>
+The "default" profile must exist in `config/profiles/default.yml`. Lasso validates this at startup.
+</Note>
+
+## Profile Loading
+
+Profiles are loaded at application startup:
+
+```elixir
+# Load all profiles from config/profiles/*.yml
+{:ok, profile_slugs} = Lasso.Config.ConfigStore.load_all_profiles()
+
+# Build provider catalog (maps profiles to shared instances)
+Lasso.Providers.Catalog.build_from_config()
+
+# Start shared infrastructure
+start_shared_infrastructure()
+
+# Start chain supervisors per (profile, chain)
+start_all_chains()
+```
+
+### Configuration Backend
+
+**File Backend** (default):
+- Loads from `config/profiles/*.yml`
+- Hot-reload not supported (requires restart)
+
+**Database Backend** (SaaS extension, not in OSS):
+- Dynamic profile management
+- Hot-reload support
+- Multi-tenant isolation
+
+## Example Profiles
+
+### Production Profile
+
+High rate limits, premium providers:
+
+```yaml
+---
+name: Production API
+slug: production
+rps_limit: 1000
+burst_limit: 5000
+---
+
+chains:
+  ethereum:
+    chain_id: 1
+    providers:
+      - id: "alchemy_premium"
+        url: "https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+        priority: 1
+        archival: true
+      - id: "quicknode_premium"
+        url: "https://api.quicknode.com/${QUICKNODE_KEY}"
+        priority: 2
+        archival: true
+```
+
+### Development Profile
+
+Lower rate limits, free public providers:
+
+```yaml
+---
+name: Development
+slug: dev
+rps_limit: 50
+burst_limit: 200
+---
+
+chains:
+  ethereum-sepolia:
+    chain_id: 11155111
+    providers:
+      - id: "sepolia_drpc"
+        url: "https://sepolia.drpc.org"
+        priority: 1
+      - id: "sepolia_publicnode"
+        url: "https://ethereum-sepolia-rpc.publicnode.com"
+        priority: 2
+```
+
+### Analytics Profile
+
+Archival data, specific method routing:
+
+```yaml
+---
+name: Analytics
+slug: analytics
+rps_limit: 100
+burst_limit: 500
+---
+
+chains:
+  ethereum:
+    chain_id: 1
+    routing:
+      default_strategy: "fastest"
+      method_overrides:
+        eth_getLogs:
+          strategy: "fastest"
+          providers: ["quicknode_archival", "alchemy_archival"]
+    providers:
+      - id: "quicknode_archival"
+        url: "https://api.quicknode.com/${QUICKNODE_KEY}"
+        archival: true
+      - id: "alchemy_archival"
+        url: "https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+        archival: true
+```
+
+## Provider Capabilities
+
+Profiles can declare provider capabilities for method filtering and error classification:
+
+```yaml
+capabilities:
+  # Method filtering
+  unsupported_categories: [debug, trace, txpool, filters]
+  unsupported_methods: ["eth_protocolVersion"]
+  
+  # Parameter limits
+  limits:
+    max_block_range: 10000  # For eth_getLogs
+    max_block_age: 1000  # For state methods
+    block_age_methods: [eth_call, eth_getBalance]
+  
+  # Error classification
+  error_rules:
+    - code: 30
+      message_contains: "timeout on the free tier"
+      category: rate_limit
+    - code: -32701
+      category: capability_violation
+```
+
+**Capability Features:**
+
+**Method Filtering**:
+- `unsupported_categories`: Block entire RPC method categories
+- `unsupported_methods`: Block specific method names
+
+**Parameter Validation**:
+- `max_block_range`: Maximum block range for `eth_getLogs`
+- `max_block_age`: Maximum block age for state queries
+- `block_age_methods`: Methods subject to `max_block_age`
+
+**Error Classification**:
+- Per-provider error rules evaluated top-to-bottom
+- First match wins
+- Affects retry behavior and circuit breaker penalties
+
+See [Provider Selection](/concepts/provider-selection) for how capabilities affect the filter pipeline.
+
+## Profile Validation
+
+Lasso validates profiles at startup:
+
+### Required Validations
+
+**Default Profile Exists**:
+```elixir
+case ProfileValidator.validate("default") do
+  {:ok, _} -> :ok
+  {:error, _type, message} -> raise "Default profile validation failed: #{message}"
+end
+```
+
+**Environment Variables Resolved**:
+```elixir
+case ChainConfig.validate_no_unresolved_placeholders(chain_config) do
+  :ok -> :ok
+  {:error, {:unresolved_env_vars, providers}} -> raise "Unresolved env vars"
+end
+```
+
+**Chain Configuration Valid**:
+```elixir
+case ChainConfig.validate_chain_config(chain_config) do
+  :ok -> :ok
+  {:error, reason} -> Logger.warning("Chain validation failed: #{inspect(reason)}")
+end
+```
+
+## Profile Status
+
+Get profile information at runtime:
+
+```elixir
+# List all profiles
+profiles = Lasso.Config.ConfigStore.list_profiles()
+# => ["default", "production", "dev"]
+
+# Get profile metadata
+{:ok, meta} = ConfigStore.get_profile_meta("default")
+# => %{name: "Lasso Public", slug: "default", rps_limit: 100, burst_limit: 500}
+
+# Get profile chains
+{:ok, chains} = ConfigStore.get_profile_chains("default")
+# => %{"ethereum" => %{chain_id: 1, ...}, "arbitrum" => %{chain_id: 42161, ...}}
+
+# Get chain status
+status = Lasso.RPC.ChainSupervisor.get_chain_status("default", "ethereum")
+# => %{chain_name: "ethereum", total_providers: 15, healthy_providers: 13, ...}
+```
+
+## Profile Lifecycle
+
+### Startup
+
+1. `ConfigStore.load_all_profiles()` loads YAML files
+2. `Catalog.build_from_config()` creates provider instance mappings
+3. `start_shared_infrastructure()` starts instance supervisors and probes
+4. `start_all_chains()` starts `(profile, chain)` supervisors
+
+### Runtime
+
+Profiles are read-only at runtime. Configuration changes require application restart.
+
+### Shutdown
+
+Graceful shutdown drains in-flight requests:
+
+```elixir
+{Plug.Cowboy.Drainer, refs: [LassoWeb.Endpoint.HTTP], shutdown: 30_000}
+```
+
+- 30-second grace period for in-flight requests
+- Circuit breaker state preserved in ETS (survives GenServer restarts)
+- Benchmark metrics persisted to disk
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Routing Strategies" icon="route" href="/concepts/routing-strategies">
+    Configure provider selection strategies
+  </Card>
+  <Card title="Provider Selection" icon="filter" href="/concepts/provider-selection">
+    Understand the 7-stage filter pipeline
+  </Card>
+  <Card title="Circuit Breakers" icon="shield-halved" href="/concepts/circuit-breakers">
+    Configure fault tolerance thresholds
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    Explore the OTP supervision tree
+  </Card>
+</CardGroup>

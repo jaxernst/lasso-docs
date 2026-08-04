@@ -1,0 +1,513 @@
+---
+title: 'Structured Logging'
+description: 'RequestContext, telemetry events, and TelemetryLogger for production debugging'
+---
+
+## Overview
+
+Lasso uses structured logging to provide comprehensive visibility into request routing, circuit breaker state transitions, and operational events. All logs follow a consistent JSON format for easy parsing and aggregation.
+
+## RequestContext Lifecycle
+
+**RequestContext** is a stateless struct that threads through the entire request pipeline, capturing all routing decisions and timing data.
+
+### Context Structure
+
+```elixir
+%RequestContext{
+  # Request identification
+  request_id: "d12fd341-cc14-fc97-ce9f-09876fffa7a3",
+  chain: "ethereum",
+  method: "eth_getLogs",
+  transport: :http,
+  strategy: :fastest,
+  params_present: true,
+  
+  # Provider selection phase
+  candidate_providers: [
+    "ethereum_cloudflare:http",
+    "ethereum_llamarpc:http",
+    "ethereum_llamarpc:ws"
+  ],
+  selected_provider: %{id: "ethereum_llamarpc", protocol: :http},
+  selection_reason: "fastest_method_latency",
+  selection_start_time: 123456789,
+  selection_end_time: 123456792,
+  selection_latency_ms: 3,
+  
+  # Execution phase
+  upstream_start_time: 123456792,
+  upstream_end_time: 123457384,
+  upstream_latency_ms: 592,
+  retries: 0,
+  circuit_breaker_state: :closed,
+  
+  # Result phase
+  status: :success,
+  result_type: "string",
+  result_size_bytes: 11,
+  end_to_end_latency_ms: 595,
+  error: nil
+}
+```
+
+### Context Creation
+
+Context created at the start of each request:
+
+```elixir
+ctx = RequestContext.new(
+  request_id: UUID.uuid4(),
+  chain: "ethereum",
+  method: "eth_blockNumber",
+  transport: :http,
+  strategy: :fastest,
+  params_present: false
+)
+```
+
+### Context Updates
+
+Context updated at each pipeline stage:
+
+```elixir
+# 1. Selection phase
+ctx = RequestContext.record_selection(
+  ctx,
+  candidate_providers,
+  selected_provider,
+  "fastest_method_latency"
+)
+
+# 2. Execution phase
+ctx = RequestContext.mark_upstream_start(ctx)
+ctx = RequestContext.record_circuit_state(ctx, :closed)
+# ... execute request ...
+ctx = RequestContext.mark_upstream_end(ctx)
+
+# 3. Result phase
+ctx = RequestContext.record_success(ctx, result)
+# or
+ctx = RequestContext.record_error(ctx, error)
+```
+
+## Structured Log Schema
+
+All completed requests emit a structured `rpc.request.completed` event.
+
+### Complete Event Example
+
+```json
+{
+  "event": "rpc.request.completed",
+  "request_id": "d12fd341-cc14-fc97-ce9f-09876fffa7a3",
+  "strategy": "fastest",
+  "chain": "ethereum",
+  "transport": "http",
+  "jsonrpc_method": "eth_getLogs",
+  "params_present": true,
+  "routing": {
+    "candidate_providers": [
+      "ethereum_cloudflare:http",
+      "ethereum_llamarpc:http",
+      "ethereum_llamarpc:ws"
+    ],
+    "selected_provider": {
+      "id": "ethereum_llamarpc",
+      "protocol": "http"
+    },
+    "selection_reason": "fastest_method_latency",
+    "retries": 2,
+    "circuit_breaker_state": "closed"
+  },
+  "timing": {
+    "selection_latency_ms": 3,
+    "upstream_latency_ms": 592,
+    "end_to_end_latency_ms": 595
+  },
+  "response": {
+    "status": "success",
+    "result_type": "array",
+    "result_size_bytes": 4521
+  }
+}
+```
+
+### Error Event Example
+
+```json
+{
+  "event": "rpc.request.completed",
+  "request_id": "abc-123",
+  "strategy": "load_balanced",
+  "chain": "ethereum",
+  "transport": "http",
+  "jsonrpc_method": "eth_call",
+  "routing": {
+    "selected_provider": {
+      "id": "ethereum_cloudflare",
+      "protocol": "http"
+    },
+    "retries": 0,
+    "circuit_breaker_state": "closed"
+  },
+  "timing": {
+    "selection_latency_ms": 2,
+    "upstream_latency_ms": 125,
+    "end_to_end_latency_ms": 127
+  },
+  "response": {
+    "status": "error",
+    "error": {
+      "code": -32000,
+      "message": "Cannot fulfill request",
+      "category": "server_error"
+    }
+  }
+}
+```
+
+### Field Descriptions
+
+**Routing section:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `candidate_providers` | array | Providers considered (format: `"provider_id:protocol"`) |
+| `selected_provider` | object | Provider chosen for execution |
+| `selection_reason` | string | Why this provider was selected |
+| `retries` | integer | Number of retry attempts (0 = first try succeeded) |
+| `circuit_breaker_state` | string | CB state when request was made |
+
+**Selection reasons:**
+- `"fastest_method_latency"` - Lowest latency for this method (fastest strategy)
+- `"static_priority"` - Config priority (priority strategy)
+- `"load_balanced_rotation"` - Load balancing (load_balanced strategy)
+- `"latency_weighted_selection"` - Weighted random (latency_weighted strategy)
+
+**Timing section:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `selection_latency_ms` | integer | Provider selection duration |
+| `upstream_latency_ms` | integer | Time from sending request to receiving response |
+| `end_to_end_latency_ms` | integer | Total request duration |
+
+**Response section:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | string | `"success"` or `"error"` |
+| `result_type` | string | Type of result (success only) |
+| `result_size_bytes` | integer | Byte size of result (success only) |
+| `error` | object | Error details (error only) |
+
+## TelemetryLogger
+
+**TelemetryLogger** bridges telemetry events to structured logs for production debugging.
+
+### Attached Handlers
+
+```elixir
+Lasso.TelemetryLogger.attach()
+```
+
+Attaches handlers for:
+
+| Event | Log Level | Description |
+|-------|-----------|-------------|
+| `[:lasso, :failover, :fast_fail]` | WARNING | Provider failover triggered |
+| `[:lasso, :failover, :circuit_open]` | WARNING | Circuit breaker blocked request |
+| `[:lasso, :failover, :degraded_mode]` | WARNING | Entered degraded mode |
+| `[:lasso, :failover, :degraded_success]` | INFO | Recovered via degraded mode |
+| `[:lasso, :failover, :exhaustion]` | ERROR | All providers exhausted |
+| `[:lasso, :request, :slow]` | WARNING | Request took >2000ms |
+| `[:lasso, :request, :very_slow]` | ERROR | Request took >4000ms |
+| `[:lasso, :circuit_breaker, :open]` | WARNING | Circuit breaker opened |
+| `[:lasso, :circuit_breaker, :close]` | INFO | Circuit breaker closed |
+| `[:lasso, :circuit_breaker, :half_open]` | INFO | Circuit breaker half-open |
+| `[:lasso, :circuit_breaker, :proactive_recovery]` | INFO | Proactive recovery attempt |
+
+### Example Log Outputs
+
+**Failover event:**
+
+```
+[warning] Failover: eth_getLogs ethereum_cloudflare:http -> rate_limit
+  chain: ethereum
+  request_id: d12fd341-cc14-fc97-ce9f-09876fffa7a3
+```
+
+**Circuit breaker opened:**
+
+```
+[warning] Circuit opened: ethereum_llamarpc:http
+  instance_id: ethereum_llamarpc
+  from: closed
+  to: open
+  reason: failure_threshold_exceeded
+  failure_count: 5
+  error_category: network_error
+```
+
+**Slow request:**
+
+```
+[warning] Slow (>2s): eth_getLogs ethereum_alchemy:http 2350ms
+  chain: ethereum
+```
+
+**All providers exhausted:**
+
+```
+[error] Exhausted: eth_call all providers failed (retry_after: 5000ms)
+  chain: ethereum
+```
+
+### Configuration
+
+Enable/disable specific log categories:
+
+```elixir
+# config/config.exs
+config :lasso, Lasso.TelemetryLogger,
+  enabled: true,
+  log_slow_requests: true,
+  log_failovers: true,
+  log_circuit_breaker: true
+```
+
+**Disable all telemetry logging:**
+
+```elixir
+config :lasso, Lasso.TelemetryLogger,
+  enabled: false
+```
+
+## Telemetry Event Schemas
+
+### Circuit Breaker Events
+
+All circuit breaker events use consistent metadata:
+
+```elixir
+:telemetry.execute(
+  [:lasso, :circuit_breaker, :open],
+  %{count: 1},
+  %{
+    instance_id: "ethereum_llamarpc",
+    transport: :http,
+    from_state: :closed,
+    to_state: :open,
+    reason: :failure_threshold_exceeded,
+    failure_count: 5,
+    error_category: :network_error
+  }
+)
+```
+
+**State transition reasons:**
+
+| Reason | Description |
+|--------|-------------|
+| `:failure_threshold_exceeded` | Opened due to consecutive failures |
+| `:reopen_due_to_failure` | Re-opened from half_open after failure |
+| `:recovered` | Closed after successful recovery |
+| `:attempt_recovery` | Transitioning to half_open to test recovery |
+| `:proactive_recovery` | Timer-based recovery attempt |
+| `:manual_open` / `:manual_close` | Manual intervention |
+
+### Failover Events
+
+```elixir
+:telemetry.execute(
+  [:lasso, :failover, :fast_fail],
+  %{count: 1},
+  %{
+    chain: "ethereum",
+    provider_id: "ethereum_cloudflare",
+    transport: :http,
+    error_category: :rate_limit,
+    method: "eth_getLogs",
+    request_id: "d12fd341-cc14-fc97-ce9f-09876fffa7a3"
+  }
+)
+```
+
+### Request Timing Events
+
+```elixir
+:telemetry.execute(
+  [:lasso, :request, :slow],
+  %{latency_ms: 2350},
+  %{
+    chain: "ethereum",
+    method: "eth_getLogs",
+    provider: "ethereum_alchemy",
+    transport: :http
+  }
+)
+```
+
+## Privacy & Redaction
+
+### Error Message Truncation
+
+Error messages limited to prevent logging unbounded responses:
+
+```elixir
+@max_error_message_chars 256
+
+def truncate_error_message(message) do
+  if String.length(message) > @max_error_message_chars do
+    String.slice(message, 0, @max_error_message_chars) <> "..."
+  else
+    message
+  end
+end
+```
+
+**Example:**
+
+```json
+{
+  "error": {
+    "code": -32000,
+    "message": "Request failed: execution reverted: ERC20: transfer amount exceeds balance. Contract address: 0x1234567890abcdef... (truncated)",
+    "category": "server_error"
+  }
+}
+```
+
+### No Secrets in Logs
+
+- **Provider URLs**: Not logged (only provider IDs)
+- **API Keys**: Never exposed
+- **Client IPs**: Not logged by default
+- **Request parameters**: Only presence flag (`params_present: true/false`)
+
+## Sampling
+
+Reduce log volume in high-traffic scenarios:
+
+```elixir
+# config/config.exs
+config :lasso, :observability,
+  sampling: [rate: 0.1]  # Log 10% of requests
+```
+
+**Sampling behavior:**
+- Random sampling: Each request independently sampled
+- Client metadata unaffected: Sampling only affects server logs
+- Rate: Float between 0.0 (none) and 1.0 (all)
+
+**Environment-specific sampling:**
+
+```elixir
+# config/dev.exs
+config :lasso, :observability,
+  sampling: [rate: 1.0]  # Log all requests in dev
+
+# config/prod.exs
+config :lasso, :observability,
+  sampling: [rate: 0.5]  # 50% sampling in production
+
+# config/test.exs
+config :lasso, :observability,
+  sampling: [rate: 0.0]  # Disable in tests
+```
+
+## Configuration Reference
+
+### Complete Configuration
+
+```elixir
+# config/config.exs
+config :lasso, :observability,
+  # Log level for rpc.request.completed events
+  log_level: :info,
+  
+  # Maximum error message length in logs
+  max_error_message_chars: 256,
+  
+  # Maximum size for X-Lasso-Meta header
+  max_meta_header_bytes: 4096,
+  
+  # Sampling configuration
+  sampling: [
+    rate: 1.0  # 1.0 = log all requests, 0.1 = log 10%
+  ]
+```
+
+## Log Parsing & Analysis
+
+### Extract Timing Data
+
+```bash
+cat logs/app.log | grep 'rpc.request.completed' | jq '.timing'
+```
+
+**Output:**
+
+```json
+{"selection_latency_ms": 3, "upstream_latency_ms": 592, "end_to_end_latency_ms": 595}
+{"selection_latency_ms": 2, "upstream_latency_ms": 145, "end_to_end_latency_ms": 147}
+```
+
+### Filter by Provider
+
+```bash
+cat logs/app.log | grep 'rpc.request.completed' | jq 'select(.routing.selected_provider.id == "ethereum_llamarpc")'
+```
+
+### Calculate Success Rate
+
+```bash
+cat logs/app.log | grep 'rpc.request.completed' | jq -s '
+  (map(select(.response.status == "success")) | length) / length * 100
+'
+```
+
+### Identify Slow Methods
+
+```bash
+cat logs/app.log | grep 'rpc.request.completed' | jq -s '
+  group_by(.jsonrpc_method) | 
+  map({
+    method: .[0].jsonrpc_method,
+    avg_latency: (map(.timing.upstream_latency_ms) | add / length),
+    count: length
+  }) | 
+  sort_by(.avg_latency) | 
+  reverse
+'
+```
+
+## Performance Characteristics
+
+### Overhead Breakdown
+
+| Operation | Overhead | Notes |
+|-----------|----------|-------|
+| Context creation | &lt;1ms | Single struct allocation |
+| Timing markers | &lt;0.1ms | `System.monotonic_time/0` |
+| Log emission | &lt;5ms | Async logger, sampling |
+| **Total (without metadata)** | **~8ms** | End-to-end overhead |
+
+### Memory Usage
+
+- **RequestContext struct**: ~200 bytes per request
+- **Process dictionary storage**: ~200 bytes (until response sent)
+- **Peak usage**: &lt;1KB per in-flight request
+
+## Summary
+
+Lasso's logging system provides:
+
+- **Structured JSON logs** for easy parsing and aggregation
+- **RequestContext lifecycle** tracking all routing decisions
+- **TelemetryLogger** for operational events (failovers, circuit breakers)
+- **Privacy-first** with error truncation and no secrets in logs
+- **Sampling support** for high-traffic scenarios
+- **Low overhead** (&lt;8ms per request, &lt;1KB per in-flight request)
+- **Telemetry integration** for custom monitoring

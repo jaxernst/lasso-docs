@@ -1,0 +1,141 @@
+---
+title: 'Chain Status'
+description: 'Query configured blockchain chains and their availability'
+---
+
+## Overview
+
+The chain status endpoint provides information about all blockchain chains configured in your Lasso RPC instance.
+
+## Endpoint
+
+```
+GET /api/chains
+```
+
+## Response
+
+Returns a JSON object containing an array of configured chains:
+
+<ResponseField name="chains" type="array" required>
+  Array of chain configuration objects
+  
+  <Expandable title="chain properties">
+    <ResponseField name="chain_id" type="string" required>
+      The numeric chain ID as a string (e.g., "1" for Ethereum Mainnet)
+    </ResponseField>
+    
+    <ResponseField name="name" type="string" required>
+      Human-readable name of the blockchain
+    </ResponseField>
+    
+    <ResponseField name="chain_name" type="string" required>
+      Internal identifier used in API paths and configuration
+    </ResponseField>
+    
+    <ResponseField name="supported" type="boolean" required>
+      Whether this chain is currently supported (always `true` for configured chains)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Response Example
+
+```json
+{
+  "chains": [
+    {
+      "chain_id": "1",
+      "name": "Ethereum Mainnet",
+      "chain_name": "ethereum",
+      "supported": true
+    },
+    {
+      "chain_id": "137",
+      "name": "Polygon",
+      "chain_name": "polygon",
+      "supported": true
+    },
+    {
+      "chain_id": "42161",
+      "name": "Arbitrum One",
+      "chain_name": "arbitrum",
+      "supported": true
+    }
+  ]
+}
+```
+
+## Use Cases
+
+### Discover Available Chains
+
+Query which chains are configured and ready to use:
+
+```bash
+curl http://localhost:4000/api/chains
+```
+
+### Validate Chain Configuration
+
+Check if a specific chain is configured before making RPC requests:
+
+```bash
+# Check if Ethereum is configured
+chains=$(curl -s http://localhost:4000/api/chains)
+has_ethereum=$(echo $chains | jq '.chains[] | select(.chain_name=="ethereum") | .chain_id')
+
+if [ -n "$has_ethereum" ]; then
+  echo "Ethereum is configured with chain_id: $has_ethereum"
+fi
+```
+
+### Dynamic Client Configuration
+
+Use this endpoint to dynamically configure multi-chain applications:
+
+```javascript
+const response = await fetch('http://localhost:4000/api/chains');
+const { chains } = await response.json();
+
+// Build RPC endpoints for each chain
+const rpcEndpoints = chains.reduce((acc, chain) => {
+  acc[chain.chain_name] = `http://localhost:4000/rpc/${chain.chain_id}`;
+  return acc;
+}, {});
+
+console.log(rpcEndpoints);
+// {
+//   ethereum: 'http://localhost:4000/rpc/1',
+//   polygon: 'http://localhost:4000/rpc/137',
+//   arbitrum: 'http://localhost:4000/rpc/42161'
+// }
+```
+
+## Chain Name vs Chain ID
+
+Lasso RPC supports referencing chains by both their numeric `chain_id` and their `chain_name`:
+
+- **chain_id**: Standard EVM chain identifier (e.g., `1`, `137`, `42161`)
+- **chain_name**: Human-friendly identifier used in configuration files (e.g., `ethereum`, `polygon`, `arbitrum`)
+
+Both can be used in RPC endpoint paths:
+
+```bash
+# Using chain_id
+curl -X POST http://localhost:4000/rpc/1 \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+
+# Using chain_name (if supported by your configuration)
+curl -X POST http://localhost:4000/rpc/ethereum \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+## Notes
+
+- The list of chains is determined by your configuration file
+- All returned chains have `supported: true` as unsupported chains are not included in the response
+- Chain configurations are loaded at startup and do not change without restarting the instance
+- This endpoint is useful for service discovery in multi-chain applications

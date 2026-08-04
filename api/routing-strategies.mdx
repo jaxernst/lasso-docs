@@ -1,0 +1,291 @@
+---
+title: Routing Strategies
+description: Learn how Lasso RPC routes requests across blockchain providers
+---
+
+## Overview
+
+Lasso RPC uses intelligent routing strategies to distribute requests across multiple blockchain providers. Each strategy optimizes for different goals: latency, availability, or load distribution.
+
+## Available Strategies
+
+### Load Balanced
+
+**Strategy:** `load_balanced` (alias: `round_robin`)
+
+**Endpoint:** `POST /rpc/load-balanced/:chain`
+
+Randomly distributes requests across available providers with health-aware tiering.
+
+```bash
+curl -X POST http://localhost:4000/rpc/load-balanced/ethereum \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+#### How It Works
+
+1. Randomly shuffles healthy providers
+2. Applies tiered reordering based on circuit breaker state and rate limits:
+   - **Tier 1**: Closed circuit, not rate-limited (preferred)
+   - **Tier 2**: Closed circuit, rate-limited
+   - **Tier 3**: Half-open circuit, not rate-limited
+   - **Tier 4**: Half-open circuit, rate-limited
+3. Attempts providers in order until success
+
+#### Use Cases
+
+- High-volume applications requiring even distribution
+- Multi-provider redundancy without latency optimization
+- Default strategy for most workloads
+
+<Tip>
+`load_balanced` is the default strategy when no explicit strategy is specified.
+</Tip>
+
+### Fastest
+
+**Strategy:** `fastest`
+
+**Endpoint:** `POST /rpc/fastest/:chain`
+
+Routes all requests to the single fastest provider based on measured latency.
+
+```bash
+curl -X POST http://localhost:4000/rpc/fastest/ethereum \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+#### How It Works
+
+1. Ranks providers by measured latency (ascending) for the specific RPC method
+2. Uses method-specific, transport-specific latency metrics
+3. Filters providers requiring minimum quality thresholds:
+   - Minimum 3 calls for stable metrics
+   - Minimum 90% success rate
+4. Falls back to other providers on circuit breaker or rate limit
+
+#### Staleness Handling
+
+Metrics older than 10 minutes are considered stale and treated as cold start, preventing routing decisions based on outdated performance data.
+
+#### Configuration
+
+```bash
+# Environment variables
+FASTEST_MIN_CALLS=3           # Minimum calls for stable metrics
+FASTEST_MIN_SUCCESS_RATE=0.9  # Minimum success rate filter
+```
+
+#### Use Cases
+
+- Low-volume, latency-sensitive applications
+- Real-time trading or gaming applications
+- Scenarios where response time is critical
+
+<Warning>
+The `fastest` strategy concentrates traffic on a single provider, which may trigger rate limits faster than distributed strategies.
+</Warning>
+
+### Latency Weighted
+
+**Strategy:** `latency_weighted`
+
+**Endpoint:** `POST /rpc/latency-weighted/:chain`
+
+Probabilistically routes requests with bias toward lower-latency providers.
+
+```bash
+curl -X POST http://localhost:4000/rpc/latency-weighted/ethereum \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+#### How It Works
+
+1. Calculates weight for each provider based on:
+   - **Latency**: Lower latency increases weight
+   - **Success rate**: Higher success rate increases weight
+   - **Confidence**: More data points increase weight
+   - **Exploration**: Minimum weight ensures all providers receive some traffic
+
+2. **Weight Formula:**
+
+   ```
+   weight = (1 / latency^beta) × success_rate × confidence × calls_scale
+   weight = max(weight, explore_floor)
+   ```
+
+3. Selects providers probabilistically based on weights
+
+#### Configuration
+
+```bash
+# Environment variables
+LW_BETA=3.0              # Latency exponent (higher = stronger latency preference)
+LW_MS_FLOOR=30           # Minimum latency denominator (prevents division by zero)
+LW_EXPLORE_FLOOR=0.05    # Minimum weight (ensures exploration)
+LW_MIN_CALLS=3           # Minimum calls for stable metrics
+LW_MIN_SR=0.85           # Minimum success rate
+```
+
+#### Staleness Handling
+
+Metrics older than 10 minutes receive only the `explore_floor` weight, maintaining exploration while preventing decisions based on outdated data.
+
+#### Use Cases
+
+- Balanced latency optimization with load distribution
+- Medium to high-volume applications
+- Scenarios requiring both speed and redundancy
+
+<Tip>
+`latency_weighted` provides a middle ground between `fastest` (concentrated) and `load_balanced` (random), offering latency optimization while maintaining load distribution.
+</Tip>
+
+## Provider Override
+
+Bypass strategy selection and route directly to a specific provider.
+
+### URL Path Override
+
+```bash
+curl -X POST http://localhost:4000/rpc/provider/alchemy/ethereum \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+Alternative syntax:
+
+```bash
+curl -X POST http://localhost:4000/rpc/ethereum/alchemy \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+### Header Override
+
+```bash
+curl -X POST http://localhost:4000/rpc/ethereum \
+  -H 'Content-Type: application/json' \
+  -H 'X-Lasso-Provider: alchemy' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+### Query Parameter Override
+
+```bash
+curl -X POST 'http://localhost:4000/rpc/ethereum?provider=alchemy' \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+### Use Cases
+
+- Testing specific provider implementations
+- Debugging provider-specific issues
+- Compliance requirements for specific providers
+- Bypass smart routing for known-good providers
+
+## Strategy Comparison
+
+| Strategy | Latency Optimization | Load Distribution | Complexity | Best For |
+|----------|---------------------|-------------------|------------|----------|
+| `load_balanced` | ❌ None | ✅ Even | Low | High-volume, redundancy |
+| `fastest` | ✅✅✅ Maximum | ❌ Concentrated | Medium | Low-volume, latency-critical |
+| `latency_weighted` | ✅✅ Balanced | ✅ Weighted | High | Medium to high-volume |
+| Provider Override | ❌ N/A | ❌ N/A | None | Testing, debugging |
+
+## Strategy Selection Priority
+
+When multiple strategy specifications are present, Lasso uses this priority order:
+
+1. **URL path**: `/rpc/fastest/:chain`
+2. **Query parameter**: `?strategy=fastest`
+3. **Header** (via `conn.assigns`)
+4. **Default**: `load_balanced`
+
+## Health-Aware Tiering
+
+All strategies apply health-aware tiering after initial ranking:
+
+1. **Closed circuit, not rate-limited** (preferred)
+2. **Closed circuit, rate-limited**
+3. **Half-open circuit, not rate-limited**
+4. **Half-open circuit, rate-limited**
+5. **Open circuit** (excluded)
+
+This ensures that even with `fastest` strategy, a provider with circuit breaker issues will be deprioritized below healthy providers.
+
+## Failover Behavior
+
+All strategies support automatic failover:
+
+1. Try selected provider
+2. If failure is retriable:
+   - Circuit breaker errors
+   - Rate limit errors
+   - Timeout errors
+   - Network errors
+3. Move to next provider in ranked list
+4. Repeat until success or all providers exhausted
+
+## Observability
+
+Track which strategy and provider handled your request:
+
+### Headers Mode
+
+```bash
+curl -X POST 'http://localhost:4000/rpc/ethereum?include_meta=headers' \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' -i
+```
+
+Check response headers:
+- `X-Lasso-Request-ID`: Request tracking ID
+- `X-Lasso-Meta`: Base64url-encoded routing metadata
+
+### Body Mode
+
+```bash
+curl -X POST 'http://localhost:4000/rpc/ethereum?include_meta=body' \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+**Response:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": "0x8471c9a",
+  "lasso_meta": {
+    "request_id": "abc-123",
+    "strategy": "fastest",
+    "selected_provider": {"id": "alchemy"},
+    "upstream_latency_ms": 45,
+    "retries": 0,
+    "circuit_breaker_state": "closed"
+  }
+}
+```
+
+## Profile-Scoped Strategies
+
+All strategies are available under profile namespaces:
+
+```bash
+# Use fastest strategy with testnet profile
+curl -X POST http://localhost:4000/rpc/profile/testnet/fastest/base \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+Each profile maintains independent:
+- Provider configurations
+- Latency metrics
+- Circuit breaker states
+- Rate limit tracking

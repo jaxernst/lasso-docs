@@ -1,0 +1,72 @@
+---
+title: Human and agent workflows
+description: Safely evaluate, configure, and integrate Lasso with an agent
+---
+
+# Human and agent workflows
+
+An agent should understand the workload before creating resources or editing an
+integration.
+
+## Discovery questions
+
+Establish:
+
+- required chains and JSON-RPC methods;
+- HTTP, WebSocket, or both;
+- current commercial providers and self-hosted nodes;
+- latency, reliability, coverage, quota, and cost goals;
+- expected request rate, regions, and critical request paths;
+- historical depth, log ranges, transaction sending, filters, and subscription
+  behavior;
+- the user's secret-management, deployment, and rollback process.
+
+These answers determine whether the next step is a managed-profile evaluation,
+a custom provider pool, a WebSocket design, a routing incident investigation,
+or no Lasso change at all.
+
+## Safe evaluation
+
+After the user approves creation of an external key:
+
+1. Fetch the live chain, pricing, and OpenAPI resources.
+2. Create one key and store it using the project's existing secret pattern.
+3. Run a harmless stateless request with an explicit strategy and opt-in
+   metadata.
+4. Show only non-secret result and routing evidence.
+5. Propose one narrow endpoint change with an application rollback.
+6. Expand only after the user accepts the evidence.
+
+Do not spend money, create paid resources, change a deployment, rotate a key, or
+activate a billable custom profile without the user's approval.
+
+## Custom profile collaboration
+
+The human should decide which upstream accounts and credentials enter the pool.
+An agent can inventory methods, prepare provider URLs in the existing secret
+store, explain probe cost, compare partial results with the workload, and
+prepare an activation checklist. Provider credentials must never be copied into
+chat, logs, screenshots, issues, or commits.
+
+After activation, validate a harmless profile-scoped request and correlate it
+with dashboard evidence. Check upstream provider dashboards when the goal
+includes quota or billing verification.
+
+## Install in a codebase
+
+Search environment templates, deployment manifests, viem/ethers clients,
+Foundry, Hardhat, indexers, and chain services for existing RPC configuration.
+Replace only the endpoint value unless the workload review requires code-level
+recovery changes. Keep the key in the project's established secret manager.
+
+## Paid actions and account linking
+
+State the exact action and amount before requesting approval. Use the live
+[`/api/v1/agent/pricing`](https://lasso.sh/api/v1/agent/pricing),
+[`/openapi.json`](https://lasso.sh/openapi.json), and payment-provider contract
+at execution time. A claim link hands management to the human without changing
+the endpoint, but creating or consuming it is still an external account action.
+
+Treat Lasso keys, provider URLs, cookies, payment credentials, and account
+identifiers as sensitive unless the user explicitly identifies a safe public
+value.

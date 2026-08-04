@@ -1,0 +1,182 @@
+---
+title: "Introduction"
+description: "Smart RPC aggregation for fault-tolerant and performant blockchain apps"
+---
+
+Lasso is a smart proxy and router that turns your node infrastructure and RPC providers into a **fast, observable, configurable, and resilient** multi-chain JSON-RPC layer.
+
+It proxies Ethereum JSON-RPC over **HTTP \+ WebSocket** and gives you a single RPC API with expressive routing control, deep redundancy, and built-in observability.
+
+## Why Lasso
+
+Choosing a single RPC provider has real UX and reliability consequences. Performance varies by region, method, and hour, and API inconsistencies make a "one URL" setup brittle.
+
+Lasso makes the RPC layer programmable and resilient:
+
+- **Geo-distributed proxy** where RPC requests are routed to the closest Lasso node
+- Each node independently measures real latencies and health
+- Route each call to the best provider for that region, chain, method, and transport
+- Get redundancy without brittle application code
+- Scale throughput by adding providers instead of replatforming\
+
+# See it Live: [Lasso.sh](https://lasso.sh)
+
+These docs are core the Core Lasso engine (OSS). Lasso.sh add full key management and agentic-driven auth & management apis.
+
+See the agent docs at [lasso.sh/llms.txt](https://lasso.sh/llms.txt)
+
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get Lasso running in under 5 minutes
+  </Card>
+
+  <Card title="Installation" icon="download" href="/installation">
+    Local setup, Docker, and prerequisites
+  </Card>
+
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Profiles, chains, providers, and routing strategies
+  </Card>
+
+  <Card title="API Reference" icon="code" href="/api-reference">
+    Complete HTTP and WebSocket endpoint documentation
+  </Card>
+</CardGroup>
+
+## Key features
+
+### Multi-provider, multi-chain routing
+
+Proxy JSON-RPC requests across multiple providers with automatic failover. Support for **HTTP \+ WebSocket** on Ethereum, Base, Arbitrum, and any EVM chain.
+
+```bash
+curl -X POST http://localhost:4000/rpc/ethereum \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+### Routing strategies
+
+Choose how requests are routed to providers:
+
+- **`fastest`** - Route to the lowest latency provider for each method
+- **`load-balanced`** - Distribute requests across healthy providers
+- **`latency-weighted`** - Weighted random selection by latency scores
+- **Provider override** - Route directly to a specific provider
+
+```bash
+# Route to fastest provider
+POST /rpc/fastest/ethereum
+
+# Load-balanced distribution
+POST /rpc/load-balanced/ethereum
+
+# Direct provider routing
+POST /rpc/provider/alchemy/ethereum
+```
+
+### Method-aware benchmarking
+
+Latency is tracked per **provider × method × transport**. Different providers excel at different workloads—Lasso learns which provider is fastest for `eth_getLogs` vs `eth_call` vs `eth_blockNumber`.
+
+### Resilience built-in
+
+- **Circuit breakers** prevent cascade failures
+- **Automatic retries** and transport-aware failover
+- **Health probing** excludes unhealthy providers from routing
+- **WebSocket gap-filling** backfills missed events via HTTP on upstream failure
+
+### WebSocket subscriptions
+
+Multiplexing with optional gap-filling:
+
+```bash
+wscat -c ws://localhost:4000/ws/rpc/ethereum
+> {"jsonrpc":"2.0","method":"eth_subscribe","params":["newHeads"],"id":1}
+```
+
+100 clients subscribing to `newHeads` share a single upstream subscription. On provider failure, Lasso backfills missed blocks via HTTP and seamlessly switches providers.
+
+### Profiles for multi-tenancy
+
+Isolated configs, state, and metrics for dev/staging/prod, multi-tenant setups, or experiments:
+
+```yaml
+# config/profiles/production.yml
+name: "Production"
+slug: "production"
+default_rps_limit: 1000
+
+chains:
+  ethereum:
+    providers:
+      - id: "your_erigon"
+        url: "http://your-erigon-node:8545"
+        priority: 1
+      - id: "alchemy_fallback"
+        url: "https://..."
+        priority: 2
+```
+
+Access via:
+
+```bash
+POST /rpc/profile/production/ethereum
+```
+
+### LiveView dashboard
+
+Real-time observability with provider status, routing decisions, latency metrics, and cluster-wide aggregation:
+
+- Provider health and circuit breaker state
+- Per-method latency distributions
+- Request/error rates
+- Regional drill-down for geo-distributed deployments
+
+Access at `http://localhost:4000/dashboard`
+
+### Cluster aggregation (optional)
+
+For geo-distributed deployments, Lasso nodes form a cluster that aggregates observability data across all regions:
+
+- Unified visibility into provider performance and health
+- Regional drill-down to compare provider latency by geography
+- No routing latency impact—clustering is purely for observability
+
+```bash
+# Node 1 (us-east)
+export LASSO_NODE_ID=us-east
+export CLUSTER_DNS_QUERY="lasso.internal"
+mix phx.server
+
+# Node 2 (eu-west)
+export LASSO_NODE_ID=eu-west
+export CLUSTER_DNS_QUERY="lasso.internal"
+mix phx.server
+```
+
+<Note>
+  Clustering is optional. A single node works great standalone.
+</Note>
+
+## Built with Elixir/OTP
+
+Lasso runs on the BEAM (Erlang VM) for:
+
+- **Massive concurrency** - 10,000\+ simultaneous requests via lightweight processes
+- **Fault isolation** - OTP supervision trees keep failures contained
+- **Distributed by design** - Native clustering and remote messaging
+- **Fast in-memory state** - ETS provides efficient shared state for routing decisions
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="play" href="/quickstart">
+    Get your first RPC request proxied in 5 minutes
+  </Card>
+
+  <Card title="Architecture" icon="sitemap" href="/architecture">
+    Understand how Lasso works under the hood
+  </Card>
+</CardGroup>

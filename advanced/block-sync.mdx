@@ -1,0 +1,396 @@
+---
+title: 'Block Height Monitoring'
+description: 'Dual-strategy block height tracking with HTTP polling and WebSocket subscriptions'
+---
+
+## Overview
+
+Lasso tracks blockchain state using HTTP polling as a reliable foundation with optional WebSocket subscriptions for sub-second updates. This dual-strategy design enables accurate lag detection for provider selection and subscription gap-filling.
+
+## Architecture
+
+### Dual-Strategy Design
+
+**HTTP Polling** (Always Running):
+- Bounded observation delay (`probe_interval_ms`)
+- Enables optimistic lag calculation with known staleness
+- Resilient to WebSocket failures
+- Predictable observation delay for fair lag comparison
+
+**WebSocket Subscription** (Optional):
+- Sub-second block notifications when healthy
+- Degrades gracefully to HTTP on failure
+- Can stale unpredictably (network issues, rate limits, provider cleanup)
+
+**Rationale**: HTTP polling provides predictable observation delay, enabling fair lag comparison across providers. WebSocket subscriptions can stale unpredictably, causing unbounded observation delay that would skew lag calculations.
+
+## BlockSync Components
+
+### BlockSync.Worker
+
+Per-(chain, instance_id) GenServer tracking block heights.
+
+Location: `Lasso.BlockSync.Worker`
+
+**Operating Modes:**
+
+`:http_only` - HTTP polling only
+```elixir
+┌─────────────────────────────────────┐
+│      BlockSync.Worker               │
+├─────────────────────────────────────┤
+│  HTTP: eth_blockNumber polling      │
+│  Interval: configured per chain     │
+└─────────────────────────────────────┘
+           ↓
+    BlockSync.Registry (ETS)
+```
+
+`:http_with_ws` - HTTP + WebSocket subscription
+```elixir
+┌─────────────────────────────────────┐
+│      BlockSync.Worker               │
+├─────────────────────────────────────┤
+│  HTTP: eth_blockNumber polling      │
+│  WS: newHeads subscription          │
+└─────────────────────────────────────┘
+           ↓
+    BlockSync.Registry (ETS)
+```
+
+**Fan-out Broadcasting:**
+
+Workers are instance-scoped (one per unique upstream provider), but broadcast to all profiles referencing that instance:
+
+```elixir
+# Single worker tracks block height
+BlockSync.Worker {chain: "ethereum", instance_id: "infura_mainnet"}
+
+# Broadcasts to all profiles using this instance
+Profile "default" → receives updates
+Profile "premium" → receives updates
+Profile "internal" → receives updates
+```
+
+### BlockSync.Registry
+
+Centralized ETS-based block height storage.
+
+Location: `Lasso.BlockSync.Registry`
+
+**Key Structure:**
+
+```elixir
+{:height, chain, instance_id} => {height, timestamp, source, metadata}
+
+# Example
+{:height, "arbitrum", "drpc"} => 
+  {421_535_503, 1736894871234, :http, %{latency_ms: 45}}
+```
+
+**Fields:**
+- `height`: Block number (integer)
+- `timestamp`: System timestamp when observed (milliseconds)
+- `source`: `:http` or `:ws` (both write to same key, last write wins)
+- `metadata`: Optional map with latency, provider info
+
+**Benefits:**
+- Single source of truth for height data
+- &lt;1ms lookups for lag calculations
+- Supports consensus height derivation
+- Lock-free concurrent reads
+
+### BlockSync.Supervisor
+
+Singleton interface to `BlockSync.DynamicSupervisor`.
+
+Location: `Lasso.BlockSync.Supervisor`
+
+**Responsibilities:**
+- Manages one Worker per `(chain, instance_id)` pair
+- Handles worker lifecycle (start, stop, restart)
+- Ensures instance-level deduplication
+
+## Dynamic Block Time Measurement
+
+Lasso derives per-chain block intervals using Exponential Moving Average (EMA) for optimistic lag calculation.
+
+Location: `Lasso.Core.BlockSync.BlockTimeMeasurement`
+
+### EMA Parameters
+
+```elixir
+@ema_alpha 0.15        # Adapts in ~10-15 samples
+@min_block_time_ms 50  # Floor: filters multi-provider convergence noise
+@max_block_time_ms 60_000  # Ceiling: rejects chain halts
+@min_samples 5         # Warmup threshold
+```
+
+### Algorithm
+
+```elixir
+def record(state, height) do
+  now = :erlang.monotonic_time(:millisecond)
+  
+  case state.last_height do
+    nil ->
+      # First observation - record baseline
+      %{state | last_height: height, last_mono_ms: now}
+    
+    last when height > last ->
+      elapsed = now - state.last_mono_ms
+      blocks = height - last
+      interval = div(elapsed, blocks)
+      
+      if interval >= @min_block_time_ms and interval <= @max_block_time_ms do
+        # Valid interval - update EMA
+        new_ema = current_ema * (1 - @ema_alpha) + interval * @ema_alpha
+        %{state | ema_ms: new_ema, sample_count: state.sample_count + 1}
+      else
+        # Invalid interval - skip but update tracking
+        %{state | last_height: height, last_mono_ms: now}
+      end
+    
+    _ ->
+      # Height not increasing (reorg, duplicate, out-of-order)
+      %{state | last_mono_ms: now}
+  end
+end
+```
+
+### Why EMA Over Median?
+
+Chains like Arbitrum have demand-driven block production where block times vary from 100ms (high activity) to 5+ seconds (quiet periods). EMA adapts quickly to these changes, while median requires ~50% of samples to change before the measurement shifts.
+
+### Multi-Provider Handling
+
+Heights come from multiple providers (WebSocket and HTTP). The measurement tracks the global max height across providers:
+
+- **Same height**: Ignored (height not increasing)
+- **Heights close together**: 50ms floor rejects artificially fast intervals
+- **Normal operation**: Interval recorded normally
+
+This naturally handles provider convergence without needing per-provider tracking.
+
+## Optimistic Lag Calculation
+
+Compensates for observation delay on fast chains to prevent false lag detection.
+
+### Algorithm
+
+```elixir
+elapsed_ms = now - timestamp
+block_time_ms = Registry.get_block_time_ms(chain) || config.block_time_ms
+staleness_credit = min(
+  div(elapsed_ms, block_time_ms),
+  div(30_000, block_time_ms)  # 30s cap
+)
+optimistic_height = height + staleness_credit
+optimistic_lag = consensus_height - optimistic_height
+```
+
+### Example: Arbitrum (250ms blocks, 2s poll interval)
+
+```
+Provider reports:
+  reported_height: 421,535,503
+  timestamp: 2s ago
+
+Consensus:
+  consensus_height: 421,535,511
+
+Naive calculation:
+  raw_lag: 421,535,511 - 421,535,503 = 8 blocks (INCORRECT)
+
+Optimistic calculation:
+  elapsed: 2000ms
+  block_time: 250ms
+  staleness_credit: 2000 / 250 = 8 blocks
+  optimistic_height: 421,535,503 + 8 = 421,535,511
+  optimistic_lag: 421,535,511 - 421,535,511 = 0 blocks (CORRECT)
+```
+
+**Why the 30s cap?**
+
+Prevents runaway credit values on stale connections:
+- Prevents credit from exceeding reasonable bounds
+- Ensures lagging providers are eventually detected
+- Typical values: 2-5s for HTTP polling, &lt;1s for WebSocket
+
+### Bounded Observation Delay
+
+HTTP polling provides predictable observation delay:
+
+- **Known staleness**: `elapsed_ms` is exact
+- **Accurate credit**: Can precisely calculate expected blocks
+- **Fair comparison**: All providers measured with same methodology
+
+WebSocket subscriptions have unbounded observation delay (network issues, rate limits, provider cleanup), making optimistic lag calculation unreliable.
+
+## Health Probing
+
+### ProbeCoordinator
+
+Per-chain health probe coordinator (one per unique chain).
+
+Location: `Lasso.Providers.ProbeCoordinator`
+
+**Responsibilities:**
+- 200ms tick cycle, probes one instance per tick
+- Periodic `eth_chainId` probes (health check + version detection)
+- Exponential backoff on failure
+- Signals recovery to circuit breakers
+- Writes health status to `:lasso_instance_state` ETS
+
+**Fixed Tick Interval:**
+
+ProbeCoordinator uses a fixed 200ms tick interval with per-instance exponential backoff. The `probe_interval_ms` config parameter (previously per-profile) has been removed.
+
+### Exponential Backoff
+
+Reduces probe load on degraded instances:
+
+| Consecutive Failures | Backoff |
+|---------------------|----------|
+| 0-1 | 0 (probe on next tick) |
+| 2 | 2 seconds |
+| 3 | 4 seconds |
+| 4 | 8 seconds |
+| 5 | 16 seconds |
+| 6+ | 30 seconds (capped) |
+
+**Implementation Details:**
+- Backoff uses monotonic time (avoids wall-clock jump issues)
+- ±20% jitter prevents synchronized probe storms
+- Backoff resets immediately on success
+- Each instance tracks its own backoff state independently
+- Probes dispatched as async Tasks (prevent slow instances from blocking cycle)
+
+**Recovery Signaling:**
+
+```elixir
+# On successful probe after failure
+CircuitBreaker.signal_recovery_cast(instance_id, :http)
+```
+
+Triggers circuit breaker transition from `:open` → `:half_open` for faster recovery.
+
+## Configuration
+
+### Chain-Level Settings
+
+```yaml
+chains:
+  ethereum:
+    block_time_ms: 12000  # Fallback for optimistic lag (EMA preferred after 5 samples)
+    monitoring:
+      lag_alert_threshold_blocks: 5  # Alert if provider lags by more than N blocks
+```
+
+Note: `probe_interval_ms` is no longer configurable per profile. ProbeCoordinator uses a fixed 200ms tick interval.
+
+### Dynamic vs Static Block Time
+
+**Preferred**: EMA measurement (after 5 samples)
+- Adapts to changing block production rates
+- Handles demand-driven chains (Arbitrum, Optimism)
+- Uses monotonic time (no clock drift)
+
+**Fallback**: `block_time_ms` config
+- Used during warmup (first 5 blocks)
+- Used if EMA measurement fails
+- Static value from chain documentation
+
+## Consensus Height Derivation
+
+Used for gap calculation in WebSocket failover.
+
+Location: `Lasso.RPC.ChainState`
+
+**Algorithm:**
+
+```elixir
+def consensus_height(chain) do
+  # Fetch all provider heights from BlockSync.Registry
+  heights = Registry.get_all_heights(chain)
+  
+  # Simple majority consensus (can be extended with outlier detection)
+  median(heights)
+end
+```
+
+**Latency:**
+- &lt;1ms (ETS read-only)
+- vs 200-500ms for blocking HTTP request
+
+**Usage:**
+
+```elixir
+# StreamCoordinator failover gap calculation
+case ChainState.consensus_height(chain) do
+  {:ok, height} ->
+    # Fast path: use consensus
+    gap = height - last_seen_block
+  
+  {:error, :insufficient_data} ->
+    # Fallback: blocking HTTP request
+    height = fetch_head_blocking(chain)
+    gap = height - last_seen_block
+end
+```
+
+## Telemetry Events
+
+```elixir
+[:lasso, :block_sync, :height_updated]
+# Measurements: height
+# Metadata: chain, instance_id, source (:http | :ws), latency_ms
+
+[:lasso, :block_sync, :lag_detected]
+# Measurements: lag_blocks
+# Metadata: chain, instance_id, consensus_height, provider_height
+
+[:lasso, :block_sync, :measurement_updated]
+# Measurements: ema_ms, sample_count
+# Metadata: chain, warmed_up (boolean)
+```
+
+## Performance Characteristics
+
+**Overhead:**
+- Height lookup: &lt;0.1ms (ETS read)
+- Consensus calculation: &lt;1ms (ETS scan + median)
+- Optimistic lag calculation: &lt;0.5ms (arithmetic)
+- HTTP poll latency: 50-200ms per provider
+- WebSocket update latency: 10-50ms
+
+**Scalability:**
+- Instance-scoped workers: O(unique_upstreams), not O(profiles × chains)
+- ETS-based registry: 10,000+ concurrent reads
+- Memory per worker: &lt;5KB
+
+## Best Practices
+
+### For Fast Chains (Arbitrum, Optimism)
+
+1. **Rely on dynamic measurement**: EMA adapts to variable block times
+2. **Set conservative lag thresholds**: 10-20 blocks to account for burst production
+3. **Use WebSocket + HTTP**: Sub-second updates for selection, HTTP for reliability
+
+### For Slow Chains (Ethereum, Bitcoin)
+
+1. **HTTP-only mode**: WebSocket overhead not worth sub-second updates
+2. **Lower probe frequency**: 12s blocks don't need 200ms ticks
+3. **Tight lag thresholds**: 2-3 blocks is a meaningful lag
+
+### For Production Monitoring
+
+1. **Track EMA warmup**: Alert if `sample_count < 5` persists
+2. **Monitor consensus failures**: Should be rare (&lt;0.1% of requests)
+3. **Alert on persistent lag**: Provider consistently >5 blocks behind
+
+## Related Documentation
+
+- [WebSocket Subscriptions](/advanced/websocket-subscriptions) - Uses consensus height for gap calculation
+- [Error Classification](/advanced/error-classification) - Health probe error handling
+- [Benchmarking](/advanced/benchmarking) - Provider selection based on lag metrics

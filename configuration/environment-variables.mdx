@@ -1,0 +1,352 @@
+---
+title: Environment Variables
+description: Runtime configuration reference for Lasso RPC
+---
+
+Lasso is configured via environment variables for runtime settings and YAML files for routing configuration. This page documents all available environment variables.
+
+## Core Configuration
+
+Required and recommended settings for running Lasso.
+
+<ParamField path="SECRET_KEY_BASE" type="string" required="production">
+  Phoenix signing and encryption secret. Must be at least 64 bytes. Generate with `mix phx.gen.secret`.
+  
+  ```bash
+  SECRET_KEY_BASE=$(mix phx.gen.secret)
+  ```
+  
+  **Required in production.** Omit in development (auto-generated).
+</ParamField>
+
+<ParamField path="PHX_HOST" type="string" default="localhost">
+  Public hostname for URL generation. Set to your domain in production.
+  
+  ```bash
+  PHX_HOST=rpc.example.com
+  ```
+  
+  **Required in production** for correct URL generation in responses and redirects.
+</ParamField>
+
+<ParamField path="PHX_SERVER" type="string" default="false">
+  Set to `true` to start the HTTP server. Required for releases and production deployments.
+  
+  ```bash
+  PHX_SERVER=true
+  ```
+</ParamField>
+
+<ParamField path="PORT" type="integer" default="4000">
+  HTTP listener port.
+  
+  ```bash
+  PORT=4000
+  ```
+  
+  Useful for running multiple instances locally:
+  
+  ```bash
+  PORT=4001 iex -S mix phx.server
+  ```
+</ParamField>
+
+<ParamField path="PHX_SCHEME" type="string" default="https">
+  URL scheme for external access. Automatically set to `https` in production.
+  
+  ```bash
+  PHX_SCHEME=https
+  ```
+</ParamField>
+
+<ParamField path="LASSO_NODE_ID" type="string" required="production">
+  Unique, stable identifier for this node instance. Used for state partitioning (circuit breakers, metrics) via `{provider_id, node_id}` keys.
+  
+  ```bash
+  LASSO_NODE_ID=us-east-1
+  ```
+  
+  **Convention:** Use geographic region names when deploying one node per region (e.g., `us-east-1`, `eu-west-1`, `ap-southeast-1`).
+  
+  **Required in production.** Defaults to `"local"` in development.
+</ParamField>
+
+## Clustering
+
+Optional configuration for multi-node clustering.
+
+<ParamField path="CLUSTER_DNS_QUERY" type="string">
+  DNS name that resolves to all node IPs for automatic cluster discovery.
+  
+  ```bash
+  CLUSTER_DNS_QUERY=lasso.internal
+  ```
+  
+  Both `CLUSTER_DNS_QUERY` and `CLUSTER_NODE_BASENAME` must be set for clustering to activate.
+</ParamField>
+
+<ParamField path="CLUSTER_NODE_BASENAME" type="string">
+  Erlang distribution node basename.
+  
+  ```bash
+  CLUSTER_NODE_BASENAME=lasso
+  ```
+  
+  Nodes will be named `<basename>@<ip>` (e.g., `lasso@10.0.1.5`).
+</ParamField>
+
+### Clustering Example
+
+```bash
+# Node 1 (us-east)
+LASSO_NODE_ID=us-east-1
+CLUSTER_DNS_QUERY=lasso.internal
+CLUSTER_NODE_BASENAME=lasso
+
+# Node 2 (eu-west)
+LASSO_NODE_ID=eu-west-1
+CLUSTER_DNS_QUERY=lasso.internal
+CLUSTER_NODE_BASENAME=lasso
+```
+
+Nodes poll DNS every 5 seconds and automatically join the cluster. See [Deployment Guide](/deployment/clustering) for details.
+
+## Provider API Keys
+
+API keys for RPC providers. Used in profile YAML via `${VAR_NAME}` substitution.
+
+<ParamField path="DRPC_API_KEY" type="string">
+  dRPC API key. Get yours at https://drpc.org/
+  
+  ```bash
+  DRPC_API_KEY=your_drpc_api_key_here
+  ```
+  
+  Use in profile:
+  
+  ```yaml
+  url: "https://eth.drpc.org/${DRPC_API_KEY}"
+  ```
+</ParamField>
+
+<ParamField path="ALCHEMY_API_KEY" type="string">
+  Alchemy API key. Get yours at https://dashboard.alchemy.com/
+  
+  ```bash
+  ALCHEMY_API_KEY=your_alchemy_api_key_here
+  ```
+  
+  Use in profile:
+  
+  ```yaml
+  url: "https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+  ```
+</ParamField>
+
+<ParamField path="LAVA_API_KEY" type="string">
+  Lava Network API key. Get yours at https://gateway.lavanet.xyz/
+  
+  ```bash
+  LAVA_API_KEY=your_lava_api_key_here
+  ```
+</ParamField>
+
+<ParamField path="ONE_RPC_API_KEY" type="string">
+  1RPC API key. Get yours at https://www.1rpc.io/
+  
+  ```bash
+  ONE_RPC_API_KEY=your_1rpc_api_key_here
+  ```
+</ParamField>
+
+<ParamField path="CHAINSTACK_API_KEY" type="string">
+  Chainstack API key. Get yours at https://console.chainstack.com/
+  
+  ```bash
+  CHAINSTACK_API_KEY=your_chainstack_api_key_here
+  ```
+</ParamField>
+
+<ParamField path="NODEREAL_API_KEY" type="string">
+  NodeReal API key. Get yours at https://nodereal.io/
+  
+  ```bash
+  NODEREAL_API_KEY=your_nodereal_api_key_here
+  ```
+</ParamField>
+
+### Custom API Keys
+
+You can use any environment variable in your profile configurations:
+
+```yaml
+providers:
+  - id: "custom_provider"
+    url: "https://rpc.example.com/v1/${MY_CUSTOM_API_KEY}"
+```
+
+```bash
+export MY_CUSTOM_API_KEY=secret-key-here
+```
+
+**Important:** Unresolved variables crash at startup to prevent silent misconfiguration.
+
+## Optional Settings
+
+<ParamField path="LASSO_VM_METRICS_ENABLED" type="boolean" default="true">
+  Enable VM metrics collection (memory, CPU, process counts).
+  
+  ```bash
+  LASSO_VM_METRICS_ENABLED=false
+  ```
+  
+  Set to `false` in production SaaS environments where VM metrics aren't relevant.
+</ParamField>
+
+<ParamField path="DATABASE_URL" type="string">
+  PostgreSQL connection URL. Only used in cloud/SaaS deployments for persistent storage.
+  
+  ```bash
+  DATABASE_URL=postgresql://user:pass@host:5432/database
+  ```
+  
+  **Not required for standalone deployments.** Lasso uses in-memory ETS tables by default.
+</ParamField>
+
+## .env File Support
+
+Lasso loads environment variables from a `.env` file in the project root if present:
+
+```bash
+# .env
+LASSO_NODE_ID=local-dev
+ALCHEMY_API_KEY=your-key-here
+DRPC_API_KEY=another-key
+```
+
+**Precedence:** System environment variables override `.env` file values.
+
+### Example .env File
+
+```bash
+# Core configuration
+SECRET_KEY_BASE=your-secret-key-base-here
+PHX_HOST=localhost
+PORT=4000
+LASSO_NODE_ID=local-dev
+
+# Provider API keys
+ALCHEMY_API_KEY=your_alchemy_api_key_here
+DRPC_API_KEY=your_drpc_api_key_here
+LAVA_API_KEY=your_lava_api_key_here
+ONE_RPC_API_KEY=your_1rpc_api_key_here
+CHAINSTACK_API_KEY=your_chainstack_api_key_here
+NODEREAL_API_KEY=your_nodereal_api_key_here
+```
+
+## Production Checklist
+
+Before deploying to production:
+
+<Accordion title="Core Settings">
+  - [ ] `SECRET_KEY_BASE` set (64+ bytes)
+  - [ ] `PHX_HOST` set to public hostname
+  - [ ] `PHX_SERVER=true` set
+  - [ ] `LASSO_NODE_ID` set to unique, stable value
+  - [ ] `PORT` configured for your infrastructure
+</Accordion>
+
+<Accordion title="Provider Keys">
+  - [ ] API keys set for all BYOK providers in profiles
+  - [ ] Environment variable substitution tested (startup should crash on unresolved vars)
+  - [ ] Keys stored securely (secrets manager, not version control)
+</Accordion>
+
+<Accordion title="Clustering (if used)">
+  - [ ] `CLUSTER_DNS_QUERY` set and resolving correctly
+  - [ ] `CLUSTER_NODE_BASENAME` set
+  - [ ] Erlang distribution ports open between nodes (4369 + epmd range)
+  - [ ] Each node has unique `LASSO_NODE_ID`
+</Accordion>
+
+<Accordion title="Infrastructure">
+  - [ ] Health check monitoring `GET /api/health`
+  - [ ] TLS terminated at reverse proxy/load balancer
+  - [ ] Structured JSON log drain configured
+  - [ ] Rate limits configured in profile frontmatter
+</Accordion>
+
+## Development vs Production
+
+### Development
+
+```bash
+# Minimal development setup
+LASSO_NODE_ID=local-dev
+PORT=4000
+
+# Optional: Add API keys for BYOK providers
+ALCHEMY_API_KEY=your-key-here
+```
+
+Run with:
+
+```bash
+mix phx.server
+```
+
+### Production
+
+```bash
+# Required
+SECRET_KEY_BASE=<64+ byte secret>
+PHX_HOST=rpc.example.com
+PHX_SERVER=true
+LASSO_NODE_ID=us-east-1
+
+# Recommended
+PORT=4000
+PHX_SCHEME=https
+
+# Provider keys (as needed)
+ALCHEMY_API_KEY=<key>
+DRPC_API_KEY=<key>
+
+# Clustering (optional)
+CLUSTER_DNS_QUERY=lasso.internal
+CLUSTER_NODE_BASENAME=lasso
+```
+
+Run with:
+
+```bash
+MIX_ENV=prod mix release
+_build/prod/rel/lasso/bin/lasso start
+```
+
+## Environment Variable Precedence
+
+1. **System environment variables** (highest priority)
+2. **.env file** (loaded at startup)
+3. **Application defaults** (config/runtime.exs)
+
+Example:
+
+```bash
+# .env file
+PORT=4000
+
+# System override
+PORT=5000 mix phx.server  # Uses 5000, not 4000
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Deployment Guide" icon="rocket" href="/deployment">
+    Learn how to deploy Lasso in production
+  </Card>
+  <Card title="Profile Configuration" icon="file-lines" href="/configuration/profiles">
+    Configure chains and routing policies
+  </Card>
+</CardGroup>

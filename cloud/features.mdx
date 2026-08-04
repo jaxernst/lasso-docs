@@ -1,0 +1,69 @@
+---
+title: Features and boundaries
+description: A compact reference for Lasso Cloud capabilities and workload boundaries
+---
+
+# Features and boundaries
+
+## RPC integration
+
+- Standard JSON-RPC 2.0 over HTTP and raw WebSocket; no Lasso SDK is required.
+- Chain names or numeric chain IDs on supported routes.
+- Explicit `load-balanced`, `latency-weighted`, and `fastest` URL paths.
+- Provider-override routes for targeted testing and diagnosis.
+
+## Routing and resilience
+
+- Capability-aware filtering before provider selection.
+- Per-provider, method, transport, and regional latency evidence.
+- Circuit and rate-limit state influence the attempt order.
+- Sequential attempts on failures that are safe to retry.
+- Shared upstream WebSocket connections with within-profile failover.
+- Ordered fallback phases for managed system profiles where configured.
+
+Read [Routing and failure semantics](routing) before interpreting strategy names as hard
+distribution or availability guarantees.
+
+## Managed and custom profiles
+
+- Managed profiles provide a ready-to-use provider pool.
+- Account-owned profiles can combine commercial provider accounts and
+  self-hosted nodes across chains.
+- Provider probes inspect representative methods, history, limits, latency, and
+  WebSocket behavior; they are optional and consume upstream requests.
+- Database-backed edits propagate to regional runtime configuration without a
+  database query on the request hot path.
+
+Provider URLs and credentials are sensitive. Never expose them in logs,
+screenshots, issues, telemetry labels, or client-visible errors.
+
+## Keys and access
+
+- Anonymous keys can be created without signup and can later be funded or
+  claimed by an account without changing the RPC endpoint.
+- Account keys support dashboard management, profile authorization, and shared
+  account usage.
+- Entitlements, balances, and rate limits are enforced before upstream routing.
+- Stripe-backed account billing and Tempo-compatible key or session payments
+  serve different human and agent workflows. Fetch the live pricing catalog
+  before quoting price or making a purchase decision.
+
+## Evidence
+
+- `x-lasso-profile` identifies the authorized profile on authenticated routes.
+- Anonymous-key and paid-session responses can include method-based CU and USD
+  charge headers. Account-key usage is recorded by the service but those
+  responses do not currently expose per-request CU or USD headers.
+- Optional routing metadata is available in response headers or the JSON body.
+- The dashboard shows topology, provider health, regional metrics, recent
+  activity, and account usage. Recent activity is bounded and not a durable
+  request ledger.
+
+See [Routing and usage evidence](observability) for exact evidence modes.
+
+## Workload boundaries
+
+Lasso does not provide application-level nonce management, transaction
+deduplication, receipt tracking, or portability for provider-local filter IDs.
+Archive state, old logs, trace methods, and WebSocket recovery each have
+different constraints. See [RPC workload behavior](rpc-behavior).

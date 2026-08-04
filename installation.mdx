@@ -1,0 +1,466 @@
+---
+title: Installation
+description: Local setup, Docker deployment, and prerequisites for running Lasso RPC
+---
+
+This guide covers installing Lasso for local development, Docker deployment, and production use.
+
+## Prerequisites
+
+Lasso requires:
+
+- **Elixir** 1.17+
+- **Erlang/OTP** 26+
+- **Node.js** 18+ (for asset compilation)
+
+### Check installed versions
+
+<CodeGroup>
+
+```bash Elixir
+elixir --version
+# Elixir 1.17.3 (compiled with Erlang/OTP 27)
+```
+
+```bash Erlang
+erl -version
+# Erlang (SMP,ASYNC_THREADS) (BEAM) emulator version 14.2.5
+```
+
+```bash Node.js
+node --version
+# v18.20.0
+```
+
+</CodeGroup>
+
+### Install Elixir and Erlang
+
+If you don't have Elixir installed:
+
+<CodeGroup>
+
+```bash macOS (Homebrew)
+brew install elixir
+```
+
+```bash Ubuntu/Debian
+wget https://packages.erlang-solutions.com/erlang-solutions_2.0_all.deb
+sudo dpkg -i erlang-solutions_2.0_all.deb
+sudo apt-get update
+sudo apt-get install -y elixir
+```
+
+```bash Fedora/CentOS
+sudo dnf install -y elixir erlang
+```
+
+</CodeGroup>
+
+<Note>
+See the [official Elixir installation guide](https://elixir-lang.org/install.html) for more platforms and version managers like `asdf`.
+</Note>
+
+### Install Node.js
+
+For asset compilation:
+
+<CodeGroup>
+
+```bash macOS (Homebrew)
+brew install node
+```
+
+```bash Ubuntu/Debian
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
+```
+
+```bash Using nvm
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+nvm install 18
+nvm use 18
+```
+
+</CodeGroup>
+
+## Local installation (recommended)
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/jaxernst/lasso-rpc
+    cd lasso-rpc
+    ```
+  </Step>
+
+  <Step title="Install Elixir dependencies">
+    ```bash
+    mix deps.get
+    ```
+
+    This downloads all required Elixir packages defined in `mix.exs`.
+  </Step>
+
+  <Step title="Start the Phoenix server">
+    ```bash
+    mix phx.server
+    ```
+
+    The application will start at `http://localhost:4000`.
+
+    You should see output like:
+
+    ```
+    [info] Running LassoWeb.Endpoint with Bandit 1.5.7 at 127.0.0.1:4000 (http)
+    [info] Access LassoWeb.Endpoint at http://localhost:4000
+    [watch] build finished, watching for changes...
+    ```
+  </Step>
+
+  <Step title="Verify it's working">
+    Open your browser to:
+
+    - **Dashboard**: `http://localhost:4000/dashboard`
+    - **Test RPC endpoint**: `http://localhost:4000/rpc/ethereum`
+
+    Or test via curl:
+
+    ```bash
+    curl -X POST http://localhost:4000/rpc/ethereum \
+      -H 'Content-Type: application/json' \
+      -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+    ```
+  </Step>
+</Steps>
+
+<Note>
+The default profile (`config/profiles/default.yml`) includes free public providers. No API keys required to start.
+</Note>
+
+## Docker installation
+
+### Using the convenience script
+
+The fastest way to run Lasso with Docker:
+
+```bash
+git clone https://github.com/jaxernst/lasso-rpc
+cd lasso-rpc
+./run-docker.sh
+```
+
+This script:
+
+1. Checks Docker is installed and running
+2. Builds the Docker image
+3. Generates a `SECRET_KEY_BASE` (if not set)
+4. Starts the container at `http://localhost:4000`
+
+### Manual Docker build and run
+
+For more control:
+
+<Steps>
+  <Step title="Build the image">
+    ```bash
+    docker build -t lasso-rpc .
+    ```
+
+    The [Dockerfile](https://github.com/jaxernst/lasso-rpc/blob/main/Dockerfile) uses a multi-stage build:
+
+    - **Builder stage**: Compiles Elixir app, builds assets, creates release
+    - **Runtime stage**: Minimal image with only release artifacts
+  </Step>
+
+  <Step title="Generate a secret key">
+    ```bash
+    export SECRET_KEY_BASE=$(openssl rand -base64 48)
+    ```
+  </Step>
+
+  <Step title="Run the container">
+    ```bash
+    docker run --rm \
+      -p 4000:4000 \
+      -e SECRET_KEY_BASE="$SECRET_KEY_BASE" \
+      --name lasso-rpc \
+      lasso-rpc
+    ```
+
+    The application will be available at `http://localhost:4000`.
+  </Step>
+</Steps>
+
+### Docker Compose (production)
+
+For production deployments with custom profiles:
+
+```yaml docker-compose.yml
+version: '3.8'
+
+services:
+  lasso:
+    image: lasso-rpc:latest
+    build: .
+    ports:
+      - "4000:4000"
+    environment:
+      - SECRET_KEY_BASE=${SECRET_KEY_BASE}
+      - PHX_HOST=lasso.example.com
+      - PORT=4000
+      # Optional: Clustering
+      - CLUSTER_DNS_QUERY=lasso.internal
+      - LASSO_NODE_ID=us-east-1
+    volumes:
+      # Mount custom profiles
+      - ./config/profiles:/data/config/profiles:ro
+    restart: unless-stopped
+```
+
+Run with:
+
+```bash
+docker-compose up -d
+```
+
+## Configuration
+
+### Profiles
+
+Profiles define chains, providers, and routing policies. They live in `config/profiles/*.yml`.
+
+The default profile (`config/profiles/default.yml`) is included and ready to use:
+
+```yaml
+---
+name: Lasso Public
+slug: default
+rps_limit: 100
+burst_limit: 500
+---
+
+chains:
+  ethereum:
+    chain_id: 1
+    name: "Ethereum Mainnet"
+    block_time_ms: 12000
+
+    monitoring:
+      probe_interval_ms: 12000
+      lag_alert_threshold_blocks: 5
+
+    providers:
+      - id: "ethereum_drpc"
+        name: "dRPC Ethereum"
+        priority: 2
+        url: "https://eth.drpc.org"
+        ws_url: "wss://eth.drpc.org"
+        archival: true
+
+      - id: "ethereum_publicnode"
+        name: "PublicNode Ethereum"
+        priority: 3
+        url: "https://ethereum-rpc.publicnode.com"
+        ws_url: "wss://ethereum-rpc.publicnode.com"
+        archival: false
+
+      # ... more providers
+```
+
+### Environment variables
+
+Profiles support `${ENV_VAR}` substitution for API keys:
+
+```yaml
+providers:
+  - id: "alchemy"
+    url: "https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+    ws_url: "wss://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+```
+
+Set the variable before starting:
+
+```bash
+export ALCHEMY_API_KEY=your_key_here
+mix phx.server
+```
+
+<Warning>
+Unresolved `${ENV_VAR}` placeholders will crash at startup. This is intentional to prevent misconfigurations.
+</Warning>
+
+### Create a custom profile
+
+Create `config/profiles/production.yml`:
+
+```yaml
+---
+name: Production
+slug: production
+rps_limit: 1000
+burst_limit: 5000
+---
+
+chains:
+  ethereum:
+    chain_id: 1
+    providers:
+      - id: "your_erigon"
+        name: "Your Erigon Node"
+        url: "http://your-erigon-node:8545"
+        ws_url: "ws://your-erigon-node:8546"
+        priority: 1
+        archival: true
+
+      - id: "alchemy_fallback"
+        name: "Alchemy Fallback"
+        url: "https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+        ws_url: "wss://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+        priority: 2
+        archival: true
+```
+
+Access it via:
+
+```bash
+curl -X POST http://localhost:4000/rpc/profile/production/ethereum \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+See the [Configuration](/configuration/overview) guide for complete profile reference.
+
+## Multi-node deployment (clustering)
+
+For geo-distributed deployments with aggregated observability:
+
+<Steps>
+  <Step title="Enable DNS-based discovery">
+    Set the DNS query for node discovery:
+
+    ```bash
+    export CLUSTER_DNS_QUERY="lasso.internal"
+    ```
+
+    Your DNS should return all Lasso node IPs.
+  </Step>
+
+  <Step title="Set unique node IDs">
+    Each node needs a unique identifier (typically a region name):
+
+    **Node 1 (US East):**
+
+    ```bash
+    export LASSO_NODE_ID=us-east-1
+    export CLUSTER_DNS_QUERY="lasso.internal"
+    mix phx.server
+    ```
+
+    **Node 2 (EU West):**
+
+    ```bash
+    export LASSO_NODE_ID=eu-west-1
+    export CLUSTER_DNS_QUERY="lasso.internal"
+    mix phx.server
+    ```
+  </Step>
+
+  <Step title="Verify cluster formation">
+    Check the dashboard at `http://localhost:4000/dashboard`. You should see all nodes listed with their regions.
+
+    Or check via IEx:
+
+    ```elixir
+    iex -S mix phx.server
+    iex> Node.list()
+    ["lasso@us-east-1", "lasso@eu-west-1"]
+    ```
+  </Step>
+</Steps>
+
+<Note>
+**Clustering is optional.** A single node works great standalone. Clustering aggregates metrics for observability—it doesn't impact routing decisions.
+</Note>
+
+Each node:
+
+- Makes independent routing decisions based on local latency measurements
+- Shares observability data with the cluster
+- Allows regional drill-down in the dashboard
+
+See [Deployment](/deployment/clustering) for production cluster setup.
+
+## Troubleshooting
+
+### Port already in use
+
+If port 4000 is already in use, set a different port:
+
+```bash
+PORT=4001 mix phx.server
+```
+
+Or in `config/runtime.exs`:
+
+```elixir
+config :lasso, LassoWeb.Endpoint,
+  http: [ip: {127, 0, 0, 1}, port: String.to_integer(System.get_env("PORT") || "4000")]
+```
+
+### Mix not found
+
+If `mix` is not in your PATH after installing Elixir:
+
+```bash
+# Add to ~/.bashrc or ~/.zshrc
+export PATH="$HOME/.mix:$PATH"
+source ~/.bashrc
+```
+
+### Compilation errors
+
+Clear dependencies and rebuild:
+
+```bash
+mix deps.clean --all
+mix deps.get
+mix compile
+```
+
+### Docker build failures
+
+Ensure you have enough disk space and memory:
+
+```bash
+docker system prune -a  # Clean up old images
+docker build --no-cache -t lasso-rpc .  # Force rebuild
+```
+
+### Profile not loading
+
+Check for YAML syntax errors:
+
+```bash
+# Validate YAML
+ruby -r yaml -e "YAML.load_file('config/profiles/default.yml')"
+```
+
+Or check Lasso logs on startup for profile parsing errors.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Make your first RPC request through Lasso
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Customize profiles, providers, and routing strategies
+  </Card>
+  <Card title="Deployment" icon="server" href="/deployment">
+    Production deployment with clustering
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/architecture">
+    Learn how Lasso works under the hood
+  </Card>
+</CardGroup>

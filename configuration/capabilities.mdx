@@ -1,0 +1,390 @@
+---
+title: Provider Capabilities
+description: Define provider limits, unsupported methods, and error classification rules
+---
+
+Capabilities declare what a provider supports and its operational limits. Lasso uses this information to filter eligible providers and classify errors during request routing.
+
+## Overview
+
+The `capabilities` field in provider configuration allows you to specify:
+
+- **Unsupported methods** - RPC methods the provider doesn't support
+- **Limits** - Block range and age restrictions
+- **Error rules** - Custom error classification for provider-specific error codes
+
+When capabilities are omitted, Lasso assumes the provider is fully capable (only `local_only` methods are blocked by default).
+
+## Unsupported Methods
+
+### Unsupported Categories
+
+<ParamField path="capabilities.unsupported_categories" type="array">
+  List of method categories this provider doesn't support. Requests for these methods will skip this provider during routing.
+  
+  ```yaml
+  capabilities:
+    unsupported_categories: [debug, trace, txpool]
+  ```
+  
+  **Available categories:**
+  - `debug` - Debug namespace methods (`debug_*`)
+  - `trace` - Trace namespace methods (`trace_*`)
+  - `txpool` - Transaction pool methods (`txpool_*`)
+  - `eip4844` - EIP-4844 blob methods
+  - `filters` - Filter methods (`eth_newFilter`, `eth_getFilterChanges`, etc.)
+  - `subscriptions` - WebSocket subscriptions
+</ParamField>
+
+### Unsupported Methods
+
+<ParamField path="capabilities.unsupported_methods" type="array">
+  List of specific RPC methods this provider doesn't support.
+  
+  ```yaml
+  capabilities:
+    unsupported_methods:
+      - eth_getLogs
+      - eth_protocolVersion
+  ```
+</ParamField>
+
+### Example: Public Provider Restrictions
+
+```yaml
+providers:
+  - id: "publicnode_ethereum"
+    url: "https://ethereum-rpc.publicnode.com"
+    capabilities:
+      unsupported_categories: [debug, trace, txpool, eip4844, filters]
+      unsupported_methods:
+        - eth_protocolVersion
+```
+
+This configuration prevents Lasso from routing debug traces, transaction pool queries, or filter-based subscriptions to PublicNode.
+
+## Limits
+
+Limits define operational boundaries for the provider. Lasso uses these to filter providers before sending requests.
+
+### Block Range Limit
+
+<ParamField path="capabilities.limits.max_block_range" type="integer">
+  Maximum block range for `eth_getLogs` and similar range queries.
+  
+  ```yaml
+  capabilities:
+    limits:
+      max_block_range: 1000
+  ```
+  
+  If a request exceeds this range, Lasso skips the provider or splits the request into smaller chunks (depending on routing strategy).
+</ParamField>
+
+### Block Age Limit
+
+<ParamField path="capabilities.limits.max_block_age" type="integer">
+  Maximum age (in blocks) for state methods on pruned providers.
+  
+  ```yaml
+  capabilities:
+    limits:
+      max_block_age: 1000
+  ```
+  
+  Providers with this limit are excluded for requests older than `current_block - max_block_age`.
+</ParamField>
+
+<ParamField path="capabilities.limits.block_age_methods" type="array">
+  Methods subject to `max_block_age` limit. Typically state-reading methods.
+  
+  ```yaml
+  capabilities:
+    limits:
+      max_block_age: 1000
+      block_age_methods:
+        - eth_call
+        - eth_getBalance
+        - eth_getCode
+        - eth_getStorageAt
+        - eth_getTransactionCount
+  ```
+</ParamField>
+
+### Example: Pruned Provider Configuration
+
+```yaml
+providers:
+  - id: "publicnode_ethereum"
+    url: "https://ethereum-rpc.publicnode.com"
+    archival: false
+    capabilities:
+      limits:
+        max_block_age: 1000
+        max_block_range: 1000
+        block_age_methods:
+          - eth_call
+          - eth_getBalance
+          - eth_getCode
+          - eth_getStorageAt
+          - eth_getTransactionCount
+```
+
+This provider:
+- Only serves data from the last 1000 blocks
+- Limits `eth_getLogs` queries to 1000-block ranges
+- Automatically excluded for historical state queries
+
+## Error Rules
+
+Error rules allow you to classify provider-specific error codes for better routing decisions. Lasso uses error categories to determine retry behavior and provider health.
+
+<ParamField path="capabilities.error_rules" type="array">
+  List of error classification rules. First matching rule wins.
+  
+  Each rule can match by:
+  - `code` - JSON-RPC error code
+  - `message_contains` - Substring in error message
+  
+  And assigns a `category`:
+  - `capability_violation` - Provider doesn't support the method
+  - `rate_limit` - Provider rate limit exceeded
+  - `requires_archival` - Request needs archival data
+  - `internal_error` - Provider internal error
+  
+  ```yaml
+  capabilities:
+    error_rules:
+      - code: 35
+        category: capability_violation
+      - message_contains: "timeout on the free tier"
+        category: rate_limit
+  ```
+</ParamField>
+
+### Error Categories
+
+| Category | Description | Retry Behavior |
+|----------|-------------|-----------------|
+| `capability_violation` | Method not supported | Skip provider permanently for this method |
+| `rate_limit` | Rate limit exceeded | Circuit breaker opens, retry other providers |
+| `requires_archival` | Needs historical data | Skip non-archival providers |
+| `internal_error` | Provider-side error | Retry with exponential backoff |
+
+### Example: dRPC Error Rules
+
+```yaml
+providers:
+  - id: "ethereum_drpc"
+    url: "https://eth.drpc.org"
+    capabilities:
+      error_rules:
+        # Code 30 with specific message = rate limit
+        - code: 30
+          message_contains: "timeout on the free tier"
+          category: rate_limit
+        
+        # Code 30 without message = generic rate limit
+        - code: 30
+          category: rate_limit
+        
+        # Code 35 = unsupported method
+        - code: 35
+          category: capability_violation
+```
+
+### Example: PublicNode Error Rules
+
+```yaml
+providers:
+  - id: "ethereum_publicnode"
+    url: "https://ethereum-rpc.publicnode.com"
+    capabilities:
+      error_rules:
+        # Custom error code for unsupported methods
+        - code: -32701
+          category: capability_violation
+        
+        # Message-based detection for pruned data
+        - message_contains: "pruned"
+          category: requires_archival
+```
+
+## Complete Example
+
+Here's a fully configured provider with all capability types:
+
+```yaml
+providers:
+  - id: "ethereum_drpc"
+    name: "dRPC Ethereum"
+    url: "https://eth.drpc.org"
+    ws_url: "wss://eth.drpc.org"
+    archival: true
+    capabilities:
+      # Method restrictions
+      unsupported_categories: []
+      unsupported_methods: []
+      
+      # Operational limits
+      limits:
+        max_block_range: 10000
+      
+      # Error classification
+      error_rules:
+        - code: 30
+          message_contains: "timeout on the free tier"
+          category: rate_limit
+        - code: 30
+          category: rate_limit
+        - code: 35
+          category: capability_violation
+```
+
+## Default Behavior
+
+When `capabilities` is omitted entirely:
+
+```yaml
+providers:
+  - id: "my_provider"
+    url: "https://my-rpc.example.com"
+    # No capabilities field
+```
+
+Lasso assumes:
+- All methods are supported except `local_only` category
+- No block range or age limits
+- Standard error code interpretation
+
+This is appropriate for:
+- Your own full nodes
+- Enterprise provider subscriptions with full support
+- Initial testing before fine-tuning capabilities
+
+## Testing Capabilities
+
+After configuring capabilities, verify they work correctly:
+
+### Test Unsupported Methods
+
+```bash
+# Should fail or skip provider
+curl -X POST http://localhost:4000/rpc/provider/publicnode_ethereum/ethereum \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"debug_traceTransaction","params":["0x123..."],"id":1}'
+```
+
+### Test Block Range Limits
+
+```bash
+# Should skip providers with max_block_range < 10000
+curl -X POST http://localhost:4000/rpc/ethereum \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc":"2.0",
+    "method":"eth_getLogs",
+    "params":[{"fromBlock":"0x1","toBlock":"0x2710"}],
+    "id":1
+  }'
+```
+
+### Test Error Rules
+
+Trigger rate limits or capability violations and check the dashboard for correct error categorization.
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Start permissive, narrow down">
+    Begin with no capabilities configured. Monitor errors in the dashboard and add restrictions based on actual provider behavior.
+  </Accordion>
+
+  <Accordion title="Document provider limits">
+    Use YAML comments to note where capability values came from (provider docs, observed behavior, support tickets).
+    
+    ```yaml
+    capabilities:
+      limits:
+        max_block_range: 1000  # From provider docs: https://...
+    ```
+  </Accordion>
+
+  <Accordion title="Match error rules to provider docs">
+    Provider API documentation often lists error codes. Create rules for rate limits, method restrictions, and data availability.
+  </Accordion>
+
+  <Accordion title="Test fallback behavior">
+    Verify that requests fail over correctly when a provider's capabilities are insufficient.
+  </Accordion>
+
+  <Accordion title="Update capabilities as providers evolve">
+    Provider capabilities change (new methods, increased limits). Review configurations periodically.
+  </Accordion>
+</AccordionGroup>
+
+## Real-World Examples from default.yml
+
+### Archival Provider (dRPC)
+
+```yaml
+- id: "ethereum_drpc"
+  url: "https://eth.drpc.org"
+  archival: true
+  capabilities:
+    limits:
+      max_block_range: 10000
+    error_rules:
+      - code: 30
+        message_contains: "timeout on the free tier"
+        category: rate_limit
+      - code: 30
+        category: rate_limit
+      - code: 35
+        category: capability_violation
+```
+
+### Pruned Provider (PublicNode)
+
+```yaml
+- id: "ethereum_publicnode"
+  url: "https://ethereum-rpc.publicnode.com"
+  archival: false
+  capabilities:
+    unsupported_categories: [debug, trace, txpool, eip4844, filters]
+    limits:
+      max_block_age: 1000
+      block_age_methods:
+        - eth_call
+        - eth_getBalance
+        - eth_getCode
+        - eth_getStorageAt
+        - eth_getTransactionCount
+    error_rules:
+      - code: -32701
+        category: capability_violation
+      - message_contains: "pruned"
+        category: requires_archival
+```
+
+### Limited Free Provider (Merkle)
+
+```yaml
+- id: "ethereum_merkle"
+  url: "https://eth.merkle.io"
+  archival: false
+  capabilities:
+    limits:
+      max_block_range: 1000
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Environment Variables" icon="key" href="/configuration/environment-variables">
+    Configure runtime settings and API keys
+  </Card>
+  <Card title="Provider Configuration" icon="server" href="/configuration/providers">
+    Learn about provider setup and priorities
+  </Card>
+</CardGroup>

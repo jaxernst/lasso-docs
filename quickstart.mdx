@@ -1,0 +1,188 @@
+---
+title: Quickstart
+description: Get Lasso RPC running in minutes and make your first JSON-RPC request
+---
+
+Get your RPC proxy running and make your first request in under 5 minutes.
+
+## Quick start
+
+<Steps>
+  <Step title="Prerequisites">
+    Before you begin, ensure you have:
+    
+    - **Elixir** 1.17+ (`elixir --version`)
+    - **Erlang/OTP** 26+ (`erl -version`)
+    - **Node.js** 18+ (for asset compilation)
+    
+    <Tip>
+    Don't have these installed? See the [Installation](/installation) guide for platform-specific instructions.
+    </Tip>
+  </Step>
+
+  <Step title="Clone and install">
+    ```bash
+    # Clone the repository
+    git clone https://github.com/jaxernst/lasso-rpc
+    cd lasso-rpc
+
+    # Install dependencies
+    mix deps.get
+
+    # Start the server
+    mix phx.server
+    ```
+    
+    The application will be available at `http://localhost:4000` and the dashboard at `http://localhost:4000/dashboard`.
+  </Step>
+
+  <Step title="Make your first request">
+    Test the RPC proxy with a simple `eth_blockNumber` call:
+    
+    <CodeGroup>
+    ```bash curl
+    curl -X POST http://localhost:4000/rpc/ethereum \
+      -H 'Content-Type: application/json' \
+      -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+    ```
+
+    ```javascript JavaScript
+    const response = await fetch('http://localhost:4000/rpc/ethereum', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'eth_blockNumber',
+        params: [],
+        id: 1
+      })
+    });
+    const data = await response.json();
+    console.log(data.result); // "0x12a4567"
+    ```
+
+    ```python Python
+    import requests
+
+    response = requests.post('http://localhost:4000/rpc/ethereum',
+      json={
+        'jsonrpc': '2.0',
+        'method': 'eth_blockNumber',
+        'params': [],
+        'id': 1
+      }
+    )
+    print(response.json()['result'])  # "0x12a4567"
+    ```
+    </CodeGroup>
+
+    You'll get a response like:
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "result": "0x12a4567"
+    }
+    ```
+  </Step>
+</Steps>
+
+## Try different routing strategies
+
+Lasso routes requests using intelligent strategies. Try each one:
+
+<CodeGroup>
+```bash Fastest
+# Route to the fastest provider based on measured latency
+curl -X POST http://localhost:4000/rpc/fastest/ethereum \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+```bash Load Balanced
+# Distribute requests evenly across healthy providers
+curl -X POST http://localhost:4000/rpc/load-balanced/ethereum \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+```bash Latency Weighted
+# Route more traffic to faster providers
+curl -X POST http://localhost:4000/rpc/latency-weighted/ethereum \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+</CodeGroup>
+
+## Inspect routing metadata
+
+See which provider handled your request:
+
+```bash
+curl -X POST 'http://localhost:4000/rpc/ethereum?include_meta=headers' \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
+  -i
+```
+
+Look for the `X-Lasso-Meta` header with base64-encoded routing information.
+
+## Try WebSocket subscriptions
+
+Subscribe to new blocks in real-time:
+
+```bash
+wscat -c ws://localhost:4000/ws/rpc/ethereum
+> {"jsonrpc":"2.0","method":"eth_subscribe","params":["newHeads"],"id":1}
+```
+
+You'll receive a subscription ID, then live block headers as they arrive.
+
+## Explore the dashboard
+
+Open `http://localhost:4000/dashboard` to see:
+
+- **Provider performance** - Latency, success rate, and circuit breaker status
+- **Request flow** - Real-time routing decisions
+- **System metrics** - Memory, CPU, and throughput
+
+## Docker alternative
+
+Prefer Docker? Use the convenience script:
+
+```bash
+./run-docker.sh
+```
+
+The application will be available at `http://localhost:4000`.
+
+<Warning>
+The `run-docker.sh` script generates a `SECRET_KEY_BASE` for you. For production deployments, set this explicitly. See [Deployment](/deployment/production-checklist) for details.
+</Warning>
+
+## What's included in the default profile
+
+The `config/profiles/default.yml` profile is pre-configured with free public providers:
+
+- **Ethereum**: LlamaRPC, PublicNode, dRPC, Merkle, 1RPC, and more
+- **Base**: LlamaRPC, Base Official, PublicNode, dRPC, Lava
+- **Arbitrum**: Arbitrum Foundation, LlamaRPC, dRPC
+
+No API keys required to get started.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/configuration/overview">
+    Customize providers, routing, and rate limits
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/http-endpoints">
+    Explore HTTP and WebSocket endpoints
+  </Card>
+  <Card title="Deployment" icon="rocket" href="/deployment/docker">
+    Deploy to production with Docker or Kubernetes
+  </Card>
+  <Card title="Observability" icon="chart-line" href="/observability/dashboard">
+    Monitor provider performance and routing
+  </Card>
+</CardGroup>

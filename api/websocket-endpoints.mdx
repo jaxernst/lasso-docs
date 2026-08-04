@@ -1,0 +1,208 @@
+---
+title: WebSocket Endpoints
+description: Connect to Lasso's WebSocket RPC endpoints for real-time blockchain subscriptions
+---
+
+Lasso's WebSocket endpoints use raw JSON-RPC protocol for real-time blockchain data streaming. Connect via standard WebSocket clients for subscriptions and unary RPC requests.
+
+## Connection URLs
+
+All WebSocket endpoints follow the pattern `ws://host/ws/rpc/...` (or `wss://` for secure connections).
+
+### Base Endpoint
+
+```
+ws://host/ws/rpc/:chain
+```
+
+Routes using the default strategy (configurable, defaults to `load_balanced`).
+
+**Example:**
+
+```bash
+wscat -c 'ws://localhost:4000/ws/rpc/ethereum?key=lasso_abc123'
+```
+
+### Strategy-Specific Endpoints
+
+```
+ws://host/ws/rpc/fastest/:chain
+ws://host/ws/rpc/load-balanced/:chain
+ws://host/ws/rpc/latency-weighted/:chain
+```
+
+Route connections using a specific routing strategy.
+
+**Example:**
+
+```bash
+wscat -c 'ws://localhost:4000/ws/rpc/fastest/ethereum?key=lasso_abc123'
+```
+
+### Provider Override
+
+```
+ws://host/ws/rpc/provider/:provider_id/:chain
+ws://host/ws/rpc/:chain/:provider_id
+```
+
+Connect directly to a specific provider, bypassing strategy selection.
+
+**Example:**
+
+```bash
+wscat -c 'ws://localhost:4000/ws/rpc/provider/ethereum_llamarpc/ethereum?key=lasso_abc123'
+```
+
+### Profile-Scoped Endpoints
+
+All routes above are available under a profile namespace:
+
+```
+ws://host/ws/rpc/profile/:profile/:chain
+ws://host/ws/rpc/profile/:profile/fastest/:chain
+ws://host/ws/rpc/profile/:profile/load-balanced/:chain
+ws://host/ws/rpc/profile/:profile/latency-weighted/:chain
+ws://host/ws/rpc/profile/:profile/provider/:provider_id/:chain
+ws://host/ws/rpc/profile/:profile/:chain/:provider_id
+```
+
+Without an explicit profile, requests use the `"default"` profile.
+
+**Example:**
+
+```bash
+wscat -c 'ws://localhost:4000/ws/rpc/profile/production/ethereum?key=lasso_abc123'
+```
+
+## Chain Identifier
+
+The `:chain` parameter accepts either:
+- **Chain name** (string): `ethereum`, `base`, `arbitrum`
+- **Chain ID** (numeric): `1`, `8453`, `42161`
+
+## Authentication
+
+All WebSocket endpoints require an API key. Provide it via:
+
+| Method | Example |
+|--------|---------||
+| Query parameter | `?key=lasso_abc123` |
+| Header (at connection) | `X-Lasso-Api-Key: lasso_abc123` |
+| Bearer token | `Authorization: Bearer lasso_abc123` |
+
+**Connection Example:**
+
+```bash
+wscat -c 'ws://localhost:4000/ws/rpc/ethereum?key=lasso_abc123'
+```
+
+## Protocol
+
+Lasso uses raw JSON-RPC 2.0 over WebSocket (not Phoenix Channels).
+
+### Unary Request/Response
+
+**Client sends:**
+
+```json
+{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}
+```
+
+**Server responds:**
+
+```json
+{"jsonrpc":"2.0","id":1,"result":"0x8471c9a"}
+```
+
+### Subscription Flow
+
+See [Subscriptions](/api/subscriptions) for detailed subscription patterns.
+
+## Supported Methods
+
+### Read-Only Methods
+
+All standard Ethereum read-only methods are supported:
+
+- `eth_blockNumber`
+- `eth_getBlockByNumber`
+- `eth_getBlockByHash`
+- `eth_getLogs`
+- `eth_getBalance`
+- `eth_getTransactionCount`
+- `eth_getCode`
+- `eth_call`
+- `eth_estimateGas`
+- `eth_gasPrice`
+- `eth_maxPriorityFeePerGas`
+- `eth_feeHistory`
+- `eth_chainId` (served locally, no upstream call)
+- `eth_getTransactionByHash`
+- `eth_getTransactionReceipt`
+- `eth_getStorageAt`
+
+### Subscription Methods
+
+- `eth_subscribe` - Create subscription (newHeads, logs)
+- `eth_unsubscribe` - Cancel subscription
+
+See [Subscriptions](/api/subscriptions) for details.
+
+## Error Responses
+
+Errors follow JSON-RPC 2.0 format:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32601,
+    "message": "Method not supported",
+    "data": {"details": "Additional context"}
+  }
+}
+```
+
+### Common Error Codes
+
+| Code | Meaning |
+|------|---------||
+| `-32700` | Parse error (malformed JSON) |
+| `-32600` | Invalid Request (missing required fields) |
+| `-32601` | Method not found or not supported |
+| `-32602` | Invalid params (unsupported chain, missing parameters) |
+| `-32603` | Internal error |
+| `-32000` | Server error (rate limit, strategy access denied, quota exceeded) |
+
+## Observability Metadata
+
+Request routing metadata by adding `"lasso_meta": "notify"` to your request:
+
+```json
+{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1,"lasso_meta":"notify"}
+```
+
+The server sends two frames:
+1. The RPC response (unmodified)
+2. A metadata notification:
+
+```json
+{
+  "jsonrpc":"2.0",
+  "method":"lasso_meta",
+  "params":{
+    "request_id":"abc-123",
+    "strategy":"fastest",
+    "selected_provider":{"id":"ethereum_llamarpc"},
+    "upstream_latency_ms":45,
+    "retries":0,
+    "circuit_breaker_state":"closed"
+  }
+}
+```
+
+## Connection Lifecycle
+
+See [Connection Lifecycle](/api/connection-lifecycle) for details on heartbeats, timeouts, and session management.

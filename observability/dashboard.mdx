@@ -1,0 +1,427 @@
+---
+title: 'LiveView Dashboard'
+description: 'Real-time observability dashboard with cluster-wide metrics and network visualization'
+---
+
+## Overview
+
+Lasso's LiveView dashboard provides real-time visibility into RPC routing, provider health, and cluster-wide metrics through an interactive web interface. The dashboard aggregates data from all cluster nodes and presents a unified view of the entire system.
+
+## Accessing the Dashboard
+
+The dashboard is available at:
+
+```
+http://localhost:4000/dashboard
+```
+
+Multi-profile deployments can access specific profiles:
+
+```
+http://localhost:4000/dashboard/{profile}
+```
+
+## Dashboard Architecture
+
+### EventStream Aggregation
+
+The dashboard uses a per-profile **EventStream** GenServer that consolidates all real-time events into batched updates, eliminating subscription explosion in multi-chain deployments.
+
+**EventStream responsibilities:**
+- Subscribes to PubSub topics for all chains in a profile
+- Batches events every 175ms for efficient LiveView updates
+- Deduplicates routing events by request ID
+- Computes per-provider metrics in real-time
+- Tracks circuit breaker states across the cluster
+
+**Subscribed PubSub topics (per profile):**
+
+| Topic Pattern | Description |
+|--------------|-------------|
+| `routing_decision:{profile}` | RPC routing decisions |
+| `circuit:events:{profile}:{chain}` | Circuit breaker state transitions |
+| `block_sync:{profile}:{chain}` | Block height updates |
+| `provider:events:{profile}:{chain}` | Provider health changes |
+| `cluster:topology` | Cluster membership changes |
+| `sync:updates:{profile}` | Sync status updates |
+
+### Message Flow
+
+```
+PubSub Events → EventStream (per profile)
+                      ↓
+            Batch aggregation (175ms)
+                      ↓
+            {:dashboard_batch, ...}
+                      ↓
+                 LiveViews
+```
+
+**Batch structure:**
+
+```elixir
+%{
+  health: %{},                    # Provider health counters
+  circuit_states: %{},            # Latest circuit states
+  block_states: %{},              # Block heights and lag
+  cluster: %{},                   # Cluster topology
+  metrics: %{},                   # Per-provider RPS/latency/success
+  routing_events: [],             # RPC routing decisions
+  circuit_events: [],             # Circuit transitions
+  provider_events: [],            # Provider health events
+  subscription_events: [],        # WebSocket subscription events
+  block_events: [],               # New block notifications
+  heartbeat: false                # Staleness prevention
+}
+```
+
+### Initial Snapshot
+
+On subscription, EventStream sends a complete snapshot of current state:
+
+```elixir
+{:dashboard_snapshot, %{
+  metrics: provider_metrics,
+  circuits: circuit_states,
+  health_counters: health_counters,
+  cluster: cluster_state,
+  events: recent_events
+}}
+```
+
+## Dashboard Tabs
+
+### Overview Tab
+
+Interactive network topology showing:
+- **Chain nodes** with provider counts and status indicators
+- **Provider nodes** with circuit breaker states and health
+- **Live request animations** flowing from chains to providers
+- **Details panel** with real-time metrics for selected chain/provider
+
+**Status indicators:**
+
+| Color | Status | Meaning |
+|-------|--------|--------|
+| Green | Healthy | Circuit closed, passing health checks |
+| Yellow | Degraded | Recent failures, half-open circuit |
+| Red | Down | Circuit open, failing health checks |
+| Gray | Unknown | No recent data |
+
+### Metrics Tab
+
+Cluster-wide performance metrics powered by **MetricsStore**:
+- Provider leaderboard (sorted by score)
+- Per-method performance with percentiles
+- Success rates and average latency
+- Multi-region comparison
+
+**Metrics are cached for 15 seconds** with stale-while-revalidate semantics.
+
+### System Tab
+
+VM-level metrics (when `LASSO_VM_METRICS_ENABLED=true`):
+- Memory usage
+- Process counts
+- Scheduler utilization
+- Message queue lengths
+
+## Cluster-Wide Metrics
+
+### MetricsStore
+
+Caches aggregated metrics from all cluster nodes using `:rpc.multicall/5`.
+
+**Configuration:**
+
+```elixir
+@cache_ttl_ms 15_000           # 15-second cache lifetime
+@refresh_timeout_ms 5_000      # RPC timeout per node
+```
+
+**Cache operations:**
+
+```elixir
+# Provider leaderboard (all nodes)
+MetricsStore.get_provider_leaderboard("default", "ethereum")
+# => %{
+#   data: [
+#     %{
+#       provider_id: "ethereum_llamarpc",
+#       score: 0.95,
+#       avg_latency_ms: 120,
+#       success_rate: 0.99,
+#       total_calls: 1500,
+#       node_count: 3,
+#       latency_by_node: %{
+#         "us-east-1" => %{p50: 100, p95: 180, p99: 250},
+#         "eu-west-1" => %{p50: 140, p95: 220, p99: 300}
+#       }
+#     }
+#   ],
+#   coverage: %{responding: 3, total: 3},
+#   stale: false
+# }
+
+# Real-time stats (all nodes)
+MetricsStore.get_realtime_stats("default", "ethereum")
+# => %{
+#   data: %{
+#     rpc_methods: ["eth_blockNumber", "eth_getLogs"],
+#     providers: ["ethereum_llamarpc", "ethereum_alchemy"],
+#     total_entries: 5000,
+#     node_count: 3
+#   },
+#   coverage: %{responding: 3, total: 3},
+#   stale: false
+# }
+```
+
+### Aggregation Logic
+
+Metrics are weighted by call volume across nodes:
+
+```elixir
+# Weighted average latency
+weighted_avg = 
+  Enum.map(entries, fn entry ->
+    entry.avg_latency_ms * entry.total_calls
+  end)
+  |> Enum.sum()
+  |> safe_divide(total_calls_across_all_nodes)
+```
+
+**Minimum call threshold:** Providers need ≥10 calls to be included in aggregates (prevents skew from cold-start nodes).
+
+### Cache Invalidation
+
+MetricsStore invalidates all cached entries on topology changes:
+
+```elixir
+Phoenix.PubSub.subscribe(Lasso.PubSub, "cluster:topology")
+
+def handle_info({:topology_event, %{event: event}}, state)
+    when event in [:node_connected, :node_disconnected] do
+  :ets.delete_all_objects(@cache_table)
+  {:noreply, %{state | generation: state.generation + 1}}
+end
+```
+
+**Generation counter** prevents stale completions from pre-invalidation async tasks.
+
+## Real-Time Provider Metrics
+
+EventStream computes per-provider metrics from routing events:
+
+```elixir
+%{
+  provider_id: "ethereum_llamarpc",
+  rps: 15.3,                    # Requests per second (rolling 60s)
+  avg_latency_ms: 125,          # Weighted average
+  success_rate: 0.98,           # Success / total
+  total_calls: 920,             # Rolling window
+  failovers: 3,                 # Failover count
+  last_request_ms: 1234567890   # Timestamp
+}
+```
+
+**Computation window:** 60 seconds (configurable via `@window_duration_ms`).
+
+## Cluster Status Indicator
+
+Fixed bottom-right indicator showing cluster health:
+
+```
+┌─────────────────────────┐
+│  Cluster: 3/3 nodes     │  ← All nodes responding
+│  Updated 2s ago         │
+└─────────────────────────┘
+```
+
+**Staleness detection:**
+- Updates marked stale after 30 seconds without new data
+- Stale indicator shown when `last_update > 30s`
+- Heartbeat messages every 2 seconds prevent false staleness
+
+## Network Topology Visualization
+
+### Canvas Layout
+
+Providers positioned using force-directed graph algorithm:
+
+```elixir
+# lib/lasso_web/network_topology.ex
+TopologyConfig.canvas_center()  # => {960, 540}
+```
+
+**Node types:**
+- **Chain nodes** (left side): Octagon shapes
+- **Provider nodes** (right side): Circles with status colors
+
+### Request Animations
+
+Live requests visualized as particles flowing from chain to provider:
+
+```javascript
+// Client-side hook: ProviderRequestAnimator
+window.addEventListener('routing_decision', (event) => {
+  animateRequest(event.detail.chain, event.detail.provider_id);
+});
+```
+
+## Performance Optimizations
+
+### Event Batching
+
+EventStream batches up to 100 events or waits 175ms before flushing:
+
+```elixir
+@batch_interval_ms 175
+@max_batch_size 100
+```
+
+**Benefits:**
+- Reduces LiveView messages from thousands/sec to ~6/sec
+- Coalesces state updates (latest-wins for health, circuits, blocks)
+- O(1) deduplication using `seen_request_ids` map
+
+### Lazy Ticking
+
+EventStream only schedules tick timers when subscribers exist:
+
+```elixir
+def handle_cast({:subscribe, pid, account_id}, state) do
+  subscribers = MapSet.put(state.subscribers, pid)
+  Process.monitor(pid)
+  
+  # Start ticking if first subscriber
+  state = if MapSet.size(subscribers) == 1 do
+    schedule_tick(state)
+  else
+    state
+  end
+  
+  send(pid, {:dashboard_snapshot, build_snapshot(state)})
+  {:noreply, %{state | subscribers: subscribers}}
+end
+```
+
+**Idle termination:** EventStream terminates after 30 seconds with no subscribers (transient restart).
+
+### Deduplication
+
+Request IDs cached for 2 minutes to prevent duplicate routing events:
+
+```elixir
+@seen_request_id_ttl_ms 120_000
+@max_seen_request_ids 50_000
+
+# O(1) dedup check before processing
+if Map.has_key?(state.seen_request_ids, event.request_id) do
+  {:noreply, state}
+else
+  # Process event...
+end
+```
+
+## Configuration
+
+### Dashboard Settings
+
+```elixir
+# config/config.exs
+config :lasso_web, LassoWeb.Dashboard,
+  event_history_size: 500,        # Max events in memory
+  recent_blocks_limit: 100,       # Max block events
+  provider_events_limit: 200      # Max provider events
+```
+
+### EventStream Tuning
+
+```elixir
+config :lasso_web, LassoWeb.Dashboard.EventStream,
+  batch_interval_ms: 175,         # Flush frequency
+  max_batch_size: 100,            # Immediate flush threshold
+  window_duration_ms: 60_000,     # Metrics rolling window
+  idle_timeout_ms: 30_000         # Terminate when no subscribers
+```
+
+### MetricsStore Tuning
+
+```elixir
+config :lasso_web, LassoWeb.Dashboard.MetricsStore,
+  cache_ttl_ms: 15_000,           # Cache lifetime
+  refresh_timeout_ms: 5_000,      # RPC timeout
+  min_calls_threshold: 10         # Minimum calls for aggregation
+```
+
+## Troubleshooting
+
+### Dashboard Not Updating
+
+**Symptom:** Cluster status shows "stale" or metrics frozen.
+
+**Check EventStream status:**
+
+```elixir
+iex> Registry.lookup(Lasso.Dashboard.StreamRegistry, {:stream, "default"})
+[{#PID<0.1234.0>, nil}]  # Should return a PID
+```
+
+**Verify PubSub subscriptions:**
+
+```elixir
+iex> Phoenix.PubSub.subscribers(Lasso.PubSub, "routing_decision:default")
+[#PID<0.1234.0>]  # EventStream should be subscribed
+```
+
+### Metrics Not Aggregating
+
+**Symptom:** Cluster metrics show 1/3 nodes or coverage errors.
+
+**Check cluster topology:**
+
+```elixir
+iex> Lasso.Cluster.Topology.get_responding_nodes()
+[:node2@host, :node3@host]  # Should list remote nodes
+
+iex> Lasso.Cluster.Topology.get_coverage()
+%{connected: 3, responding: 3}  # All nodes healthy
+```
+
+**Check RPC connectivity:**
+
+```elixir
+iex> :rpc.multicall([node()], Lasso.Benchmarking.BenchmarkStore, :get_provider_leaderboard, ["default", "ethereum"], 5000)
+{[results], []}  # Empty bad_nodes list = success
+```
+
+### High Memory Usage
+
+**Symptom:** EventStream memory growing unbounded.
+
+**Check event counts:**
+
+```elixir
+iex> :sys.get_state(pid)
+%EventStream{
+  seen_request_ids: %{...},  # Should be < 50,000 entries
+  circuit_states: %{...},    # Should be < 500 entries
+  block_heights: %{...}      # Should be < 500 entries
+}
+```
+
+**Cleanup runs automatically:**
+- `seen_request_ids` cleaned every 5 seconds
+- `circuit_states` and `block_heights` cleaned every 30 seconds
+
+## Summary
+
+Lasso's dashboard provides:
+
+- **Real-time aggregation** via EventStream (175ms batching)
+- **Cluster-wide metrics** via MetricsStore (15s cache, stale-while-revalidate)
+- **Multi-region visibility** with per-node latency breakdown
+- **Interactive topology** with live request animations
+- **Efficient updates** through batching, coalescing, and deduplication
+- **Automatic scaling** with lazy ticking and idle termination

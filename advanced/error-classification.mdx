@@ -1,0 +1,483 @@
+---
+title: 'Error Classification'
+description: 'Composable error categorization with retriability and circuit breaker penalty semantics'
+---
+
+## Overview
+
+Lasso's error classification system provides semantic categorization of errors from providers, transports, and JSON-RPC responses. The classification determines both retriability (failover behavior) and circuit breaker penalty semantics.
+
+Location: `Lasso.Core.Support.ErrorClassification`
+
+## Error Categories
+
+Each category determines:
+1. **Retriability**: Should the request failover to another provider?
+2. **Circuit Breaker Penalty**: Should this error count against the provider's failure threshold?
+
+### Retriable Categories
+
+**`:rate_limit`**
+- Provider rate limiting or quota exceeded
+- Temporary backpressure (will recover)
+- **Retriable**: Yes (try different provider)
+- **Breaker Penalty**: No (not a failure, just temporary constraint)
+- **Examples**: "rate limit exceeded", "too many requests", "quota exceeded"
+
+**`:network_error`**
+- Network/connectivity issues
+- Transient failures (TCP errors, timeouts)
+- **Retriable**: Yes
+- **Breaker Penalty**: Yes
+- **Examples**: Connection refused, DNS failure, socket timeout
+
+**`:server_error`**
+- Provider-side server errors (5xx, provider crashes)
+- **Retriable**: Yes
+- **Breaker Penalty**: Yes
+- **Examples**: "please retry", "temporary internal error", HTTP 500-599
+
+**`:capability_violation`**
+- Provider lacks capability for this request
+- **Retriable**: Yes (try provider with different capabilities)
+- **Breaker Penalty**: No (permanent constraint, not transient failure)
+- **Examples**: "block range too large", "archive node required", "tracing not enabled"
+
+**`:method_not_found`**
+- Method not supported by this provider
+- **Retriable**: Yes (try provider that supports the method)
+- **Breaker Penalty**: Yes
+- **Examples**: JSON-RPC -32601, "method unavailable"
+
+**`:internal_error`**
+- Provider internal error (JSON-RPC -32603)
+- **Retriable**: Yes
+- **Breaker Penalty**: Yes
+
+**`:auth_error`**
+- Authentication/authorization failure
+- **Retriable**: Yes (credentials may work on different provider)
+- **Breaker Penalty**: Yes
+- **Examples**: "unauthorized", "api key", "forbidden"
+
+**`:chain_error`**
+- Chain-level error (e.g., unsupported chain)
+- **Retriable**: Yes
+- **Breaker Penalty**: Yes
+- **Examples**: EIP-1193 4900, "unsupported chain"
+
+### Non-Retriable Categories
+
+**`:invalid_request`**
+- Malformed JSON-RPC request
+- **Retriable**: No (client error, won't succeed elsewhere)
+- **Breaker Penalty**: No (not provider's fault)
+- **Examples**: JSON-RPC -32600
+
+**`:invalid_params`**
+- Invalid method parameters
+- **Retriable**: No
+- **Breaker Penalty**: No
+- **Examples**: JSON-RPC -32602, "invalid address format"
+
+**`:parse_error`**
+- JSON parsing failure
+- **Retriable**: No
+- **Breaker Penalty**: No
+- **Examples**: JSON-RPC -32700
+
+**`:user_error`**
+- User rejected transaction (EIP-1193)
+- **Retriable**: No
+- **Breaker Penalty**: No
+- **Examples**: EIP-1193 4001 (user rejected)
+
+**`:client_error`**
+- Generic client error (4xx)
+- **Retriable**: No
+- **Breaker Penalty**: No
+- **Examples**: HTTP 400, 403, 404
+
+### Special Categories
+
+**`:timeout`**
+- Request timeout
+- **Retriable**: Yes
+- **Breaker Penalty**: Yes
+
+**`:provider_error`**
+- Infrastructure-level provider unavailability (no channels, pool errors)
+- **Retriable**: Yes
+- **Breaker Penalty**: Yes
+
+**`:unknown_error`**
+- Unclassified error (fallback category)
+- **Retriable**: No (conservative default)
+- **Breaker Penalty**: Yes
+
+## Classification Strategy
+
+Two-stage classification:
+
+1. **Message-based patterns** (highest priority)
+2. **Code-based classification** (fallback)
+
+### Message-Based Classification
+
+Detects provider-specific error messages that don't follow standard codes:
+
+```elixir
+@rate_limit_patterns [
+  "rate limit",
+  "too many requests",
+  "throttled",
+  "quota exceeded",
+  "capacity exceeded",
+  "compute units",
+  "timeout on the free tier"
+]
+
+@capability_violation_patterns [
+  "block range exceeded",
+  "archive node required",
+  "tracing not enabled",
+  "free tier",
+  "upgrade your plan",
+  "missing trie node",
+  "result set too large"
+]
+
+@auth_patterns [
+  "unauthorized",
+  "api key",
+  "forbidden",
+  "access denied"
+]
+```
+
+**Priority Order**:
+
+1. Rate limits (checked first)
+2. Auth errors
+3. Transient server errors ("please retry")
+4. Result size violations (provider-specific capabilities)
+5. Other capability violations
+
+**Example**:
+
+```elixir
+categorize(-32000, "block range too large")
+# => :capability_violation (message match)
+
+categorize(-32000, "unknown error")
+# => :server_error (code fallback: -32000 is server error range)
+```
+
+### Code-Based Classification
+
+**JSON-RPC 2.0 Standard Codes:**
+
+| Code | Category | Retriable? |
+|------|----------|------------|
+| -32700 | `:parse_error` | No |
+| -32600 | `:invalid_request` | No |
+| -32601 | `:method_not_found` | Yes |
+| -32602 | `:invalid_params` | No |
+| -32603 | `:internal_error` | Yes |
+| -32000 to -32099 | `:server_error` | Yes |
+
+**EIP-1193 Provider Error Codes:**
+
+| Code | Category | Retriable? |
+|------|----------|------------|
+| 4001 | `:user_error` | No |
+| 4100 | `:auth_error` | Yes |
+| 4200 | `:method_error` | Yes |
+| 4900 | `:chain_error` | Yes |
+| 4901 | `:network_error` | Yes |
+
+**HTTP Status Codes:**
+
+| Code Range | Category | Retriable? |
+|------------|----------|------------|
+| 429 | `:rate_limit` | Yes |
+| 500-599 | `:server_error` | Yes |
+| 400-499 | `:client_error` | No |
+
+**Provider-Specific Codes:**
+
+```elixir
+@provider_specific_codes %{
+  30 => :rate_limit,           # DRPC: "timeout on the free tier"
+  35 => :capability_violation, # DRPC: capability constraint
+  -32046 => :rate_limit,       # PublicNode: rate limit
+  -32701 => :capability_violation  # 1RPC: range limit
+}
+```
+
+## API Reference
+
+### categorize/2
+
+Categorizes an error into a semantic category.
+
+```elixir
+@spec categorize(integer(), String.t() | nil) :: atom()
+
+ErrorClassification.categorize(-32000, "block range too large")
+# => :capability_violation
+
+ErrorClassification.categorize(-32602, nil)
+# => :invalid_params
+
+ErrorClassification.categorize(429, "rate limit exceeded")
+# => :rate_limit
+```
+
+### retriable?/2
+
+Determines if an error should trigger failover to another provider.
+
+```elixir
+@spec retriable?(integer(), String.t() | nil) :: boolean()
+
+ErrorClassification.retriable?(-32000, "temporary internal error")
+# => true
+
+ErrorClassification.retriable?(-32602, "invalid address")
+# => false
+```
+
+### retriable_for_category?/1
+
+Determines if a category should trigger failover.
+
+```elixir
+@spec retriable_for_category?(atom()) :: boolean()
+
+ErrorClassification.retriable_for_category?(:rate_limit)
+# => true
+
+ErrorClassification.retriable_for_category?(:invalid_params)
+# => false
+
+ErrorClassification.retriable_for_category?(:capability_violation)
+# => true  # Try a provider with different capabilities
+```
+
+### breaker_penalty?/1
+
+Determines if an error should count against circuit breaker failure threshold.
+
+```elixir
+@spec breaker_penalty?(atom()) :: boolean()
+
+ErrorClassification.breaker_penalty?(:server_error)
+# => true
+
+ErrorClassification.breaker_penalty?(:capability_violation)
+# => false  # Permanent constraint, not transient failure
+
+ErrorClassification.breaker_penalty?(:rate_limit)
+# => false  # Temporary backpressure with known recovery
+```
+
+## Integration with Circuit Breakers
+
+### Classification Flow
+
+```elixir
+# 1. Classify error
+category = ErrorClassification.categorize(code, message)
+
+# 2. Derive behavior
+error_info = %{
+  category: category,
+  retriable?: ErrorClassification.retriable_for_category?(category),
+  breaker_penalty?: ErrorClassification.breaker_penalty?(category)
+}
+
+# 3. Apply circuit breaker logic
+if error_info.breaker_penalty? do
+  CircuitBreaker.record_failure(provider_id, transport)
+end
+
+# 4. Trigger failover if retriable
+if error_info.retriable? do
+  Selection.select_next_provider(exclude: [failed_provider_id])
+end
+```
+
+### Why No Penalty for Capability Violations?
+
+Capability violations represent **permanent constraints**, not **transient failures**:
+
+- A provider without archival data will never have archival data
+- A free tier provider will always have block range limits
+- Tracing unavailability is a configuration decision, not a health issue
+
+**Without exemption**: Provider circuit breakers would permanently trip for valid architectural constraints.
+
+**With exemption**: Circuit breakers only track transient health issues (network errors, server crashes, timeouts).
+
+### Why No Penalty for Rate Limits?
+
+Rate limits are **temporary backpressure** with **known recovery**:
+
+- Rate limits reset on a predictable schedule (per second, per hour)
+- RateLimitState tiering handles backpressure without circuit breakers
+- Provider is healthy, just temporarily at capacity
+
+**Without exemption**: Circuit breakers would trip during traffic spikes, removing healthy providers.
+
+**With exemption**: RateLimitState tiers down the provider temporarily, circuit breaker tracks actual failures.
+
+## Provider Capability Overrides
+
+Providers can declare custom error classification rules in capabilities:
+
+```yaml
+providers:
+  - id: "ethereum_drpc"
+    url: "https://eth.drpc.org"
+    capabilities:
+      error_rules:
+        - code: 30
+          message_contains: "timeout on the free tier"
+          category: rate_limit
+        - code: 35
+          category: capability_violation
+        - code: 19
+          message_contains: "please retry"
+          category: server_error
+```
+
+**Evaluation Order**:
+
+1. **Provider-specific rules** (top-to-bottom, first match wins)
+2. **Global ErrorClassification** (message patterns, then code ranges)
+
+**Implementation**:
+
+```elixir
+case Capabilities.classify_error(code, message, capabilities) do
+  {:ok, category} -> category  # Provider override matched
+  :default -> ErrorClassification.categorize(code, message)  # Global classification
+end
+```
+
+## Common Error Patterns
+
+### Rate Limit Errors
+
+**DRPC Free Tier**:
+```json
+{"code": 30, "message": "timeout on the free tier, please consider ordering a dedicated full node..."}
+```
+Category: `:rate_limit`
+
+**Generic Rate Limit**:
+```json
+{"code": -32005, "message": "rate limit exceeded"}
+```
+Category: `:rate_limit`
+
+### Capability Violations
+
+**Block Range Limit**:
+```json
+{"code": -32000, "message": "block range exceeded, max is 1k blocks"}
+```
+Category: `:capability_violation`
+
+**Archival Data**:
+```json
+{"code": -32000, "message": "missing trie node (archive node required)"}
+```
+Category: `:capability_violation`
+
+**Result Size Limit**:
+```json
+{"code": -32000, "message": "query returned more than 10000 results"}
+```
+Category: `:capability_violation` (different providers have different limits)
+
+### Transient Server Errors
+
+**DRPC Retry Message**:
+```json
+{"code": 19, "message": "Temporary internal error. Please retry"}
+```
+Category: `:server_error` (message match: "please retry")
+
+**Generic Server Error**:
+```json
+{"code": -32000, "message": "service temporarily unavailable"}
+```
+Category: `:server_error` (message match: "temporarily unavailable")
+
+### Invalid Client Requests
+
+**Invalid Parameters**:
+```json
+{"code": -32602, "message": "invalid address format"}
+```
+Category: `:invalid_params`
+
+**Method Not Found**:
+```json
+{"code": -32601, "message": "the method eth_traceBlock does not exist"}
+```
+Category: `:method_not_found`
+
+## Telemetry Integration
+
+Circuit breaker telemetry includes error category:
+
+```elixir
+[:lasso, :circuit_breaker, :failure]
+# Metadata: chain, provider_id, transport, error_category, circuit_state
+
+:telemetry.execute(
+  [:lasso, :circuit_breaker, :failure],
+  %{count: 1},
+  %{
+    chain: "ethereum",
+    provider_id: "alchemy",
+    transport: :http,
+    error_category: :network_error,  # From ErrorClassification
+    circuit_state: :closed
+  }
+)
+```
+
+**Benefits**:
+- Distinguish transient failures from capability constraints
+- Track rate limit incidents separately from server errors
+- Identify provider-specific error patterns
+
+## Best Practices
+
+### For Provider Configuration
+
+1. **Add custom error_rules**: Provider error codes/messages vary widely
+2. **Test error scenarios**: Verify classification matches expected behavior
+3. **Document edge cases**: Note provider-specific quirks in YAML comments
+
+### For Monitoring
+
+1. **Alert on high breaker penalty errors**: Server errors, network errors, timeouts
+2. **Track capability violations separately**: May indicate client usage pattern mismatch
+3. **Monitor rate limit trends**: May indicate need for tier upgrade or better load distribution
+
+### For Development
+
+1. **Test both code and message**: Classification logic has two paths
+2. **Verify retriability**: Failover behavior depends on correct classification
+3. **Check breaker penalty**: Ensure transient failures penalize, constraints don't
+
+## Related Documentation
+
+- [WebSocket Subscriptions](/advanced/websocket-subscriptions) - Failover triggers based on error classification
+- [Benchmarking](/advanced/benchmarking) - Error categories tracked in performance metrics
+- [Block Sync](/advanced/block-sync) - Health probe error handling

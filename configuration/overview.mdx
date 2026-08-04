@@ -1,0 +1,130 @@
+---
+title: Configuration Overview
+description: Learn how Lasso's profile-based configuration system works
+---
+
+Lasso is configured via YAML profile files located in `config/profiles/`. Each profile defines chains, providers, routing policies, and rate limits. Multiple profiles enable isolated configurations for different environments or tenants.
+
+## Profile System
+
+Profiles are the core configuration unit in Lasso. Each profile:
+
+- Defines which blockchain networks (chains) to support
+- Specifies RPC providers for each chain
+- Configures routing behavior, health monitoring, and WebSocket subscriptions
+- Sets rate limits and capacity controls
+- Can be accessed via unique URL paths
+
+### Profile File Structure
+
+Each profile is a YAML file with two sections separated by document markers (`---`):
+
+```yaml
+# config/profiles/<slug>.yml
+
+# --- Frontmatter: Profile metadata ---
+---
+name: "My Profile"
+slug: "my-profile"
+rps_limit: 100
+burst_limit: 500
+---
+
+# --- Body: Chain configurations ---
+chains:
+  ethereum:
+    chain_id: 1
+    providers:
+      - id: "my_provider"
+        url: "https://..."
+```
+
+**Frontmatter** contains profile-level settings like name, URL slug, and rate limits.
+
+**Body** defines chain configurations with providers, monitoring settings, and routing parameters.
+
+## URL Structure
+
+Profiles are accessed via URL paths:
+
+```bash
+# Default profile
+POST /rpc/ethereum
+
+# Named profile
+POST /rpc/profile/production/ethereum
+
+# Strategy override
+POST /rpc/fastest/ethereum
+
+# Profile + strategy
+POST /rpc/profile/production/fastest/ethereum
+```
+
+## Configuration Hierarchy
+
+Lasso's configuration follows this hierarchy:
+
+1. **Application Level** - Runtime environment variables and system defaults
+2. **Profile Level** - Frontmatter settings (rate limits, metadata)
+3. **Chain Level** - Per-chain configuration (monitoring, selection, WebSocket)
+4. **Provider Level** - Individual provider settings (URLs, capabilities, priority)
+
+## Multiple Profiles
+
+Create separate profiles for different use cases:
+
+```
+config/profiles/
+├── default.yml      # Free public providers
+├── production.yml   # BYOK + own nodes
+└── staging.yml      # Subset for testing
+```
+
+**Benefits:**
+
+- **Environment isolation** - Separate configs for dev, staging, production
+- **Tenant segmentation** - Different provider sets per customer
+- **A/B testing** - Compare provider performance across profiles
+- **Cost optimization** - Route low-priority traffic to free providers
+
+## Configuration Best Practices
+
+<AccordionGroup>
+  <Accordion title="Start with the default profile">
+    The included `default.yml` profile contains battle-tested public providers for major chains. Use it as a reference or starting point.
+  </Accordion>
+
+  <Accordion title="Use meaningful slugs">
+    Profile slugs appear in URLs. Choose descriptive, URL-safe names: `production`, `high-priority`, `customer-acme`.
+  </Accordion>
+
+  <Accordion title="Set appropriate rate limits">
+    Configure `rps_limit` and `burst_limit` based on expected traffic patterns. Start conservative and increase as needed.
+  </Accordion>
+
+  <Accordion title="Validate on startup">
+    Lasso validates all profiles at startup and crashes on errors (missing required fields, unresolved environment variables). This prevents runtime surprises.
+  </Accordion>
+
+  <Accordion title="Document provider choices">
+    Use YAML comments to explain why providers are included, their known limitations, and any special configuration.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Profile Configuration" icon="file-lines" href="/configuration/profiles">
+    Learn about frontmatter fields and chain configuration
+  </Card>
+  <Card title="Provider Setup" icon="server" href="/configuration/providers">
+    Configure providers, API keys, and capabilities
+  </Card>
+  <Card title="Environment Variables" icon="key" href="/configuration/environment-variables">
+    Reference for all runtime configuration options
+  </Card>
+  <Card title="Capabilities" icon="shield-check" href="/configuration/capabilities">
+    Define provider limits and error handling rules
+  </Card>
+</CardGroup>

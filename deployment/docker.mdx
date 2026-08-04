@@ -1,0 +1,312 @@
+---
+title: Docker Deployment
+description: Deploy Lasso RPC using Docker with containerized releases
+---
+
+Lasso RPC provides a production-ready Dockerfile for containerized deployments. The Docker setup uses multi-stage builds for optimized image size and includes all necessary runtime dependencies.
+
+## Quick Start
+
+The fastest way to run Lasso RPC with Docker:
+
+<Steps>
+  <Step title="Run the Docker script">
+    ```bash
+    ./run-docker.sh
+    ```
+    
+    This script automatically:
+    - Validates Docker is installed and running
+    - Builds the image as `lasso-rpc`
+    - Generates a `SECRET_KEY_BASE` if not set
+    - Starts the container with port 4000 exposed
+  </Step>
+  
+  <Step title="Access the dashboard">
+    Open your browser to:
+    - **Dashboard**: http://localhost:4000
+    - **RPC Endpoint**: http://localhost:4000/rpc/fastest/ethereum
+  </Step>
+</Steps>
+
+## Dockerfile Architecture
+
+The Dockerfile uses a two-stage build for optimal image size:
+
+### Build Stage
+
+```dockerfile
+FROM hexpm/elixir:1.17.3-erlang-27.2-debian-bullseye-20241202 AS builder
+
+WORKDIR /app
+ENV MIX_ENV=prod
+
+# Install hex and rebar
+RUN mix local.hex --force && \
+    mix local.rebar --force
+
+# Install dependencies (prod only)
+COPY mix.exs mix.lock ./
+COPY config/ ./config/
+RUN mix deps.get --only prod
+
+# Copy application source
+COPY lib/ ./lib/
+COPY assets/ ./assets/
+COPY priv/ ./priv/
+
+# Compile and build assets
+RUN mix compile
+RUN mix tailwind.install && \
+    mix esbuild.install && \
+    mix tailwind lasso --minify && \
+    mix esbuild lasso --minify && \
+    mix phx.digest
+
+# Create release
+RUN mix release
+```
+
+### Runtime Stage
+
+```dockerfile
+FROM hexpm/elixir:1.17.3-erlang-27.2-debian-bullseye-20241202-slim
+
+WORKDIR /app
+ENV MIX_ENV=prod
+ENV PHX_SERVER=true
+
+# Copy built release from builder
+COPY --from=builder /app/_build/prod/rel/lasso ./
+COPY --from=builder /app/config/profiles ./config/profiles
+COPY deployment/entrypoint.sh /app/entrypoint.sh
+
+EXPOSE 4000
+ENTRYPOINT ["/app/entrypoint.sh"]
+```
+
+## Manual Docker Commands
+
+### Building the Image
+
+```bash
+docker build -t lasso-rpc .
+```
+
+Build with custom tag:
+
+```bash
+docker build -t myregistry.com/lasso-rpc:v1.0.0 .
+```
+
+### Running the Container
+
+Basic run with required environment variables:
+
+```bash
+docker run --rm \
+  -p 4000:4000 \
+  -e SECRET_KEY_BASE="$(openssl rand -base64 48)" \
+  -e PHX_HOST="rpc.example.com" \
+  -e LASSO_NODE_ID="production-1" \
+  --name lasso-rpc \
+  lasso-rpc
+```
+
+Run with custom port:
+
+```bash
+docker run --rm \
+  -p 8080:8080 \
+  -e PORT=8080 \
+  -e SECRET_KEY_BASE="your-secret" \
+  -e PHX_HOST="rpc.example.com" \
+  -e LASSO_NODE_ID="production-1" \
+  lasso-rpc
+```
+
+## Environment Variables
+
+### Required for Production
+
+| Variable | Description | Example |
+|----------|-------------|----------|
+| `SECRET_KEY_BASE` | Phoenix signing/encryption secret (64+ bytes) | Generate with `mix phx.gen.secret` |
+| `PHX_HOST` | Public hostname for URL generation | `rpc.example.com` |
+| `LASSO_NODE_ID` | Unique, stable node identifier | `us-east-1` |
+| `PHX_SERVER` | Set to `true` to start HTTP server | `true` (set by default in Dockerfile) |
+
+### Optional Configuration
+
+| Variable | Description | Default |
+|----------|-------------|----------|
+| `PORT` | HTTP listener port | `4000` |
+| `LASSO_VM_METRICS_ENABLED` | Enable VM metrics collection | `true` |
+| `LASSO_DATA_DIR` | Data directory for profile persistence | Not set |
+
+### Provider API Keys
+
+Pass provider API keys as environment variables:
+
+```bash
+docker run --rm \
+  -p 4000:4000 \
+  -e SECRET_KEY_BASE="your-secret" \
+  -e PHX_HOST="rpc.example.com" \
+  -e LASSO_NODE_ID="production-1" \
+  -e ALCHEMY_API_KEY="your-alchemy-key" \
+  -e INFURA_API_KEY="your-infura-key" \
+  lasso-rpc
+```
+
+These are referenced in profile YAML files using `${ENV_VAR}` syntax:
+
+```yaml
+providers:
+  - id: "alchemy_ethereum"
+    url: "https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+```
+
+## Volume Mounts
+
+### Custom Profiles
+
+Mount a custom profiles directory:
+
+```bash
+docker run --rm \
+  -p 4000:4000 \
+  -v /path/to/profiles:/app/config/profiles:ro \
+  -e SECRET_KEY_BASE="your-secret" \
+  -e PHX_HOST="rpc.example.com" \
+  -e LASSO_NODE_ID="production-1" \
+  lasso-rpc
+```
+
+### Persistent Data Directory
+
+Use `LASSO_DATA_DIR` to persist profile modifications:
+
+```bash
+docker run --rm \
+  -p 4000:4000 \
+  -v lasso-data:/data \
+  -e LASSO_DATA_DIR=/data \
+  -e SECRET_KEY_BASE="your-secret" \
+  -e PHX_HOST="rpc.example.com" \
+  -e LASSO_NODE_ID="production-1" \
+  lasso-rpc
+```
+
+The entrypoint script automatically seeds default profiles to `/data/config/profiles` on first run.
+
+## Docker Compose
+
+Example `docker-compose.yml`:
+
+```yaml
+version: '3.8'
+
+services:
+  lasso:
+    build: .
+    ports:
+      - "4000:4000"
+    environment:
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      PHX_HOST: rpc.example.com
+      PHX_SERVER: "true"
+      LASSO_NODE_ID: production-1
+      ALCHEMY_API_KEY: ${ALCHEMY_API_KEY}
+      INFURA_API_KEY: ${INFURA_API_KEY}
+    volumes:
+      - lasso-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  lasso-data:
+```
+
+Run with:
+
+```bash
+docker-compose up -d
+```
+
+## Health Checks
+
+The health endpoint is available at `/api/health`:
+
+```bash
+curl http://localhost:4000/api/health
+```
+
+Configure Docker health checks:
+
+```bash
+docker run --rm \
+  -p 4000:4000 \
+  -e SECRET_KEY_BASE="your-secret" \
+  -e PHX_HOST="rpc.example.com" \
+  -e LASSO_NODE_ID="production-1" \
+  --health-cmd="curl -f http://localhost:4000/api/health || exit 1" \
+  --health-interval=30s \
+  --health-timeout=10s \
+  --health-retries=3 \
+  --health-start-period=40s \
+  lasso-rpc
+```
+
+## Container Registry
+
+Push to a container registry:
+
+```bash
+# Build and tag
+docker build -t myregistry.com/lasso-rpc:latest .
+
+# Push
+docker push myregistry.com/lasso-rpc:latest
+```
+
+## Entrypoint Script
+
+The container uses `/app/entrypoint.sh` to handle initialization:
+
+```bash
+#!/bin/bash
+set -e
+
+echo "Lasso RPC starting..."
+
+# Seed profiles to data directory if LASSO_DATA_DIR is set
+if [ -n "$LASSO_DATA_DIR" ]; then
+  PROFILE_DIR="${LASSO_DATA_DIR}/config/profiles"
+  mkdir -p "$PROFILE_DIR"
+  
+  if [ -z "$(ls -A "$PROFILE_DIR" 2>/dev/null)" ]; then
+    echo "Seeding profiles to $PROFILE_DIR"
+    cp -r /app/config/profiles/* "$PROFILE_DIR/"
+  fi
+fi
+
+# Start the Elixir release
+exec /app/bin/lasso start
+```
+
+This enables:
+- Automatic profile seeding on first run
+- Persistent profile storage with volume mounts
+- Foreground process execution for container lifecycle
+
+## Next Steps
+
+- [Clustering](/deployment/clustering) - Connect multiple Docker containers
+- [Geo-Distributed Deployment](/deployment/geo-distributed) - Multi-region setup
+- [Production Checklist](/deployment/production-checklist) - Pre-launch verification

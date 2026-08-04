@@ -1,0 +1,359 @@
+---
+title: Subscriptions
+description: Real-time blockchain event subscriptions via WebSocket
+---
+
+Lasso supports Ethereum JSON-RPC subscriptions over WebSocket for real-time blockchain events. Use `eth_subscribe` to create subscriptions and `eth_unsubscribe` to cancel them.
+
+## Subscription Types
+
+Lasso supports the following subscription types:
+
+| Type | Description |
+|------|-------------||
+| `newHeads` | New block headers as they arrive |
+| `logs` | Log events matching a filter |
+
+## Creating Subscriptions
+
+### Subscribe to New Block Headers
+
+**Request:**
+
+```json
+{"jsonrpc":"2.0","method":"eth_subscribe","params":["newHeads"],"id":1}
+```
+
+**Response:**
+
+```json
+{"jsonrpc":"2.0","id":1,"result":"0xabc123..."}
+```
+
+The `result` field contains the subscription ID. Save this ID to unsubscribe later.
+
+**Subscription Events:**
+
+As new blocks arrive, the server pushes events:
+
+```json
+{
+  "jsonrpc":"2.0",
+  "method":"eth_subscription",
+  "params":{
+    "subscription":"0xabc123...",
+    "result":{
+      "parentHash":"0x...",
+      "sha3Uncles":"0x...",
+      "miner":"0x...",
+      "stateRoot":"0x...",
+      "transactionsRoot":"0x...",
+      "receiptsRoot":"0x...",
+      "logsBloom":"0x...",
+      "difficulty":"0x0",
+      "number":"0x8471c9a",
+      "gasLimit":"0x1c9c380",
+      "gasUsed":"0x5208",
+      "timestamp":"0x65f3a2b0",
+      "extraData":"0x...",
+      "mixHash":"0x...",
+      "nonce":"0x0000000000000000",
+      "baseFeePerGas":"0x7",
+      "hash":"0x..."
+    }
+  }
+}
+```
+
+### Subscribe to Logs
+
+**Request with filter:**
+
+```json
+{
+  "jsonrpc":"2.0",
+  "method":"eth_subscribe",
+  "params":[
+    "logs",
+    {
+      "address":"0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "topics":["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"]
+    }
+  ],
+  "id":2
+}
+```
+
+This example subscribes to Transfer events from USDC on Ethereum.
+
+**Response:**
+
+```json
+{"jsonrpc":"2.0","id":2,"result":"0xdef456..."}
+```
+
+**Subscription Events:**
+
+As matching logs are emitted, the server pushes events:
+
+```json
+{
+  "jsonrpc":"2.0",
+  "method":"eth_subscription",
+  "params":{
+    "subscription":"0xdef456...",
+    "result":{
+      "address":"0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "topics":[
+        "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+        "0x000000000000000000000000742d35cc6634c0532925a3b844bc454e4438f44e",
+        "0x0000000000000000000000001e0049783f008a0085193e00003d00cd54003c71"
+      ],
+      "data":"0x0000000000000000000000000000000000000000000000000000000002faf080",
+      "blockNumber":"0x8471c9a",
+      "transactionHash":"0x...",
+      "transactionIndex":"0x0",
+      "blockHash":"0x...",
+      "logIndex":"0x0",
+      "removed":false
+    }
+  }
+}
+```
+
+### Log Filter Options
+
+The `logs` subscription accepts a filter object with:
+
+| Field | Type | Description |
+|-------|------|-------------||
+| `address` | string or array | Contract address(es) to filter. Omit for all contracts. |
+| `topics` | array | Event signature and indexed parameters. Use `null` for wildcards. |
+
+**Examples:**
+
+**All events from a contract:**
+
+```json
+{
+  "address":"0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+}
+```
+
+**Specific event signature across all contracts:**
+
+```json
+{
+  "topics":["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"]
+}
+```
+
+**Event from multiple contracts:**
+
+```json
+{
+  "address":[
+    "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+    "0xdac17f958d2ee523a2206206994597c13d831ec7"
+  ],
+  "topics":["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"]
+}
+```
+
+**Event with indexed parameter filter:**
+
+```json
+{
+  "address":"0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+  "topics":[
+    "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+    null,
+    "0x0000000000000000000000001e0049783f008a0085193e00003d00cd54003c71"
+  ]
+}
+```
+
+This filters for Transfer events where the second indexed parameter (recipient) matches the specified address.
+
+## Unsubscribing
+
+Cancel a subscription using `eth_unsubscribe`:
+
+**Request:**
+
+```json
+{"jsonrpc":"2.0","method":"eth_unsubscribe","params":["0xabc123..."],"id":3}
+```
+
+**Response:**
+
+```json
+{"jsonrpc":"2.0","id":3,"result":true}
+```
+
+A result of `true` indicates successful unsubscription. After unsubscribing, no more events will be pushed for that subscription ID.
+
+## Full Example
+
+Here's a complete subscription flow using `wscat`:
+
+```bash
+# Connect to WebSocket endpoint
+wscat -c 'ws://localhost:4000/ws/rpc/ethereum?key=lasso_abc123'
+
+# Subscribe to new blocks
+> {"jsonrpc":"2.0","method":"eth_subscribe","params":["newHeads"],"id":1}
+< {"jsonrpc":"2.0","id":1,"result":"0xabc123..."}
+
+# Receive block events
+< {"jsonrpc":"2.0","method":"eth_subscription","params":{"subscription":"0xabc123...","result":{...}}}
+< {"jsonrpc":"2.0","method":"eth_subscription","params":{"subscription":"0xabc123...","result":{...}}}
+
+# Unsubscribe
+> {"jsonrpc":"2.0","method":"eth_unsubscribe","params":["0xabc123..."],"id":2}
+< {"jsonrpc":"2.0","id":2,"result":true}
+```
+
+## Subscription Lifecycle
+
+### Automatic Cleanup
+
+Subscriptions are automatically cleaned up when:
+- The WebSocket connection closes
+- The connection times out (see [Connection Lifecycle](/api/connection-lifecycle))
+- An `eth_unsubscribe` request is received
+
+### Multiple Subscriptions
+
+You can create multiple subscriptions on a single WebSocket connection:
+
+```json
+// Subscribe to blocks
+{"jsonrpc":"2.0","method":"eth_subscribe","params":["newHeads"],"id":1}
+
+// Subscribe to logs
+{"jsonrpc":"2.0","method":"eth_subscribe","params":["logs",{"address":"0x..."}],"id":2}
+```
+
+Each subscription receives a unique subscription ID and events are tagged with the corresponding ID.
+
+## Error Handling
+
+### Invalid Subscription Type
+
+**Request:**
+
+```json
+{"jsonrpc":"2.0","method":"eth_subscribe","params":["invalidType"],"id":1}
+```
+
+**Response:**
+
+```json
+{
+  "jsonrpc":"2.0",
+  "id":1,
+  "error":{
+    "code":-32602,
+    "message":"Invalid params: unsupported subscription type"
+  }
+}
+```
+
+### Invalid Filter Format
+
+**Request:**
+
+```json
+{"jsonrpc":"2.0","method":"eth_subscribe","params":["logs",{"invalid":"field"}],"id":2}
+```
+
+**Response:**
+
+```json
+{
+  "jsonrpc":"2.0",
+  "id":2,
+  "error":{
+    "code":-32602,
+    "message":"Invalid params: malformed filter"
+  }
+}
+```
+
+### Unsubscribe Non-Existent Subscription
+
+**Request:**
+
+```json
+{"jsonrpc":"2.0","method":"eth_unsubscribe","params":["0xnonexistent"],"id":3}
+```
+
+**Response:**
+
+```json
+{"jsonrpc":"2.0","id":3,"result":false}
+```
+
+A result of `false` indicates the subscription ID was not found.
+
+## Best Practices
+
+### Track Subscription IDs
+
+Always store subscription IDs returned by `eth_subscribe` to unsubscribe later:
+
+```javascript
+const subscriptionIds = new Map();
+
+// Subscribe
+const request = {jsonrpc: "2.0", method: "eth_subscribe", params: ["newHeads"], id: 1};
+ws.send(JSON.stringify(request));
+
+ws.on('message', (data) => {
+  const response = JSON.parse(data);
+  if (response.id === 1) {
+    subscriptionIds.set('newHeads', response.result);
+  }
+});
+
+// Unsubscribe
+function cleanup() {
+  const subId = subscriptionIds.get('newHeads');
+  if (subId) {
+    const request = {jsonrpc: "2.0", method: "eth_unsubscribe", params: [subId], id: 2};
+    ws.send(JSON.stringify(request));
+  }
+}
+```
+
+### Handle Reconnection
+
+Subscriptions don't persist across reconnections. Re-subscribe after reconnecting:
+
+```javascript
+ws.on('open', () => {
+  // Re-subscribe to all active subscriptions
+  subscribeToNewHeads();
+  subscribeToLogs();
+});
+```
+
+### Filter Logs Efficiently
+
+Use specific filters to reduce network traffic:
+
+```json
+// Good: Specific contract and event
+{
+  "address":"0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+  "topics":["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"]
+}
+
+// Avoid: No filter (receives all logs)
+{}
+```
+
+### Rate Limiting
+
+Subscriptions count toward your API rate limit. Monitor your usage and adjust filters accordingly.

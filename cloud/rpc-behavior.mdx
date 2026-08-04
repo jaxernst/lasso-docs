@@ -1,0 +1,65 @@
+---
+title: RPC workload behavior
+description: Plan routing for reads, historical state, writes, filters, and WebSocket subscriptions
+---
+
+# RPC workload behavior
+
+Routing guarantees depend on the operation. Classify the workload before
+choosing a rollout and recovery plan.
+
+## Stateless reads
+
+Methods such as `eth_chainId`, `eth_blockNumber`, current balances, transaction
+receipts, and many contract calls are the cleanest failover candidates. Lasso
+can try another eligible provider when a failure is safe to retry. Applications
+must still tolerate ordinary chain reorganization and provider freshness
+differences.
+
+## Historical state and logs
+
+Historical block, state, and log coverage varies independently across provider
+plans. Lasso analyzes block references and provider capabilities, but a probe is
+evidence from selected depths and representative calls—not proof of unlimited
+history.
+
+`eth_getLogs` also has provider-specific block-range and result-size limits.
+Split large ranges, paginate with an overlap appropriate for reorg handling,
+and verify the exact range used by an indexer. A provider that serves old logs
+may still lack old state, and the reverse is also possible.
+
+## Trace and debug methods
+
+Trace namespaces are often plan-gated or client-specific. Include only providers
+that support the exact trace method and parameters your application sends.
+Treat a successful representative probe as a starting point, then test real
+payload shapes and timeouts.
+
+## Transaction broadcast
+
+`eth_sendRawTransaction` forwards a pre-signed transaction to a selected
+provider. Lasso does not manage account nonces, deduplicate application
+submissions, guarantee propagation to every upstream, or track receipts for the
+application. Production senders should own signing, nonce allocation,
+idempotency, rebroadcast policy, and receipt/finality tracking.
+
+## Stateful HTTP filters
+
+Methods such as `eth_newFilter` create provider-local state. A filter ID from one
+provider is not valid on another, so ordinary provider failover can break the
+polling sequence. Prefer direct `eth_getLogs` for historical scans and WebSocket
+subscriptions for real-time delivery, or maintain explicit provider affinity
+and recovery in the application.
+
+## WebSocket subscriptions
+
+Lasso multiplexes compatible upstream subscriptions and can fail over within a
+profile. On provider changes it can gap-fill `newHeads` and log subscriptions
+with HTTP backfill and deduplication. Pending transactions are ephemeral and do
+not have gap filling.
+
+Within-profile subscription failover should not be confused with system-profile
+HTTP fallback. Cross-profile subscription fallback is not part of the current
+guarantee. Clients must reconnect after network interruption, handle duplicate
+or delayed events, and keep their own durable checkpoint for indexer-grade
+processing.

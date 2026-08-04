@@ -1,0 +1,94 @@
+---
+title: First endpoint quickstart
+description: Create a key, make a harmless RPC call, and stage the first endpoint change
+---
+
+# First endpoint quickstart
+
+This flow evaluates Lasso with a standard JSON-RPC call. Creating an external
+key changes service state; an agent should ask before doing it for a user.
+
+## 1. Check live support
+
+```bash
+curl -sS https://lasso.sh/api/v1/agent/chains
+curl -sS https://lasso.sh/api/v1/agent/pricing
+```
+
+Choose a chain and an explicit strategy. The runtime default is
+`load-balanced`, but an explicit URL makes the evaluation reproducible.
+
+## 2. Create and save a key
+
+```bash
+curl -sS -X POST https://lasso.sh/api/v1/agent/keys
+```
+
+The response includes a full `key` and a ready-to-use endpoint. The full key is
+shown once. Put it in the project's existing secret store; do not print it into
+chat, logs, shell history, screenshots, or source control.
+
+Load the key from the project's secret manager. For a one-off interactive shell,
+read it without echoing it or placing the value in shell history:
+
+```bash
+read -rsp "Lasso key: " LASSO_KEY && export LASSO_KEY && printf '\n'
+```
+
+## 3. Make a harmless call
+
+```bash
+curl -sS -D /tmp/lasso-headers.txt \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' \
+  "https://lasso.sh/rpc/k/$LASSO_KEY/load-balanced/ethereum?include_meta=headers"
+```
+
+The body remains standard JSON-RPC. `include_meta=headers` adds a request ID and
+encoded routing metadata without changing the body shape. Anonymous keys can
+also receive per-request CU and USD headers. See
+[Routing and usage evidence](observability) before building automation around a
+header.
+
+## 4. Install the URL
+
+Lasso replaces the upstream URL; the client remains standard EVM JSON-RPC.
+
+```bash
+export RPC_URL="https://lasso.sh/rpc/k/$LASSO_KEY/load-balanced/ethereum"
+```
+
+For viem:
+
+```javascript
+import { createPublicClient, http } from "viem";
+import { mainnet } from "viem/chains";
+
+const client = createPublicClient({
+  chain: mainnet,
+  transport: http(
+    `https://lasso.sh/rpc/k/${process.env.LASSO_KEY}/load-balanced/ethereum`,
+  ),
+});
+```
+
+Begin with a non-critical stateless read path. Compare results, latency, and
+routing evidence before expanding traffic or adding historical, write, filter,
+or subscription workloads.
+
+## 5. Link management when useful
+
+An anonymous key can be linked to a dashboard account without changing its RPC
+URL:
+
+```bash
+curl -sS -X POST \
+  "https://lasso.sh/api/v1/agent/keys/$LASSO_KEY/claim-link"
+```
+
+Give the short-lived `claim_url` to the user. Linking adds the account management
+surface; it should not be performed without the user's approval.
+
+For exact key, funding, claim, and session-payment payloads, use
+[`/openapi.json`](https://lasso.sh/openapi.json) and
+[`/SKILL.md`](https://lasso.sh/SKILL.md).

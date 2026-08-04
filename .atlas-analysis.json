@@ -1,0 +1,137 @@
+{
+  "projectType": "infrastructure",
+  "projectName": "Lasso RPC",
+  "projectDescription": "Blockchain node RPC aggregation and smart routing for better RPC endpoints",
+  "theme": "aspen",
+  "primaryColor": "#3B82F6",
+  "lightColor": "#60A5FA",
+  "darkColor": "#1E40AF",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/routing-strategies",
+              "concepts/profiles",
+              "concepts/provider-selection",
+              "concepts/circuit-breakers"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/overview",
+              "configuration/profiles",
+              "configuration/providers",
+              "configuration/capabilities",
+              "configuration/environment-variables"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/docker",
+              "deployment/clustering",
+              "deployment/geo-distributed",
+              "deployment/production-checklist"
+            ]
+          },
+          {
+            "group": "Observability",
+            "pages": [
+              "observability/dashboard",
+              "observability/metrics",
+              "observability/logging",
+              "observability/request-metadata"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/websocket-subscriptions",
+              "advanced/block-sync",
+              "advanced/benchmarking",
+              "advanced/error-classification"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "HTTP API",
+            "pages": [
+              "api/http-endpoints",
+              "api/routing-strategies",
+              "api/batch-requests",
+              "api/authentication"
+            ]
+          },
+          {
+            "group": "WebSocket API",
+            "pages": [
+              "api/websocket-endpoints",
+              "api/subscriptions",
+              "api/connection-lifecycle"
+            ]
+          },
+          {
+            "group": "Management API",
+            "pages": [
+              "api/health-check",
+              "api/chain-status",
+              "api/metrics-api"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "api/supported-methods",
+              "api/error-codes",
+              "api/response-formats"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Multi-provider RPC aggregation with intelligent routing",
+    "HTTP and WebSocket JSON-RPC proxy support",
+    "Circuit breakers and automatic failover",
+    "Real-time provider benchmarking and selection",
+    "WebSocket subscription multiplexing with gap-filling",
+    "Geo-distributed clustering for observability",
+    "Profile-based multi-tenancy",
+    "LiveView dashboard for monitoring"
+  ],
+  "publicApiSurface": [
+    "POST /rpc/:chain",
+    "POST /rpc/fastest/:chain",
+    "POST /rpc/load-balanced/:chain",
+    "POST /rpc/latency-weighted/:chain",
+    "POST /rpc/provider/:provider_id/:chain",
+    "POST /rpc/profile/:profile/:chain",
+    "ws://host/ws/rpc/:chain",
+    "ws://host/ws/rpc/:strategy/:chain",
+    "ws://host/ws/rpc/provider/:provider_id/:chain",
+    "ws://host/ws/rpc/profile/:profile/:chain",
+    "GET /api/health",
+    "GET /api/chains",
+    "GET /api/chains/:chain_id/status",
+    "GET /api/metrics/:chain"
+  ]
+}

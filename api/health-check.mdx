@@ -1,0 +1,147 @@
+---
+title: 'Health Check'
+description: 'Monitor Lasso RPC instance health and cluster status'
+---
+
+## Overview
+
+The health check endpoint provides real-time information about your Lasso RPC instance's operational status, uptime, and cluster connectivity.
+
+## Endpoint
+
+```
+GET /api/health
+```
+
+## Response
+
+Returns a JSON object containing instance health information:
+
+<ResponseField name="status" type="string" required>
+  Overall health status of the instance (always "healthy" when responding)
+</ResponseField>
+
+<ResponseField name="timestamp" type="string" required>
+  ISO 8601 timestamp of the health check
+</ResponseField>
+
+<ResponseField name="uptime_seconds" type="integer" required>
+  Time in seconds since the Lasso RPC instance started
+</ResponseField>
+
+<ResponseField name="version" type="string" required>
+  Current version of Lasso RPC
+</ResponseField>
+
+<ResponseField name="cluster" type="object" required>
+  Cluster connectivity and status information
+  
+  <Expandable title="cluster properties">
+    <ResponseField name="enabled" type="boolean" required>
+      Whether clustering is enabled for this instance
+    </ResponseField>
+    
+    <ResponseField name="nodes_connected" type="integer" required>
+      Number of cluster nodes currently connected
+    </ResponseField>
+    
+    <ResponseField name="nodes_responding" type="integer" required>
+      Number of cluster nodes actively responding to health checks
+    </ResponseField>
+    
+    <ResponseField name="nodes_total" type="integer" required>
+      Expected total number of nodes in the cluster
+    </ResponseField>
+    
+    <ResponseField name="regions" type="array" required>
+      List of geographic regions where cluster nodes are deployed
+    </ResponseField>
+    
+    <ResponseField name="status" type="string" required>
+      Cluster health status: `standalone`, `healthy`, `degraded`, or `critical`
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Response Example
+
+```json
+{
+  "status": "healthy",
+  "timestamp": "2026-03-03T21:45:30.123456Z",
+  "uptime_seconds": 86400,
+  "version": "0.1.0",
+  "cluster": {
+    "enabled": true,
+    "nodes_connected": 3,
+    "nodes_responding": 3,
+    "nodes_total": 3,
+    "regions": ["us-east-1", "eu-west-1", "ap-southeast-1"],
+    "status": "healthy"
+  }
+}
+```
+
+## Cluster Status Values
+
+The `cluster.status` field indicates the overall health of your cluster deployment:
+
+<ResponseField name="standalone">
+  Clustering is not enabled. Instance is running independently.
+</ResponseField>
+
+<ResponseField name="healthy">
+  All expected cluster nodes are connected and responding.
+</ResponseField>
+
+<ResponseField name="degraded">
+  At least half of the cluster nodes are responding, but some are unavailable.
+</ResponseField>
+
+<ResponseField name="critical">
+  Less than half of the expected cluster nodes are responding.
+</ResponseField>
+
+## Use Cases
+
+### Load Balancer Health Checks
+
+Configure your load balancer to poll this endpoint:
+
+```bash
+curl http://localhost:4000/api/health
+```
+
+### Monitoring and Alerts
+
+Integrate with monitoring systems to track uptime and cluster status:
+
+```bash
+# Check if instance is healthy
+response=$(curl -s http://localhost:4000/api/health)
+status=$(echo $response | jq -r '.status')
+
+if [ "$status" != "healthy" ]; then
+  echo "Alert: Lasso RPC is not healthy"
+fi
+```
+
+### Cluster Health Monitoring
+
+Monitor cluster connectivity in distributed deployments:
+
+```bash
+# Alert if cluster is degraded
+cluster_status=$(curl -s http://localhost:4000/api/health | jq -r '.cluster.status')
+
+if [ "$cluster_status" = "degraded" ] || [ "$cluster_status" = "critical" ]; then
+  echo "Alert: Cluster is $cluster_status"
+fi
+```
+
+## Notes
+
+- This endpoint responds immediately and does not perform heavy computation
+- Response time is typically under 10ms, making it suitable for frequent polling
+- The endpoint is always accessible, even when other parts of the system may be degraded
+- For single-instance deployments, `cluster.enabled` will be `false` and `cluster.status` will be `standalone`

@@ -1,0 +1,367 @@
+---
+title: Provider Configuration
+description: Configure RPC providers, API keys, and routing priorities
+---
+
+Providers are the upstream RPC endpoints that Lasso routes requests to. Each chain can have multiple providers with different priorities, capabilities, and access methods.
+
+## Provider Fields
+
+Providers are defined in the `providers` list under each chain configuration.
+
+<ParamField path="id" type="string" required>
+  Unique identifier for the provider within the chain. Used in metrics, logs, and provider-specific routing.
+  
+  ```yaml
+  providers:
+    - id: "ethereum_llamarpc"
+  ```
+</ParamField>
+
+<ParamField path="name" type="string">
+  Display name shown in the dashboard and logs. Defaults to `id` if omitted.
+  
+  ```yaml
+  name: "LlamaRPC Ethereum"
+  ```
+</ParamField>
+
+<ParamField path="url" type="string" required="*">
+  HTTP RPC endpoint URL. Supports environment variable substitution.
+  
+  ```yaml
+  url: "https://eth.llamarpc.com"
+  ```
+  
+  *At least one of `url` or `ws_url` is required.
+</ParamField>
+
+<ParamField path="ws_url" type="string">
+  WebSocket RPC endpoint URL. Required for subscriptions and real-time block tracking.
+  
+  ```yaml
+  ws_url: "wss://eth.llamarpc.com"
+  ```
+</ParamField>
+
+<ParamField path="priority" type="integer">
+  Routing priority. Lower values = higher priority. Used by the `:priority` strategy and as a tiebreaker in other strategies.
+  
+  ```yaml
+  priority: 2
+  ```
+  
+  **Common patterns:**
+  - `1-5`: Your own nodes and premium providers
+  - `10-20`: Free public providers
+  - `100+`: Last-resort fallbacks
+</ParamField>
+
+<ParamField path="archival" type="boolean" default="true">
+  Whether this provider serves historical/archival data. Non-archival providers are excluded for requests older than `selection.archival_threshold`.
+  
+  ```yaml
+  archival: true
+  ```
+</ParamField>
+
+<ParamField path="subscribe_new_heads" type="boolean">
+  Override chain-level `websocket.subscribe_new_heads` for this provider.
+  
+  ```yaml
+  subscribe_new_heads: true
+  ```
+</ParamField>
+
+<ParamField path="capabilities" type="object">
+  Provider capabilities and limits. See [Capabilities](/configuration/capabilities) for details.
+  
+  ```yaml
+  capabilities:
+    limits:
+      max_block_range: 1000
+  ```
+</ParamField>
+
+## Basic Provider Example
+
+```yaml
+providers:
+  - id: "ethereum_llamarpc"
+    name: "LlamaRPC Ethereum"
+    priority: 5
+    url: "https://eth.llamarpc.com"
+    ws_url: "wss://eth.llamarpc.com"
+    archival: false
+    subscribe_new_heads: true
+    capabilities:
+      limits:
+        max_block_range: 1000
+```
+
+## Environment Variable Substitution
+
+Provider URLs support `${ENV_VAR}` substitution for API keys and secrets. Unresolved variables crash at startup to prevent silent misconfiguration.
+
+### Basic Substitution
+
+```yaml
+providers:
+  - id: "alchemy_ethereum"
+    url: "https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+    ws_url: "wss://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+```
+
+Set the environment variable:
+
+```bash
+export ALCHEMY_API_KEY="your-key-here"
+```
+
+### Multiple Variables
+
+```yaml
+providers:
+  - id: "custom_endpoint"
+    url: "https://${RPC_HOST}:${RPC_PORT}/v1/${API_KEY}"
+```
+
+### .env File Support
+
+Lasso loads `.env` files from the project root if present:
+
+```bash
+# .env
+ALCHEMY_API_KEY=your-key-here
+DRPC_API_KEY=another-key
+CHAINSTACK_API_KEY=third-key
+```
+
+System environment variables take precedence over `.env` values.
+
+## BYOK (Bring Your Own Keys)
+
+Use your own provider API keys alongside public providers for better rate limits and reliability.
+
+### Example: Tiered Provider Setup
+
+```yaml
+chains:
+  ethereum:
+    chain_id: 1
+    providers:
+      # Tier 1: Your own node (highest priority)
+      - id: "my_erigon"
+        url: "http://my-erigon:8545"
+        priority: 1
+        archival: true
+
+      # Tier 2: Paid provider with your API key
+      - id: "alchemy"
+        url: "https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+        ws_url: "wss://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+        priority: 2
+        archival: true
+
+      # Tier 3: Free public fallback
+      - id: "publicnode"
+        url: "https://ethereum-rpc.publicnode.com"
+        ws_url: "wss://ethereum-rpc.publicnode.com"
+        priority: 10
+        archival: false
+```
+
+### Benefits of BYOK
+
+<AccordionGroup>
+  <Accordion title="Higher rate limits">
+    Paid provider plans typically offer 10-100x higher rate limits than free public endpoints.
+  </Accordion>
+
+  <Accordion title="Better reliability">
+    Your own nodes and paid providers have dedicated capacity and SLAs.
+  </Accordion>
+
+  <Accordion title="Cost control">
+    Use free public providers for low-priority traffic and paid providers for critical requests.
+  </Accordion>
+
+  <Accordion title="Data sovereignty">
+    Route sensitive requests to your own infrastructure while using public providers for general queries.
+  </Accordion>
+</AccordionGroup>
+
+## Provider Override
+
+Bypass routing strategies and send requests directly to a specific provider:
+
+```bash
+POST /rpc/provider/:provider_id/:chain
+```
+
+Example:
+
+```bash
+curl -X POST http://localhost:4000/rpc/provider/ethereum_llamarpc/ethereum \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+Use cases:
+- Testing specific provider behavior
+- Debugging provider issues
+- Sending requests to providers with unique features
+
+## Common Provider Patterns
+
+### Archival + Pruned Combination
+
+```yaml
+providers:
+  # Archival provider for historical queries
+  - id: "drpc_archival"
+    url: "https://eth.drpc.org"
+    priority: 2
+    archival: true
+    capabilities:
+      limits:
+        max_block_range: 10000
+
+  # Pruned provider for recent data (faster, cheaper)
+  - id: "publicnode_pruned"
+    url: "https://ethereum-rpc.publicnode.com"
+    priority: 3
+    archival: false
+    capabilities:
+      limits:
+        max_block_age: 1000
+        block_age_methods:
+          - eth_call
+          - eth_getBalance
+```
+
+Lasso automatically routes historical requests to archival providers and recent requests to pruned providers.
+
+### WebSocket Fallback
+
+```yaml
+providers:
+  # Primary: WebSocket + HTTP
+  - id: "drpc"
+    url: "https://eth.drpc.org"
+    ws_url: "wss://eth.drpc.org"
+    priority: 2
+    subscribe_new_heads: true
+
+  # Fallback: HTTP only
+  - id: "publicnode"
+    url: "https://ethereum-rpc.publicnode.com"
+    priority: 3
+    subscribe_new_heads: false
+```
+
+### Multi-Region Setup
+
+```yaml
+providers:
+  # US provider
+  - id: "alchemy_us"
+    url: "https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+    priority: 2
+
+  # EU provider
+  - id: "chainstack_eu"
+    url: "https://ethereum-mainnet.eu.chainstack.com/${CHAINSTACK_API_KEY}"
+    priority: 2
+
+  # Asia provider
+  - id: "nodereal_asia"
+    url: "https://eth-mainnet.asia.nodereal.io/v1/${NODEREAL_API_KEY}"
+    priority: 2
+```
+
+Deploy Lasso nodes in each region and configure routing to prefer local providers.
+
+## Provider Configuration from default.yml
+
+Here's a real example from the included `default.yml` profile:
+
+```yaml
+providers:
+  - id: "ethereum_drpc"
+    name: "dRPC Ethereum"
+    priority: 2
+    url: "https://eth.drpc.org"
+    ws_url: "wss://eth.drpc.org"
+    archival: true
+    subscribe_new_heads: true
+    capabilities:
+      limits:
+        max_block_range: 10000
+      error_rules:
+        - code: 30
+          message_contains: "timeout on the free tier"
+          category: rate_limit
+        - code: 30
+          category: rate_limit
+        - code: 35
+          category: capability_violation
+
+  - id: "ethereum_publicnode"
+    name: "PublicNode Ethereum"
+    priority: 3
+    url: "https://ethereum-rpc.publicnode.com"
+    ws_url: "wss://ethereum-rpc.publicnode.com"
+    subscribe_new_heads: true
+    archival: false
+    capabilities:
+      unsupported_categories: [debug, trace, txpool, eip4844, filters]
+      limits:
+        max_block_age: 1000
+        block_age_methods:
+          - eth_call
+          - eth_getBalance
+          - eth_getCode
+          - eth_getStorageAt
+          - eth_getTransactionCount
+      error_rules:
+        - code: -32701
+          category: capability_violation
+        - message_contains: "pruned"
+          category: requires_archival
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use descriptive provider IDs">
+    Provider IDs appear in metrics and logs. Use names like `ethereum_llamarpc` or `base_alchemy` that include both chain and provider.
+  </Accordion>
+
+  <Accordion title="Set WebSocket URLs when available">
+    WebSocket support enables real-time block tracking and reduces polling overhead.
+  </Accordion>
+
+  <Accordion title="Configure capabilities accurately">
+    Incorrect capability configuration can cause request failures. Test providers and document their actual limits.
+  </Accordion>
+
+  <Accordion title="Layer providers by priority">
+    Use priority tiers to control routing order: own nodes (1-5), paid providers (10-20), free providers (30-50), fallbacks (100+).
+  </Accordion>
+
+  <Accordion title="Document provider quirks">
+    Use YAML comments to note rate limits, known issues, or special behavior.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Capabilities" icon="shield-check" href="/configuration/capabilities">
+    Configure provider capabilities and error handling
+  </Card>
+  <Card title="Environment Variables" icon="key" href="/configuration/environment-variables">
+    Learn about runtime configuration options
+  </Card>
+</CardGroup>

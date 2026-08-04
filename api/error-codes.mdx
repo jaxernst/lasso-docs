@@ -1,0 +1,465 @@
+---
+title: Error Codes
+description: JSON-RPC error codes and error handling in Lasso
+---
+
+Lasso normalizes all error responses to standard JSON-RPC 2.0 format, providing consistent error handling across all providers.
+
+## Error Response Format
+
+All errors follow the JSON-RPC 2.0 specification:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32601,
+    "message": "Method not supported over HTTP. Use WebSocket connection for subscriptions.",
+    "data": {
+      "websocket_url": "/ws/rpc/ethereum"
+    }
+  }
+}
+```
+
+### Error Object Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `code` | integer | Standard JSON-RPC error code or server-defined code |
+| `message` | string | Human-readable error description |
+| `data` | object (optional) | Additional error context and hints |
+
+## Standard JSON-RPC Error Codes
+
+Lasso implements the complete JSON-RPC 2.0 error code specification:
+
+### -32700: Parse Error
+
+**Meaning:** Invalid JSON was received by the server. The request could not be parsed.
+
+**Common Causes:**
+- Malformed JSON syntax
+- Invalid UTF-8 encoding
+- Truncated request body
+
+**Example:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": null,
+  "error": {
+    "code": -32700,
+    "message": "Parse error: Invalid JSON"
+  }
+}
+```
+
+### -32600: Invalid Request
+
+**Meaning:** The JSON sent is not a valid Request object.
+
+**Common Causes:**
+- Missing required fields (`jsonrpc`, `method`, `id`)
+- Invalid field types
+- Batch request exceeds maximum size (default: 50)
+- Invalid `jsonrpc` version (must be "2.0")
+
+**Examples:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32600,
+    "message": "Invalid Request: Missing required field 'method'"
+  }
+}
+```
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32600,
+    "message": "Invalid Request: Batch size 75 exceeds maximum of 50",
+    "data": {
+      "batch_size": 75,
+      "max_batch_size": 50
+    }
+  }
+}
+```
+
+### -32601: Method Not Found
+
+**Meaning:** The requested method does not exist or is not supported in the current context.
+
+**Common Causes:**
+- Method name typo
+- Subscription method called over HTTP (use WebSocket)
+- Blocked method (wallet, signing, filters)
+- Chain-specific method not available on requested chain
+
+**Examples:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32601,
+    "message": "Method not supported over HTTP. Use WebSocket connection for subscriptions.",
+    "data": {
+      "websocket_url": "/ws/rpc/ethereum",
+      "hint": "Connect via WebSocket to use eth_subscribe"
+    }
+  }
+}
+```
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32601,
+    "message": "Method 'eth_sendRawTransaction' is not currently supported",
+    "data": {
+      "hint": "Transaction writes require nonce management and are planned for future releases"
+    }
+  }
+}
+```
+
+<Info>
+When subscription methods are called over HTTP, Lasso provides the correct WebSocket URL in the `data.websocket_url` field, mirroring the HTTP request path structure.
+</Info>
+
+### -32602: Invalid Params
+
+**Meaning:** Invalid method parameter(s).
+
+**Common Causes:**
+- Unsupported chain name or ID
+- Missing required parameters
+- Invalid parameter types or formats
+- Block number out of range
+
+**Examples:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32602,
+    "message": "Invalid params: Unsupported chain 'polygon'",
+    "data": {
+      "chain": "polygon",
+      "supported_chains": ["ethereum", "base", "arbitrum"]
+    }
+  }
+}
+```
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32602,
+    "message": "Invalid params: Block number must be a hex string or block tag",
+    "data": {
+      "provided": 12345,
+      "expected": "0x3039 or 'latest', 'earliest', 'pending', 'safe', 'finalized'"
+    }
+  }
+}
+```
+
+### -32603: Internal Error
+
+**Meaning:** Internal JSON-RPC error. Typically indicates an upstream provider failure.
+
+**Common Causes:**
+- All providers failed (circuit breakers open)
+- Upstream provider returned an error
+- Timeout waiting for provider response
+- Network connectivity issues
+
+**Example:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32603,
+    "message": "Internal error: All providers failed for chain ethereum",
+    "data": {
+      "attempted_providers": ["alchemy_eth", "infura_eth", "llamarpc_eth"],
+      "circuit_breaker_states": {
+        "alchemy_eth": "open",
+        "infura_eth": "open",
+        "llamarpc_eth": "half_open"
+      }
+    }
+  }
+}
+```
+
+### -32000: Server Error
+
+**Meaning:** Server-side error specific to Lasso's operation.
+
+**Common Causes:**
+- Rate limit exceeded
+- Strategy access denied (profile restriction)
+- Quota exceeded
+- Provider override failed
+- Authentication failure
+
+**Examples:**
+
+**Rate Limiting:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32000,
+    "message": "Rate limit exceeded. Limit: 100 requests per second.",
+    "data": {
+      "retry_after_ms": 150,
+      "rate_limit": 100,
+      "current_usage": 105
+    }
+  }
+}
+```
+
+<Tip>
+When rate limited, use the `retry_after_ms` value in the error data to implement exponential backoff.
+</Tip>
+
+**Authentication Failure:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32000,
+    "message": "Authentication failed: Invalid API key",
+    "data": {
+      "hint": "Provide API key via ?key=, X-Lasso-Api-Key header, or Authorization: Bearer"
+    }
+  }
+}
+```
+
+**Quota Exceeded:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32000,
+    "message": "Monthly quota exceeded",
+    "data": {
+      "quota_limit": 1000000,
+      "usage": 1000042,
+      "reset_date": "2026-04-01T00:00:00Z"
+    }
+  }
+}
+```
+
+**Strategy Access Denied:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32000,
+    "message": "Strategy 'fastest' not allowed for profile 'free'",
+    "data": {
+      "allowed_strategies": ["load_balanced"],
+      "requested_strategy": "fastest"
+    }
+  }
+}
+```
+
+## Batch Request Errors
+
+When sending batch requests, each item in the response array contains either a `result` or `error` field:
+
+**Request:**
+
+```json
+[
+  {"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1},
+  {"jsonrpc":"2.0","method":"eth_invalidMethod","params":[],"id":2},
+  {"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":3}
+]
+```
+
+**Response:**
+
+```json
+[
+  {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": "0x8471c9a"
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "error": {
+      "code": -32601,
+      "message": "Method not found: eth_invalidMethod"
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 3,
+    "result": "0x1"
+  }
+]
+```
+
+## Provider-Specific Errors
+
+Lasso normalizes upstream provider errors into standard JSON-RPC format. Original provider errors are preserved in the `data` field when available:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32602,
+    "message": "Query exceeds block range limit",
+    "data": {
+      "provider": "alchemy_eth",
+      "original_error": {
+        "code": -32005,
+        "message": "eth_getLogs is limited to a 10000 block range"
+      },
+      "hint": "Reduce block range or paginate your query"
+    }
+  }
+}
+```
+
+## WebSocket Errors
+
+WebSocket connections may receive errors in the same JSON-RPC format. Additionally, the connection may be closed with a specific close code:
+
+### WebSocket Close Codes
+
+| Code | Meaning | Description |
+|------|---------|-------------|
+| 1000 | Normal Closure | Subscription completed successfully |
+| 1001 | Going Away | Server shutting down |
+| 1002 | Protocol Error | Invalid frame or message format |
+| 1003 | Unsupported Data | Message type not supported |
+| 1008 | Policy Violation | Authentication failed or rate limit exceeded |
+| 1011 | Internal Error | Server error |
+
+### Heartbeat Timeout
+
+Lasso sends WebSocket pings every 30 seconds. If no pong is received within 5 seconds, the connection will be closed after 2 missed heartbeats:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": null,
+  "error": {
+    "code": -32000,
+    "message": "Connection timeout: No heartbeat response",
+    "data": {
+      "missed_heartbeats": 2,
+      "timeout_ms": 5000
+    }
+  }
+}
+```
+
+## Error Handling Best Practices
+
+### Retry Strategy
+
+**Retryable Errors:**
+- `-32603` Internal Error (temporary upstream failure)
+- `-32000` Rate Limit Exceeded (with exponential backoff)
+- `-32000` Server Error (check `data` for specifics)
+
+**Non-Retryable Errors:**
+- `-32700` Parse Error (fix request format)
+- `-32600` Invalid Request (fix request structure)
+- `-32601` Method Not Found (use correct method/transport)
+- `-32602` Invalid Params (fix parameters)
+
+### Exponential Backoff
+
+For rate limit errors, implement exponential backoff using `retry_after_ms`:
+
+```javascript
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function callWithRetry(request, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    const response = await fetch(url, request);
+    const json = await response.json();
+    
+    if (json.error?.code === -32000 && json.error.data?.retry_after_ms) {
+      const backoff = json.error.data.retry_after_ms * Math.pow(2, i);
+      await sleep(backoff);
+      continue;
+    }
+    
+    return json;
+  }
+}
+```
+
+### Circuit Breaker Awareness
+
+When all providers fail with circuit breakers open, consider:
+- Switching to a different chain if available
+- Implementing client-side caching for recent data
+- Showing user-friendly error messages
+- Monitoring circuit breaker state via observability metadata
+
+### Error Logging
+
+Always log the `data` field for debugging:
+
+```javascript
+if (response.error) {
+  console.error('RPC Error:', {
+    code: response.error.code,
+    message: response.error.message,
+    context: response.error.data,
+    request_id: response.error.data?.request_id
+  });
+}
+```
+
+## See Also
+
+- [Response Formats](/api/response-formats) - Understanding successful responses
+- [Authentication](/api/authentication) - API key setup and usage
+- [Configuration](/configuration/profiles) - Rate limits and quotas

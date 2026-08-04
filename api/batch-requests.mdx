@@ -1,0 +1,346 @@
+---
+title: Batch Requests
+description: Send multiple JSON-RPC requests in a single HTTP call
+---
+
+## Overview
+
+Lasso RPC supports JSON-RPC batch requests, allowing you to send multiple RPC calls in a single HTTP request. This reduces network overhead and improves throughput for bulk operations.
+
+## Batch Request Format
+
+Send an array of JSON-RPC request objects instead of a single object.
+
+### Single Request
+
+```json
+{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}
+```
+
+### Batch Request
+
+```json
+[
+  {"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1},
+  {"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":2}
+]
+```
+
+## Basic Example
+
+```bash
+curl -X POST http://localhost:4000/rpc/ethereum \
+  -H 'Content-Type: application/json' \
+  -d '[
+    {"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1},
+    {"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":2}
+  ]'
+```
+
+**Response:**
+
+```json
+[
+  {"jsonrpc":"2.0","id":1,"result":"0x8471c9a"},
+  {"jsonrpc":"2.0","id":2,"result":"0x1"}
+]
+```
+
+<Note>
+Responses are returned in the same order as the requests, preserving the request array order.
+</Note>
+
+## Batch Size Limit
+
+Maximum **50 requests** per batch (configurable via `max_batch_requests` application config).
+
+Exceeding the limit returns an error:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": null,
+  "error": {
+    "code": -32600,
+    "message": "Invalid Request: batch too large"
+  }
+}
+```
+
+## Advanced Examples
+
+### Account Balance and Nonce
+
+```bash
+curl -X POST http://localhost:4000/rpc/ethereum \
+  -H 'Content-Type: application/json' \
+  -d '[
+    {"jsonrpc":"2.0","method":"eth_getBalance","params":["0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb","latest"],"id":1},
+    {"jsonrpc":"2.0","method":"eth_getTransactionCount","params":["0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb","latest"],"id":2}
+  ]'
+```
+
+**Response:**
+
+```json
+[
+  {"jsonrpc":"2.0","id":1,"result":"0x1bc16d674ec80000"},
+  {"jsonrpc":"2.0","id":2,"result":"0x5"}
+]
+```
+
+### Multiple Contract Calls
+
+```bash
+curl -X POST http://localhost:4000/rpc/ethereum \
+  -H 'Content-Type: application/json' \
+  -d '[
+    {"jsonrpc":"2.0","method":"eth_call","params":[{"to":"0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48","data":"0x18160ddd"},"latest"],"id":1},
+    {"jsonrpc":"2.0","method":"eth_call","params":[{"to":"0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48","data":"0x313ce567"},"latest"],"id":2},
+    {"jsonrpc":"2.0","method":"eth_call","params":[{"to":"0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48","data":"0x95d89b41"},"latest"],"id":3}
+  ]'
+```
+
+**Response:**
+
+```json
+[
+  {"jsonrpc":"2.0","id":1,"result":"0x000000000000000000000000000000000000000000000000000000174876e800"},
+  {"jsonrpc":"2.0","id":2,"result":"0x0000000000000000000000000000000000000000000000000000000000000006"},
+  {"jsonrpc":"2.0","id":3,"result":"0x0000000000000000000000000000000000000000000000000000000000000020..."}
+]
+```
+
+### Mixed Methods
+
+```bash
+curl -X POST http://localhost:4000/rpc/ethereum \
+  -H 'Content-Type: application/json' \
+  -d '[
+    {"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1},
+    {"jsonrpc":"2.0","method":"eth_gasPrice","params":[],"id":2},
+    {"jsonrpc":"2.0","method":"eth_maxPriorityFeePerGas","params":[],"id":3},
+    {"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":4}
+  ]'
+```
+
+**Response:**
+
+```json
+[
+  {"jsonrpc":"2.0","id":1,"result":"0x8471c9a"},
+  {"jsonrpc":"2.0","id":2,"result":"0x3b9aca00"},
+  {"jsonrpc":"2.0","id":3,"result":"0x59682f00"},
+  {"jsonrpc":"2.0","id":4,"result":"0x1"}
+]
+```
+
+### Historical Log Queries
+
+```bash
+curl -X POST http://localhost:4000/rpc/ethereum \
+  -H 'Content-Type: application/json' \
+  -d '[
+    {"jsonrpc":"2.0","method":"eth_getLogs","params":[{"fromBlock":"0x1000000","toBlock":"0x1000100","topics":["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"]}],"id":1},
+    {"jsonrpc":"2.0","method":"eth_getLogs","params":[{"fromBlock":"0x1000100","toBlock":"0x1000200","topics":["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"]}],"id":2}
+  ]'
+```
+
+## Batch Requests with Strategies
+
+Batch requests work with all routing strategies.
+
+### Fastest Strategy
+
+```bash
+curl -X POST http://localhost:4000/rpc/fastest/ethereum \
+  -H 'Content-Type: application/json' \
+  -d '[
+    {"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1},
+    {"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":2}
+  ]'
+```
+
+### Provider Override
+
+```bash
+curl -X POST http://localhost:4000/rpc/provider/alchemy/ethereum \
+  -H 'Content-Type: application/json' \
+  -d '[
+    {"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1},
+    {"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":2}
+  ]'
+```
+
+### Profile-Scoped
+
+```bash
+curl -X POST http://localhost:4000/rpc/profile/testnet/load-balanced/base \
+  -H 'Content-Type: application/json' \
+  -d '[
+    {"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1},
+    {"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":2}
+  ]'
+```
+
+## Error Handling
+
+Batch requests return partial results if some requests fail.
+
+### Mixed Success and Error
+
+```bash
+curl -X POST http://localhost:4000/rpc/ethereum \
+  -H 'Content-Type: application/json' \
+  -d '[
+    {"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1},
+    {"jsonrpc":"2.0","method":"eth_subscribe","params":["newHeads"],"id":2},
+    {"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":3}
+  ]'
+```
+
+**Response:**
+
+```json
+[
+  {"jsonrpc":"2.0","id":1,"result":"0x8471c9a"},
+  {
+    "jsonrpc":"2.0",
+    "id":2,
+    "error":{
+      "code":-32601,
+      "message":"Method not supported over HTTP. Use WebSocket connection for subscriptions.",
+      "data":{"websocket_url":"/ws/rpc/ethereum"}
+    }
+  },
+  {"jsonrpc":"2.0","id":3,"result":"0x1"}
+]
+```
+
+### Invalid Request in Batch
+
+```bash
+curl -X POST http://localhost:4000/rpc/ethereum \
+  -H 'Content-Type: application/json' \
+  -d '[
+    {"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1},
+    {"invalid":"request"},
+    {"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":3}
+  ]'
+```
+
+**Response:**
+
+```json
+[
+  {"jsonrpc":"2.0","id":1,"result":"0x8471c9a"},
+  {
+    "jsonrpc":"2.0",
+    "id":null,
+    "error":{"code":-32600,"message":"Invalid Request"}
+  },
+  {"jsonrpc":"2.0","id":3,"result":"0x1"}
+]
+```
+
+## Performance Optimization
+
+Lasso optimizes batch requests with zero-copy passthrough when possible.
+
+### Passthrough Conditions
+
+Batch responses use raw bytes directly from upstream providers when:
+
+1. All requests succeed
+2. All responses are `Response.Success` structs
+3. Observability metadata is not requested in body (`include_meta` not set to `body`)
+
+### Observability with Batches
+
+```bash
+curl -X POST 'http://localhost:4000/rpc/ethereum?include_meta=headers' \
+  -H 'Content-Type: application/json' \
+  -d '[
+    {"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1},
+    {"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":2}
+  ]' -i
+```
+
+Response headers include:
+- `X-Lasso-Request-ID`: Request tracking ID
+- `X-Lasso-Meta`: Metadata for first successful request
+
+<Note>
+For batch requests, observability metadata in headers represents the first request with a valid context. Use `include_meta=body` for per-request metadata (degrades performance).
+</Note>
+
+## Request IDs
+
+Each request in a batch must have a unique `id` field for proper response correlation.
+
+### Good Practice
+
+```json
+[
+  {"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1},
+  {"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":2},
+  {"jsonrpc":"2.0","method":"eth_gasPrice","params":[],"id":3}
+]
+```
+
+### Bad Practice
+
+```json
+[
+  {"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1},
+  {"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1},
+  {"jsonrpc":"2.0","method":"eth_gasPrice","params":[],"id":1}
+]
+```
+
+<Warning>
+Duplicate IDs make it impossible to correlate responses with requests. Always use unique IDs.
+</Warning>
+
+## Best Practices
+
+### Batch Size
+
+- Keep batches under 50 requests (hard limit)
+- Optimal batch size: 10-20 requests for balance between throughput and latency
+- Larger batches may trigger provider rate limits
+
+### Request Ordering
+
+- Group related requests together
+- Place high-priority requests first
+- Consider response time variance
+
+### Error Recovery
+
+- Check each response individually for errors
+- Implement retry logic for failed requests
+- Don't assume all-or-nothing success
+
+### Use Cases
+
+**Good for batching:**
+- Multiple account balances
+- Multiple contract read calls
+- Block metadata queries
+- Token holder data
+
+**Bad for batching:**
+- Subscription requests (`eth_subscribe` not supported over HTTP)
+- Write operations (not supported)
+- Single high-priority request (no latency benefit)
+
+## Configuration
+
+Configure batch size limit in your application config:
+
+```elixir
+config :lasso, max_batch_requests: 50
+```
+
+Default: `50`

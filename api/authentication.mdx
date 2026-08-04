@@ -1,0 +1,108 @@
+---
+title: Authentication
+description: Authentication and access control for Lasso RPC
+---
+
+## Current Status
+
+Lasso RPC currently operates **without authentication** in the open-source version. All endpoints are publicly accessible when you deploy your own Lasso instance.
+
+<Warning>
+If you deploy Lasso publicly, ensure proper network-level security (firewall rules, VPC isolation, reverse proxy authentication) to restrict access.
+</Warning>
+
+## Securing Your Deployment
+
+Since Lasso doesn't have built-in authentication, use these strategies to secure your deployment:
+
+### Reverse Proxy Authentication
+
+Deploy Lasso behind a reverse proxy (nginx, Caddy, Traefik) with authentication:
+
+```nginx
+location /rpc/ {
+    auth_basic "Lasso RPC";
+    auth_basic_user_file /etc/nginx/.htpasswd;
+    proxy_pass http://localhost:4000;
+}
+```
+
+### API Gateway
+
+Use an API gateway (Kong, Tyk, AWS API Gateway) to add:
+- API key validation
+- Rate limiting per key
+- Usage tracking
+- Multiple authentication methods
+
+### Network-Level Security
+
+- **Firewall rules**: Restrict access by IP address
+- **VPC isolation**: Deploy in private subnet, expose via load balancer
+- **VPN**: Require VPN access to reach Lasso endpoints
+- **mTLS**: Client certificate authentication at load balancer
+
+### Example: Nginx with API Key
+
+```nginx
+location /rpc/ {
+    # Validate API key from header
+    if ($http_x_api_key != "your-secret-key") {
+        return 401;
+    }
+    proxy_pass http://localhost:4000;
+}
+```
+
+## Provider Authentication
+
+Lasso authenticates with upstream RPC providers using API keys configured in your profile YAML:
+
+```yaml
+providers:
+  - id: "alchemy_eth"
+    url: "https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+```
+
+Set provider API keys as environment variables:
+
+```bash
+export ALCHEMY_API_KEY=your_alchemy_key
+export INFURA_API_KEY=your_infura_key
+```
+
+See [Environment Variables](/configuration/environment-variables) for all available provider API keys.
+
+## Future: Built-in Authentication
+
+API key authentication and multi-tenant access control are planned features. See the [roadmap](https://github.com/jaxernst/lasso-rpc/blob/main/docs/FUTURE_FEATURES.md#api-keys--auth) for details.
+
+**Planned features:**
+- Per-tenant API keys
+- Rate limiting per key
+- Usage attribution and billing
+- Provider access controls per tenant
+- OAuth 2.0 / JWT support
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Internal Deployment" icon="lock">
+    Deploy in private network, access via VPN or bastion host
+  </Card>
+  <Card title="Public Deployment" icon="shield">
+    Use reverse proxy with authentication and rate limiting
+  </Card>
+  <Card title="Development" icon="laptop-code">
+    Bind to localhost only: `http: [ip: {127, 0, 0, 1}]`
+  </Card>
+  <Card title="Production" icon="server">
+    Layer multiple security controls (network + proxy + monitoring)
+  </Card>
+</CardGroup>
+
+## See Also
+
+- [Deployment](/deployment/production-checklist) - Security checklist
+- [Configuration](/configuration/environment-variables) - Provider API keys
+- [Docker](/deployment/docker) - Container security best practices
