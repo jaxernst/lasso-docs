@@ -37,26 +37,31 @@ payload shapes and timeouts.
 
 ## Transaction broadcast
 
-`eth_sendRawTransaction` forwards a pre-signed transaction to a selected
-provider. Lasso does not manage account nonces, deduplicate application
-submissions, guarantee propagation to every upstream, or track receipts for the
-application. Production senders should own signing, nonce allocation,
-idempotency, rebroadcast policy, and receipt/finality tracking.
+`eth_sendRawTransaction` sends the signed bytes to one selected upstream under
+one deadline. Lasso does not automatically retry or fan out after dispatch
+because a lost response may still mean the transaction was applied. Production
+senders should own signing, nonce allocation, idempotency, reconciliation by
+transaction hash, rebroadcast policy, and receipt/finality tracking.
 
 ## Stateful HTTP filters
 
-Methods such as `eth_newFilter` create provider-local state. A filter ID from one
-provider is not valid on another, so ordinary provider failover can break the
-polling sequence. Prefer direct `eth_getLogs` for historical scans and WebSocket
-subscriptions for real-time delivery, or maintain explicit provider affinity
-and recovery in the application.
+Lasso currently rejects `eth_newFilter`, `eth_newBlockFilter`,
+`eth_newPendingTransactionFilter`, `eth_getFilterChanges`,
+`eth_getFilterLogs`, and `eth_uninstallFilter` locally with `-32601`. Their IDs
+are provider-local, and Lasso does not yet have an accepted affinity lifecycle
+for creation, follow-up calls, owner loss, and expiry. Use `eth_getLogs` for
+historical scans and WebSocket subscriptions for real-time delivery.
 
 ## WebSocket subscriptions
 
 Lasso multiplexes compatible upstream subscriptions and can fail over within a
 profile. On provider changes it can gap-fill `newHeads` and log subscriptions
-with HTTP backfill and deduplication. Pending transactions are ephemeral and do
-not have gap filling.
+with bounded HTTP backfill and duplicate suppression. The launch subset accepts
+only `newHeads` and `logs`; pending-transaction subscriptions are not included.
+
+Recovery that exceeds its time, replay, buffer, or ancestry bounds closes the
+affected client explicitly. Lasso does not continue after a silent partial
+backfill.
 
 Within-profile subscription failover should not be confused with system-profile
 HTTP fallback. Cross-profile subscription fallback is not part of the current

@@ -1,11 +1,14 @@
 ---
-title: 'WebSocket Subscriptions'
-description: 'Intelligent multiplexing with automatic failover and gap-filling for blockchain event subscriptions'
+title: 'WebSocket subscriptions'
+description: 'Multiplexing with bounded failover and recovery for blockchain event subscriptions'
 ---
 
 ## Overview
 
-Lasso's WebSocket subscription system provides continuity-preserving event delivery with automatic failover and gap-filling. The architecture multiplexes client subscriptions to minimize upstream connections while ensuring no events are lost during provider failures.
+Lasso's WebSocket subscription system multiplexes compatible clients and runs
+bounded recovery when an upstream fails. Recovery either restores the stream
+within its deadline, ancestry, replay, and memory limits or terminates the
+affected client explicitly.
 
 ## Architecture
 
@@ -45,7 +48,7 @@ StreamCoordinator (per-subscription key)
 **StreamCoordinator**
 - Per-subscription-key GenServer managing continuity and gap-filling
 - Orchestrates failover with synchronous state transitions
-- Ensures gap-free, duplicate-free event delivery
+- Orders bounded replay and suppresses overlap with buffered live events
 - Location: `lib/lasso/core/streaming/stream_coordinator.ex`
 
 **WSConnection**
@@ -113,25 +116,23 @@ On provider failure mid-stream:
 5. **Resubscribe**: Request new WebSocket subscription to proposed provider
 6. **Drain Buffer**: Deduplicate and emit buffered events after transition
 
-**Result**: Clients receive continuous event stream without gaps or duplicates.
+**Result**: Recovery resumes an ordered stream within the configured bounds.
+If Lasso cannot prove that recovery is complete, it terminates continuity
+instead of silently continuing after a partial backfill.
 
 ### Continuity Policy
 
-**`:best_effort`** (default):
-- Backfills up to `max_backfill_blocks` (default: 32)
-- If gap exceeds limit, fills what it can and continues
-
-**`:strict_abort`**:
-- Fails if gap exceeds `max_backfill_blocks`
-- Guarantees complete continuity or explicit failure
+The current continuity contract uses a chain-time-aware replay allowance. It
+takes the greater of the configured block allowance and the blocks expected
+during the recovery deadline. Recovery fails explicitly if the effective
+allowance, retained ancestry, deadline, or memory budget is exceeded.
 
 Configuration:
 
 ```elixir
 # StreamCoordinator initialization
 max_backfill_blocks: 32,
-backfill_timeout: 30_000,
-continuity_policy: :best_effort
+backfill_timeout: 30_000
 ```
 
 ## Deduplication
@@ -279,10 +280,9 @@ await provider.send('eth_subscribe', ['logs', {
 - Gap calculation: &lt;1ms (consensus height from ETS)
 - Failover latency: 200-500ms (backfill + resubscribe)
 
-**Scalability:**
-- Subscriptions per upstream: 1,000+ clients per upstream subscription
-- Memory per StreamCoordinator: &lt;10KB (state + dedupe cache)
-- Concurrent failovers: Independent per subscription key
+Capacity depends on the deployed node size, event rate, filter cardinality,
+and downstream consumption rate. Validate the intended subscription mix under
+load instead of deriving capacity from the multiplexing ratio alone.
 
 ## Configuration
 
@@ -293,7 +293,6 @@ chains:
     subscription:
       max_backfill_blocks: 32
       backfill_timeout: 30000
-      continuity_policy: best_effort  # or strict_abort
       dedupe_max_items: 256
       dedupe_max_age_ms: 30000
       max_failover_attempts: 3
@@ -308,13 +307,12 @@ chains:
 1. **Monitor failover metrics**: Track `[:lasso, :subs, :failover, :degraded]` events
 2. **Configure provider priorities**: Order providers by subscription reliability
 3. **Set appropriate backfill limits**: Balance continuity vs latency (32 blocks ≈ 6 minutes on Ethereum)
-4. **Use best_effort for high-throughput chains**: Arbitrum's fast blocks can create large gaps
+4. **Test fast chains separately**: A nominal block allowance represents less recovery time on a faster chain
 
 ### For Development
 
-1. **Enable debug logging**: Set `continuity_policy: :strict_abort` to detect gap issues
-2. **Test failover scenarios**: Manually trigger provider failures to verify gap-filling
-3. **Monitor telemetry**: Use LiveView dashboard to observe failover state transitions
+1. **Test failover scenarios**: Trigger provider failures to verify bounded recovery
+2. **Monitor telemetry**: Use the dashboard to observe failover state transitions
 
 ## Related Documentation
 

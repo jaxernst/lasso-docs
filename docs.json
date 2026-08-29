@@ -61,6 +61,7 @@
               "cloud/routing",
               "cloud/custom-profiles",
               "cloud/rpc-behavior",
+              "cloud/json-rpc-compatibility",
               "cloud/observability"
             ]
           },

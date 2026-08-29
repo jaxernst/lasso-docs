@@ -8,9 +8,16 @@ description: A compact reference for Lasso Cloud capabilities and workload bound
 ## RPC integration
 
 - Standard JSON-RPC 2.0 over HTTP and raw WebSocket; no Lasso SDK is required.
+- A versioned Ethereum compatibility target with strict client envelopes,
+  standards-shaped Lasso errors, transparent valid upstream results and
+  errors, and explicit provider capability differences.
 - Chain names or numeric chain IDs on supported routes.
-- Explicit `load-balanced`, `latency-weighted`, and `fastest` URL paths.
+- Explicit `load-balanced`, `latency-weighted`, `fastest`, and `priority` URL
+  paths where profile policy permits them.
 - Provider-override routes for targeted testing and diagnosis.
+
+Read [Ethereum JSON-RPC compatibility](/cloud/json-rpc-compatibility) for the precise
+unification contract and claim boundaries.
 
 ## Routing and resilience
 
@@ -18,10 +25,12 @@ description: A compact reference for Lasso Cloud capabilities and workload bound
 - Per-provider, method, transport, and regional latency evidence.
 - Circuit and rate-limit state influence the attempt order.
 - Sequential attempts on failures that are safe to retry.
+- Conservative single-dispatch handling for signed transactions, unknown
+  methods, and provider-local work.
 - Shared upstream WebSocket connections with within-profile failover.
 - Ordered fallback phases for managed system profiles where configured.
 
-Read [Routing and failure semantics](routing) before interpreting strategy names as hard
+Read [Routing and failure semantics](/cloud/routing) before interpreting strategy names as hard
 distribution or availability guarantees.
 
 ## Managed and custom profiles
@@ -63,7 +72,8 @@ See [Routing and usage evidence](observability) for exact evidence modes.
 
 ## Workload boundaries
 
-Lasso does not provide application-level nonce management, transaction
-deduplication, receipt tracking, or portability for provider-local filter IDs.
-Archive state, old logs, trace methods, and WebSocket recovery each have
-different constraints. See [RPC workload behavior](rpc-behavior).
+Lasso does not provide application-level signing, nonce management,
+transaction replacement, receipt tracking, or recreation of provider-local
+filter state. Archive state, old logs, transaction submission, filters,
+unknown methods, and WebSocket recovery each have different execution
+contracts. See [RPC workload behavior](/cloud/rpc-behavior).
