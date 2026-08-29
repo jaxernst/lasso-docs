@@ -1,0 +1,113 @@
+---
+title: Ethereum JSON-RPC compatibility
+description: The standards, provider differences, and claim boundaries behind Lasso's unified RPC interface
+---
+
+# Ethereum JSON-RPC compatibility
+
+Lasso is a standards-led compatibility and routing layer for EVM RPC.
+Applications use ordinary JSON-RPC while Lasso handles provider differences in
+transport behavior, error delivery, method coverage, history, limits, and
+chain-specific extensions.
+
+The goal is one predictable interface. It is not a claim that every provider
+implements every method identically.
+
+## Compatibility target
+
+Ethereum RPC is governed by a versioned set of specifications rather than one
+complete, immutable document. Lasso uses this precedence:
+
+1. [JSON-RPC 2.0](https://www.jsonrpc.org/specification) for request, response,
+   notification, error, and batch envelopes.
+2. Applicable Final Ethereum Interface EIPs for specific wire contracts.
+3. The [`ethereum/execution-apis`](https://github.com/ethereum/execution-apis)
+   schemas pinned to commit
+   [`739f9e00806003d2204adca7595f704849b9be30`](https://github.com/ethereum/execution-apis/commit/739f9e00806003d2204adca7595f704849b9be30).
+4. The activated fork and official specification for the requested chain.
+5. Observed provider capabilities for what a particular endpoint can serve.
+
+EIP-1474 remains useful for Ethereum value and error conventions, but its
+status is Stagnant. Lasso does not treat it as a complete Final baseline.
+
+## What Lasso unifies
+
+### JSON-RPC envelopes
+
+Lasso validates client envelopes before routing. `jsonrpc` must be the exact
+string `"2.0"`, `method` must be a string, and present `params` must be an array
+or object. IDs retain their JSON type and value. Valid notifications do not
+receive a response, and malformed requests that cannot supply a valid ID use
+`id: null`.
+
+HTTP batches preserve every valid item, including duplicate IDs, and omit
+notification responses. Use unique IDs because duplicate IDs remain ambiguous
+for clients even when Lasso preserves them.
+
+### Provider results and errors
+
+Successful upstream results pass through. Lasso does not rebuild blocks,
+transactions, receipts, or logs because doing so could remove new fork fields
+or chain extensions.
+
+Some providers return a valid JSON-RPC error with an HTTP 4xx or 5xx status.
+Lasso preserves a request-correlated upstream `code`, `message`, and `data`
+object. HTML, gateway text, and other transport failures remain routing
+evidence and may trigger safe failover.
+
+### Ethereum parameter conventions
+
+Lasso validates standards-defined shapes that affect routing or remove genuine
+ambiguity:
+
+- EIP-1898 block selectors require exactly one of `blockNumber` or
+  `blockHash`. `requireCanonical` is valid only with `blockHash`.
+- EIP-234 `eth_getLogs` filters may use `blockHash`, but not together with
+  `fromBlock` or `toBlock`.
+- Values authored by Lasso, including downstream subscription IDs, use
+  canonical Ethereum quantity encoding.
+
+Provider result-shape and value-encoding checks run in tests and provider
+canaries rather than adding schema validation to the routing path.
+
+## Methods, extensions, and affinity
+
+Lasso does not treat every method as interchangeable:
+
+- Reviewed replay-safe reads can use bounded failover.
+- `eth_sendRawTransaction` receives one upstream dispatch because a lost
+  response may still mean the transaction was applied.
+- Unknown and vendor methods remain forward-compatible, but receive one
+  dispatch unless reviewed policy marks them replay-safe.
+- Provider-local HTTP filter lifecycles are rejected until Lasso has an
+  explicit affinity contract for creation, follow-up calls, owner loss, and
+  expiry.
+- WebSocket subscriptions use a connection-scoped continuity path. The launch
+  subset supports `newHeads` and `logs` with bounded recovery.
+
+Profiles can include chain extensions, bundler methods, or client-specific
+namespaces. Their transport, replay safety, affinity, capability, cost, and
+access policy must be explicit before Lasso advertises stronger behavior than
+single dispatch.
+
+## Compatibility terms
+
+| Term | Meaning |
+| --- | --- |
+| Conformant | Lasso owns and tests the behavior against a cited requirement. |
+| Pass-through | Lasso preserves an upstream result or authoritative error without promising equal answers from independent upstreams. |
+| Capability-routed | Eligibility uses configured or observed support, which can still be incomplete or stale. |
+| Supported subset | Lasso enumerates the exact implemented portion of a larger interface. |
+| Extension | A client-, provider-, or chain-specific method is routed without being presented as standard Ethereum JSON-RPC. |
+| Unsupported | Lasso rejects or does not advertise the surface. Missing evidence is unknown, not proof of support or lack of support. |
+
+## Claim boundary
+
+It is accurate to describe Lasso as a standards-led Ethereum JSON-RPC
+unification layer. It is not accurate to claim universal method support,
+identical provider semantics, conformance by every upstream, or complete
+implementation of every method in a rolling specification.
+
+Read [RPC workload behavior](/cloud/rpc-behavior) for execution-safety and
+continuity boundaries. Read [supported methods](/api/supported-methods) for the
+current method and transport surface.

@@ -3,7 +3,10 @@ title: Error Codes
 description: JSON-RPC error codes and error handling in Lasso
 ---
 
-Lasso normalizes all error responses to standard JSON-RPC 2.0 format, providing consistent error handling across all providers.
+Lasso validates JSON-RPC response envelopes and authors valid JSON-RPC errors
+for failures it owns. A request-correlated upstream JSON-RPC error remains
+authoritative: Lasso preserves its `code`, `message`, and optional `data`
+instead of replacing provider semantics with a synthetic universal error.
 
 ## Error Response Format
 
@@ -117,20 +120,6 @@ Lasso implements the complete JSON-RPC 2.0 error code specification:
     "data": {
       "websocket_url": "/ws/rpc/ethereum",
       "hint": "Connect via WebSocket to use eth_subscribe"
-    }
-  }
-}
-```
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "error": {
-    "code": -32601,
-    "message": "Method 'eth_sendRawTransaction' is not currently supported",
-    "data": {
-      "hint": "Transaction writes require nonce management and are planned for future releases"
     }
   }
 }
@@ -340,26 +329,25 @@ When sending batch requests, each item in the response array contains either a `
 
 ## Provider-Specific Errors
 
-Lasso normalizes upstream provider errors into standard JSON-RPC format. Original provider errors are preserved in the `data` field when available:
+Providers can return valid JSON-RPC errors with an HTTP 2xx, 4xx, or 5xx
+status. Lasso preserves a structurally valid, request-correlated upstream error:
 
 ```json
 {
   "jsonrpc": "2.0",
   "id": 1,
   "error": {
-    "code": -32602,
-    "message": "Query exceeds block range limit",
-    "data": {
-      "provider": "alchemy_eth",
-      "original_error": {
-        "code": -32005,
-        "message": "eth_getLogs is limited to a 10000 block range"
-      },
-      "hint": "Reduce block range or paginate your query"
-    }
+    "code": -32005,
+    "message": "query exceeds provider block range",
+    "data": {"maxBlockRange": 10000}
   }
 }
 ```
+
+Lasso classifies capacity, capability, transport, and execution failures
+internally so it can decide whether failover is safe. Those categories do not
+replace the terminal provider error returned to the caller. Non-JSON bodies,
+gateway pages, and malformed envelopes remain transport failures.
 
 ## WebSocket Errors
 

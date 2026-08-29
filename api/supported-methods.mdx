@@ -1,174 +1,144 @@
 ---
-title: Supported Methods
-description: Complete reference of Ethereum JSON-RPC methods supported by Lasso
+title: Supported methods
+description: Ethereum JSON-RPC methods, extensions, transport restrictions, and routing safety in Lasso
 ---
 
-Lasso provides production-grade routing for stateless Ethereum JSON-RPC reads and subscriptions. This page lists all supported methods organized by category.
+# Supported methods
 
-## Read-Only Methods (HTTP + WebSocket)
+Lasso routes a broad Ethereum JSON-RPC read surface, a conservative signed
+transaction path, and a defined WebSocket subscription subset. Actual
+availability still depends on the chain, profile, provider plan, transport,
+history, and live capacity.
 
-All read-only methods support failover, circuit breakers, and performance-based routing.
+Method names are not assumed to be fungible. Lasso classifies execution safety
+separately from provider capability:
 
-### Blocks & Transactions
+- Reviewed replay-safe reads can use bounded failover.
+- `eth_sendRawTransaction` receives one upstream dispatch.
+- Unknown and vendor methods receive one dispatch unless reviewed policy marks
+  them replay-safe.
+- Stateful filter lifecycles and node-local signing methods are rejected.
 
-| Method | Description |
-|--------|-------------|
-| `eth_blockNumber` | Returns the number of the most recent block |
-| `eth_getBlockByNumber` | Returns information about a block by block number |
-| `eth_getBlockByHash` | Returns information about a block by block hash |
-| `eth_getBlockTransactionCountByNumber` | Returns the number of transactions in a block by block number |
-| `eth_getBlockTransactionCountByHash` | Returns the number of transactions in a block by block hash |
-| `eth_getTransactionByHash` | Returns information about a transaction by transaction hash |
-| `eth_getTransactionReceipt` | Returns the receipt of a transaction by transaction hash |
-| `eth_getTransactionByBlockHashAndIndex` | Returns information about a transaction by block hash and transaction index |
-| `eth_getTransactionByBlockNumberAndIndex` | Returns information about a transaction by block number and transaction index |
-| `eth_getUncleCountByBlockHash` | Returns the number of uncles in a block by block hash |
-| `eth_getUncleCountByBlockNumber` | Returns the number of uncles in a block by block number |
-| `eth_getUncleByBlockHashAndIndex` | Returns information about an uncle by block hash and uncle index |
-| `eth_getUncleByBlockNumberAndIndex` | Returns information about an uncle by block number and uncle index |
+Read [Ethereum JSON-RPC compatibility](/cloud/json-rpc-compatibility) for the
+versioned standards target and precise compatibility terms.
 
-### Account State
+## Common stateless reads
 
-| Method | Description |
-|--------|-------------|
-| `eth_getBalance` | Returns the balance of an account at a given block |
-| `eth_getTransactionCount` | Returns the number of transactions sent from an address (nonce) |
-| `eth_getCode` | Returns the code at a given address |
-| `eth_getStorageAt` | Returns the value from a storage position at a given address |
-| `eth_getProof` | Returns the Merkle proof for account and storage values (EIP-1186) |
+The following methods are routable over HTTP and as unary WebSocket requests,
+subject to provider capability and profile policy.
 
-### Execution & Gas
+### Blocks and transactions
 
-| Method | Description |
-|--------|-------------|
-| `eth_call` | Executes a new message call immediately without creating a transaction |
-| `eth_estimateGas` | Generates and returns an estimate of gas needed for transaction execution |
-| `eth_gasPrice` | Returns the current gas price in wei |
-| `eth_maxPriorityFeePerGas` | Returns a fee per gas value for EIP-1559 transactions |
-| `eth_feeHistory` | Returns historical gas information for fee estimation |
+| Method |
+| --- |
+| `eth_blockNumber` |
+| `eth_getBlockByNumber` |
+| `eth_getBlockByHash` |
+| `eth_getBlockTransactionCountByNumber` |
+| `eth_getBlockTransactionCountByHash` |
+| `eth_getTransactionByHash` |
+| `eth_getTransactionReceipt` |
+| `eth_getTransactionByBlockHashAndIndex` |
+| `eth_getTransactionByBlockNumberAndIndex` |
+| `eth_getUncleCountByBlockHash` |
+| `eth_getUncleCountByBlockNumber` |
+| `eth_getUncleByBlockHashAndIndex` |
+| `eth_getUncleByBlockNumberAndIndex` |
 
-### Logs & Events
+### State, execution, and gas
 
-| Method | Description |
-|--------|-------------|
-| `eth_getLogs` | Returns an array of logs matching a given filter object |
+| Method |
+| --- |
+| `eth_getBalance` |
+| `eth_getTransactionCount` |
+| `eth_getCode` |
+| `eth_getStorageAt` |
+| `eth_getProof` |
+| `eth_call` |
+| `eth_estimateGas` |
+| `eth_createAccessList` |
+| `eth_gasPrice` |
+| `eth_maxPriorityFeePerGas` |
+| `eth_feeHistory` |
+| `eth_blobBaseFee` |
 
-<Warning>
-Large `eth_getLogs` queries may be limited by provider block range caps (typically 2,000-10,000 blocks). See [provider capabilities](/configuration/capabilities) for block range limits.
-</Warning>
+Historical state availability varies by provider plan. A method being routable
+does not prove that every eligible provider retains the requested block.
 
-### Network Information
+### Logs and network information
 
-| Method | Description |
-|--------|-------------|
-| `eth_chainId` | Returns the chain ID (served locally, no upstream call) |
-| `eth_protocolVersion` | Returns the current Ethereum protocol version |
-| `eth_syncing` | Returns an object with sync status or false |
-| `net_version` | Returns the current network ID |
-| `net_listening` | Returns true if client is actively listening for network connections |
-| `net_peerCount` | Returns number of peers currently connected to the client |
-| `web3_clientVersion` | Returns the current client version |
-| `web3_sha3` | Returns Keccak-256 hash of the given data |
+| Method | Notes |
+| --- | --- |
+| `eth_getLogs` | Stateless log query. Provider block-range and result-size limits apply. |
+| `eth_chainId` | Served locally after route authentication and chain resolution. |
+| `eth_syncing` | Upstream pass-through. |
+| `net_version` | Upstream pass-through. |
+| `web3_clientVersion` | Upstream pass-through. |
+| `web3_sha3` | Upstream pass-through. |
 
-## Subscription Methods (WebSocket Only)
+Node-operator methods such as `net_listening`, `net_peerCount`, and
+`eth_protocolVersion` may be withheld by hosted providers. Their absence does
+not imply that ordinary application reads are unavailable.
 
-These methods are only available over WebSocket connections and include automatic gap-filling on failover.
+## Evolving reads and extensions
 
-| Method | Description |
-|--------|-------------|
-| `eth_subscribe` | Create a subscription for events (newHeads, logs, newPendingTransactions) |
-| `eth_unsubscribe` | Cancel an active subscription |
+Lasso's reviewed registry includes evolving reads such as
+`eth_getBlockReceipts`, `eth_capabilities`, `eth_config`,
+`eth_getStorageValues`, and `eth_simulateV1`. These methods are replay-safe in
+Lasso's execution policy, but remain capability-routed because deployment,
+fork, cost, and access differ across providers.
 
-### Supported Subscription Types
-
-| Type | Parameters | Gap-Filling |
-|------|-----------|-------------|
-| `newHeads` | `["newHeads"]` | ✅ Full backfill with `eth_getBlockByNumber` |
-| `logs` | `["logs", {"address":"0x...", "topics":[...]}]` | ✅ Full backfill with `eth_getLogs` |
-| `newPendingTransactions` | `["newPendingTransactions"]` | ❌ No gap-filling (ephemeral) |
-
-<Info>
-When a WebSocket provider fails, Lasso automatically detects gaps, backfills missing events via HTTP, and resumes the stream on a new provider.
-</Info>
-
-## Advanced & Non-Standard Methods
-
-These methods are forwarded on a best-effort basis with no guarantees of availability.
-
-### Enhanced Batch Methods
-
-| Method | Description | Availability |
-|--------|-------------|-------------|
-| `eth_getBlockReceipts` | Returns all transaction receipts for a block | Alchemy, Erigon, some providers |
-
-### EIP-4844 (Blob Transactions)
-
-| Method | Description | Availability |
-|--------|-------------|-------------|
-| `eth_getBlobBaseFee` | Returns the current blob base fee | Post-Dencun networks |
-
-### Debug & Trace Methods
+Debug, trace, transaction-pool, bundler, and chain-specific namespaces may also
+be forwarded when an upstream supports them. Lasso presents them as extensions,
+not as universally supported Ethereum methods.
 
 <Warning>
-Debug and trace methods are expensive and rarely supported on hosted providers. Use provider override to target specific nodes.
+Debug and trace calls can be expensive or plan-gated. Test the exact method,
+parameters, provider plan, and timeout before depending on one in production.
 </Warning>
 
-**Debug Methods:**
-- `debug_traceTransaction`
-- `debug_traceBlockByNumber`
-- `debug_traceBlockByHash`
-- `debug_traceCall`
-- `debug_getBadBlocks`
-- `debug_storageRangeAt`
-- `debug_getModifiedAccountsByNumber`
-- `debug_getModifiedAccountsByHash`
+Unknown methods remain forward-compatible. They receive one upstream dispatch
+and no cross-request affinity guarantee unless a reviewed contract states
+otherwise.
 
-**Trace Methods (Parity/Erigon):**
-- `trace_block`
-- `trace_transaction`
-- `trace_call`
-- `trace_callMany`
-- `trace_rawTransaction`
-- `trace_replayBlockTransactions`
-- `trace_replayTransaction`
-- `trace_filter`
-- `trace_get`
+## Signed transaction submission
 
-**Chain-Specific:**
-- `arbtrace_*` (Arbitrum)
-- `optimism_*` (Optimism)
-- Other L2-specific extensions
+`eth_sendRawTransaction` is routable. Lasso sends the signed bytes to one
+selected upstream under one deadline and does not retry or fan out after
+dispatch. A lost response may still mean the upstream accepted the transaction.
 
-## Blocked Methods
+Your application remains responsible for signing, nonce allocation,
+replacement, transaction-hash reconciliation, receipt tracking, and finality.
 
-The following methods are explicitly blocked for security or architectural reasons:
+## WebSocket subscriptions
 
-### Subscriptions Over HTTP
+The launch subset supports these exact forms over WebSocket:
 
-❌ `eth_subscribe`, `eth_unsubscribe` - Use WebSocket connections instead
+| Method | Parameters | Recovery |
+| --- | --- | --- |
+| `eth_subscribe` | `["newHeads"]` | Bounded block replay and reorg repair. |
+| `eth_subscribe` | `["logs"]` or `["logs", filter]` | Bounded log replay, retained orphan removal, and duplicate suppression. |
+| `eth_unsubscribe` | `[subscriptionId]` | Removes a subscription owned by the downstream connection. |
 
-### Wallet & Signing
+Subscription IDs authored by Lasso are lowercase hexadecimal quantities.
+Trailing arguments and unsupported subscription kinds return invalid-params
+errors. A `logs` filter must be an object; the selected upstream remains
+authoritative for its field-level validation.
 
-❌ Server-side key management is out of scope:
-- `eth_sign`
-- `eth_signTransaction`
-- `eth_signTypedData`, `eth_signTypedData_v3`, `eth_signTypedData_v4`
-- `eth_sendTransaction`
-- `eth_accounts`
-- All `personal_*` methods
-- All `wallet_*` methods (EIP-1193 client APIs)
+Pending-transaction and transaction-receipt subscription kinds are not part of
+the launch subset. Recovery that exceeds the configured time, ancestry, replay,
+or memory bounds terminates the affected client explicitly.
 
-### Transaction Writes
+HTTP requests for `eth_subscribe` or `eth_unsubscribe` return a method error
+with a WebSocket hint.
 
-❌ `eth_sendRawTransaction` - Currently blocked. Multi-provider routing requires nonce management and transaction deduplication.
+## Rejected methods
 
-<Info>
-Write support is planned for future releases with proper nonce queuing, sticky sessions, and idempotency tracking.
-</Info>
+### Provider-local HTTP filters
 
-### Stateful Filters
+Lasso rejects the following methods locally with `-32601` across HTTP, batch
+items, unary WebSocket requests, and explicit-provider routes:
 
-❌ Filter methods require sticky sessions and are incompatible with failover:
 - `eth_newFilter`
 - `eth_newBlockFilter`
 - `eth_newPendingTransactionFilter`
@@ -176,61 +146,44 @@ Write support is planned for future releases with proper nonce queuing, sticky s
 - `eth_getFilterLogs`
 - `eth_uninstallFilter`
 
-**Alternative:** Use WebSocket subscriptions (`eth_subscribe`) for real-time events.
+Their filter IDs belong to one upstream. Lasso does not advertise a sticky
+affinity lifecycle for them. Use `eth_getLogs` for historical scans or the
+supported WebSocket subscription subset for real-time delivery.
 
-### Transaction Pool
+### Wallet, signing, and node-local account methods
 
-❌ Provider-specific internal state with no standardization:
-- `txpool_content`
-- `txpool_inspect`
-- `txpool_status`
+Lasso does not hold user signing keys or provide node-local account management.
+It rejects methods such as:
 
-### Mining & Local Node Operations
+- `eth_accounts`
+- `eth_sign`
+- `eth_signTransaction`
+- `eth_sendTransaction`
+- `personal_sign`
+- mining and work-submission methods
 
-❌ Not available on hosted providers:
-- `eth_coinbase`
-- `eth_mining`
-- `eth_hashrate`
-- `eth_getWork`
-- `eth_submitWork`
-- `eth_submitHashrate`
+Use a wallet or application signer, then submit the resulting signed bytes with
+`eth_sendRawTransaction`.
 
-## EIP Compatibility
+## Standards status
 
-| EIP | Description | Support |
-|-----|-------------|----------|
-| EIP-1474 | JSON-RPC API | ✅ Full baseline method set |
-| EIP-1898 | Block Parameter Objects | ✅ `blockHash`, `blockNumber`, `requireCanonical` |
-| EIP-1186 | State Proofs | ✅ `eth_getProof` |
-| EIP-1559 | Fee Market | ✅ `eth_maxPriorityFeePerGas`, `eth_feeHistory` |
-| EIP-4844 | Blob Transactions | ⚠️ Pass-through, provider-specific |
-| EIP-1193 | Provider API | ⚠️ Recognized, wallet methods blocked |
+| Interface | Lasso posture |
+| --- | --- |
+| JSON-RPC 2.0 | Lasso validates client envelopes and authors conformant local responses. |
+| EIP-1898 | Object block selectors support `blockNumber` or `blockHash`, with `requireCanonical` valid only for `blockHash`. |
+| EIP-234 | `eth_getLogs.blockHash` is mutually exclusive with `fromBlock` and `toBlock`. |
+| EIP-1186 | `eth_getProof` is routable subject to history and provider capability. |
+| EIP-1474 | Used as an influential source for value and error conventions; it is Stagnant, not a complete Final baseline. |
+| Pinned execution APIs | Reviewed at commit `739f9e00806003d2204adca7595f704849b9be30`; inclusion does not imply universal provider availability. |
 
-## Best Practices
+Successful upstream result objects pass through without field-by-field
+rewriting. This preserves additive fork fields and chain-specific extensions.
 
-### Gas Estimation Consistency
+## HTTP batches
 
-`eth_estimateGas` and `eth_call` can vary across providers due to different node implementations and timing. For consistency:
+Lasso supports JSON-RPC batches over HTTP. Each item is validated and routed
+independently. Valid notifications produce no response item, duplicate IDs are
+preserved, and the exact ID type and value are echoed. Use unique IDs for
+unambiguous client correlation.
 
-- Pin estimates to a single provider using `?provider=<id>`
-- Use `:priority` strategy for consistent results
-- Add a 10-20% buffer on the client side
-
-### Large Log Queries
-
-For `eth_getLogs` with large block ranges:
-
-- Query 2,000 blocks at a time
-- Filter aggressively using `address` and `topics`
-- Monitor for rate limit errors and back off
-- Use `:priority` strategy for consistency across pages
-
-### Non-Standard Method Availability
-
-To check if a specific provider supports a non-standard method:
-
-```bash
-curl -X POST 'http://localhost:4000/rpc/ethereum?provider=alchemy_eth' \
-  -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","method":"eth_getBlockReceipts","params":["latest"],"id":1}'
-```
+WebSocket batching is not part of the advertised launch surface.

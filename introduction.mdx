@@ -39,7 +39,7 @@ See the agent docs at [lasso.sh/llms.txt](https://lasso.sh/llms.txt)
     Profiles, chains, providers, and routing strategies
   </Card>
 
-  <Card title="API Reference" icon="code" href="/api-reference">
+  <Card title="API Reference" icon="code" href="/api/http-endpoints">
     Complete HTTP and WebSocket endpoint documentation
   </Card>
 </CardGroup>
@@ -96,7 +96,9 @@ wscat -c ws://localhost:4000/ws/rpc/ethereum
 > {"jsonrpc":"2.0","method":"eth_subscribe","params":["newHeads"],"id":1}
 ```
 
-100 clients subscribing to `newHeads` share a single upstream subscription. On provider failure, Lasso backfills missed blocks via HTTP and seamlessly switches providers.
+Compatible clients subscribing to `newHeads` can share an upstream
+subscription. On provider failure, Lasso performs bounded HTTP replay and
+either resumes on a replacement or terminates the affected clients explicitly.
 
 ### Profiles for multi-tenancy
 
@@ -176,7 +178,7 @@ Lasso runs on the BEAM (Erlang VM) for:
     Get your first RPC request proxied in 5 minutes
   </Card>
 
-  <Card title="Architecture" icon="sitemap" href="/architecture">
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
     Understand how Lasso works under the hood
   </Card>
 </CardGroup>
