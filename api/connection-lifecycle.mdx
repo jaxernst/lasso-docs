@@ -13,7 +13,7 @@ Use a standard WebSocket client:
 wscat -c 'ws://localhost:4000/ws/rpc/ethereum?key=lasso_abc123'
 ```
 
-The connection can close when you disconnect, fail to answer heartbeats, lose profile access, encounter a network interruption, or the server restarts. Subscription continuity exhaustion can also close the connection.
+The connection can close when you disconnect, fail to answer heartbeats, lose profile access, encounter a network interruption, or the server restarts. Subscription continuity exhaustion or a client that cannot keep up with subscription traffic can also close the connection.
 
 ## Heartbeats
 
@@ -48,14 +48,17 @@ Reconnect whenever the connection closes. Do not rely on a periodic two-hour dis
 
 ## Connection closure
 
-Two application-level closure cases have explicit heartbeat or continuity meaning:
+These application-level closure cases have explicit meanings:
 
 | Cause | Code | Meaning |
 | --- | --- | --- |
 | Two missed heartbeat replies | 1002 | `Heartbeat timeout - no pong responses` |
 | Subscription continuity exhausted | 1011 | `Lasso subscription continuity exhausted` |
+| Subscription client too slow | 1013 | `Lasso subscription client too slow` |
 
 A JSON-RPC rate-limit error can be returned on an open connection. It does not inherently mean the socket closes with code 1008. Deployments, access changes, proxies, and network failures can produce other close events; handle closure regardless of code.
+
+If you receive code 1013, address slow message processing or downstream backpressure before reconnecting repeatedly. Reconnect and reconcile missed events after your client can keep up.
 
 ## Reconnection
 

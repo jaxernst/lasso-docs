@@ -44,6 +44,14 @@ The corresponding WebSocket route is
 WebSocket, and authentication details. A key from another account is not
 authorized merely because it knows the profile slug.
 
+## Supported provider connection settings
+
+The current Lasso Cloud editor accepts provider URLs. Use the endpoint URL supplied by your provider and verify the required methods with a probe and a test request.
+
+The editor does not currently expose custom authentication headers or independent HTTP and WebSocket endpoint pairing. A provider that requires header-only authentication, or different HTTP and WebSocket hosts or paths, cannot be fully configured through this editor. Do not assume that changing `https` to `wss` creates a valid WebSocket endpoint, or move a header credential into a URL unless your provider explicitly supports that authentication method.
+
+Lasso RPC Core supports more transport configuration options when self-hosted; those options are separate from the current Cloud editor.
+
 ## Interpret probe results
 
 A category result summarizes representative method calls; it is not a verdict
