@@ -1,6 +1,6 @@
 ---
 title: WebSocket endpoints
-description: Unary RPC and bounded subscriptions in RPC Core v0.3.5.
+description: Unary RPC and bounded subscriptions in RPC Core v0.3.6.
 ---
 
 Connect to `ws://localhost:4000/ws/rpc/ethereum` for the included public profile. For a named profile, use `/ws/rpc/profile/my-app/ethereum`. Explicit strategy routes include `/ws/rpc/fastest/ethereum`, `/ws/rpc/load-balanced/ethereum`, and `/ws/rpc/latency-weighted/ethereum`.
@@ -27,7 +27,7 @@ To stop a subscription, send `eth_unsubscribe` with the returned ID as its only 
 
 ## Provider configuration
 
-A connected upstream WebSocket is required. In RPC Core v0.3.5, `subscribe_new_heads: true` enables both automatic block tracking and client `newHeads` eligibility. New profiles sharing an existing connection work after successful reload. See [Provider configuration](/configuration/providers).
+A connected upstream WebSocket is required. In RPC Core v0.3.6, `subscribe_new_heads: true` enables both automatic block tracking and client `newHeads` eligibility. New profiles sharing an existing connection work after successful reload. See [Provider configuration](/configuration/providers).
 
 ## Supported streams and recovery
 
