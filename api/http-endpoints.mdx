@@ -130,7 +130,7 @@ POST /rpc/profile/:profile/provider/:provider_id/:chain
 
 ### Parameters
 
-- `:profile` - Profile slug (e.g., `default`, `testnet`, `production`)
+- `:profile` - Profile slug (e.g., `public`, `testnet`, `production`)
 
 ### Example
 
@@ -141,7 +141,7 @@ curl -X POST http://localhost:4000/rpc/profile/testnet/fastest/base \
 ```
 
 <Note>
-Without an explicit profile in the URL, requests automatically use the `"default"` profile. Ensure `config/profiles/default.yml` exists at startup.
+Without an explicit profile in the URL, requests automatically use the `"public"` profile. Ensure `config/profiles/public.yml` exists at startup.
 </Note>
 
 ## Supported Methods
@@ -205,7 +205,7 @@ Subscription methods (`eth_subscribe`, `eth_unsubscribe`) are rejected over HTTP
 
 ### Write Methods
 
-Write methods (`eth_sendRawTransaction`, `eth_sendTransaction`) are not currently supported.
+`eth_sendRawTransaction` is routed with one upstream dispatch. `eth_sendTransaction` and the node-local methods listed in [Supported methods](/api/supported-methods) are rejected.
 
 ## Request Headers
 
@@ -288,7 +288,7 @@ curl -X POST 'http://localhost:4000/rpc/ethereum?strategy=fastest' \
 | `-32601` | Method not found or not supported on this transport |
 | `-32602` | Invalid params (unsupported chain, missing chain_id) |
 | `-32603` | Internal error |
-| `-32000` | Server error (rate limit, strategy access denied, quota exceeded) |
+| `-32000` | Server error (for example, upstream rate limiting or exhausted routing) |
 
 ## Response Headers
 

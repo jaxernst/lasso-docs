@@ -1,33 +1,21 @@
 ---
-title: Configuration Overview
-description: Learn how Lasso's profile-based configuration system works
+title: Configuration overview
+description: Configure routing profiles without confusing them with access or quota boundaries.
 ---
 
-Lasso is configured via YAML profile files located in `config/profiles/`. Each profile defines chains, providers, routing policies, and rate limits. Multiple profiles enable isolated configurations for different environments or tenants.
+Lasso is configured via YAML profile files in `config/profiles/`. Each profile defines chains, providers, routing policy, and dashboard tester settings. Multiple profiles provide separate routing configurations for different environments. Identical upstreams can share connections, health, and observations; profiles are not authentication boundaries.
 
-## Profile System
-
-Profiles are the core configuration unit in Lasso. Each profile:
-
-- Defines which blockchain networks (chains) to support
-- Specifies RPC providers for each chain
-- Configures routing behavior, health monitoring, and WebSocket subscriptions
-- Sets rate limits and capacity controls
-- Can be accessed via unique URL paths
-
-### Profile File Structure
-
-Each profile is a YAML file with two sections separated by document markers (`---`):
+## Profile File Structure
 
 ```yaml
 # config/profiles/<slug>.yml
 
-# --- Frontmatter: Profile metadata ---
+# --- Frontmatter (YAML document separator) ---
 ---
-name: "My Profile"
-slug: "my-profile"
-rps_limit: 100
-burst_limit: 500
+name: "My Profile"           # Display name
+slug: "my-profile"           # URL identifier (used in /rpc/profile/:slug/...)
+rps_limit: 100               # Dashboard tester maximum RPS
+burst_limit: 500             # Metadata; not enforced by OSS
 ---
 
 # --- Body: Chain configurations ---
@@ -39,92 +27,25 @@ chains:
         url: "https://..."
 ```
 
-**Frontmatter** contains profile-level settings like name, URL slug, and rate limits.
+**Frontmatter fields:**
 
-**Body** defines chain configurations with providers, monitoring settings, and routing parameters.
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | Yes | Human-readable profile name |
+| `slug` | string | Yes | URL-safe identifier. Must be unique across profiles |
+| `rps_limit` | integer | No | Maximum RPS offered by dashboard tester controls (default: 100) |
+| `burst_limit` | integer | No | Profile metadata (default: 500); no OSS ingress enforcement |
 
-## URL Structure
+OSS does not authenticate clients or enforce per-client request quotas. Configure authentication and inbound rate limiting at your reverse proxy. Provider quota and circuit-breaker backoff are separate routing controls.
 
-Profiles are accessed via URL paths:
+Unknown YAML fields and invalid types are rejected. Use booleans (`false`), not quoted strings (`"false"`). A failed reload keeps the previous active configuration. Errors identify the field without printing credential values.
 
-```bash
-# Default profile
-POST /rpc/ethereum
+Profile slugs must match their `.yml` filenames. Files beginning with `_` or `.` are skipped. Keep a `public.yml` profile: routes without a profile use `public`, and it is required at startup. `unlisted: true` hides a profile from the selector; its endpoints remain accessible.
 
-# Named profile
-POST /rpc/profile/production/ethereum
 
-# Strategy override
-POST /rpc/fastest/ethereum
+## Next steps
 
-# Profile + strategy
-POST /rpc/profile/production/fastest/ethereum
-```
-
-## Configuration Hierarchy
-
-Lasso's configuration follows this hierarchy:
-
-1. **Application Level** - Runtime environment variables and system defaults
-2. **Profile Level** - Frontmatter settings (rate limits, metadata)
-3. **Chain Level** - Per-chain configuration (monitoring, selection, WebSocket)
-4. **Provider Level** - Individual provider settings (URLs, capabilities, priority)
-
-## Multiple Profiles
-
-Create separate profiles for different use cases:
-
-```
-config/profiles/
-├── default.yml      # Free public providers
-├── production.yml   # BYOK + own nodes
-└── staging.yml      # Subset for testing
-```
-
-**Benefits:**
-
-- **Environment isolation** - Separate configs for dev, staging, production
-- **Tenant segmentation** - Different provider sets per customer
-- **A/B testing** - Compare provider performance across profiles
-- **Cost optimization** - Route low-priority traffic to free providers
-
-## Configuration Best Practices
-
-<AccordionGroup>
-  <Accordion title="Start with the default profile">
-    The included `default.yml` profile contains battle-tested public providers for major chains. Use it as a reference or starting point.
-  </Accordion>
-
-  <Accordion title="Use meaningful slugs">
-    Profile slugs appear in URLs. Choose descriptive, URL-safe names: `production`, `high-priority`, `customer-acme`.
-  </Accordion>
-
-  <Accordion title="Set appropriate rate limits">
-    Configure `rps_limit` and `burst_limit` based on expected traffic patterns. Start conservative and increase as needed.
-  </Accordion>
-
-  <Accordion title="Validate on startup">
-    Lasso validates all profiles at startup and crashes on errors (missing required fields, unresolved environment variables). This prevents runtime surprises.
-  </Accordion>
-
-  <Accordion title="Document provider choices">
-    Use YAML comments to explain why providers are included, their known limitations, and any special configuration.
-  </Accordion>
-</AccordionGroup>
-
-## Next Steps
-
-<CardGroup cols={2}>
-  <Card title="Profile Configuration" icon="file-lines" href="/configuration/profiles">
-    Learn about frontmatter fields and chain configuration
-  </Card>
-  <Card title="Provider Setup" icon="server" href="/configuration/providers">
-    Configure providers, API keys, and capabilities
-  </Card>
-  <Card title="Environment Variables" icon="key" href="/configuration/environment-variables">
-    Reference for all runtime configuration options
-  </Card>
-  <Card title="Capabilities" icon="shield-check" href="/configuration/capabilities">
-    Define provider limits and error handling rules
-  </Card>
-</CardGroup>
+- [Profile and chain settings](/configuration/profiles)
+- [Provider settings and credentials](/configuration/providers)
+- [Capability declarations](/configuration/capabilities)
+- [Reload and profile sharing](/concepts/profiles)
