@@ -1,312 +1,160 @@
 ---
-title: Docker Deployment
-description: Deploy Lasso RPC using Docker with containerized releases
+title: Docker deployment
+description: Run, verify, configure, upgrade, and roll back the public RPC Core image.
 ---
 
-Lasso RPC provides a production-ready Dockerfile for containerized deployments. The Docker setup uses multi-stage builds for optimized image size and includes all necessary runtime dependencies.
-
-## Quick Start
-
-The fastest way to run Lasso RPC with Docker:
-
-<Steps>
-  <Step title="Run the Docker script">
-    ```bash
-    ./run-docker.sh
-    ```
-    
-    This script automatically:
-    - Validates Docker is installed and running
-    - Builds the image as `lasso-rpc`
-    - Generates a `SECRET_KEY_BASE` if not set
-    - Starts the container with port 4000 exposed
-  </Step>
-  
-  <Step title="Access the dashboard">
-    Open your browser to:
-    - **Dashboard**: http://localhost:4000
-    - **RPC Endpoint**: http://localhost:4000/rpc/fastest/ethereum
-  </Step>
-</Steps>
-
-## Dockerfile Architecture
-
-The Dockerfile uses a two-stage build for optimal image size:
-
-### Build Stage
-
-```dockerfile
-FROM hexpm/elixir:1.17.3-erlang-27.2-debian-bullseye-20241202 AS builder
-
-WORKDIR /app
-ENV MIX_ENV=prod
-
-# Install hex and rebar
-RUN mix local.hex --force && \
-    mix local.rebar --force
-
-# Install dependencies (prod only)
-COPY mix.exs mix.lock ./
-COPY config/ ./config/
-RUN mix deps.get --only prod
-
-# Copy application source
-COPY lib/ ./lib/
-COPY assets/ ./assets/
-COPY priv/ ./priv/
-
-# Compile and build assets
-RUN mix compile
-RUN mix tailwind.install && \
-    mix esbuild.install && \
-    mix tailwind lasso --minify && \
-    mix esbuild lasso --minify && \
-    mix phx.digest
-
-# Create release
-RUN mix release
-```
-
-### Runtime Stage
-
-```dockerfile
-FROM hexpm/elixir:1.17.3-erlang-27.2-debian-bullseye-20241202-slim
-
-WORKDIR /app
-ENV MIX_ENV=prod
-ENV PHX_SERVER=true
-
-# Copy built release from builder
-COPY --from=builder /app/_build/prod/rel/lasso ./
-COPY --from=builder /app/config/profiles ./config/profiles
-COPY deployment/entrypoint.sh /app/entrypoint.sh
-
-EXPOSE 4000
-ENTRYPOINT ["/app/entrypoint.sh"]
-```
-
-## Manual Docker Commands
-
-### Building the Image
+The primary distribution is `ghcr.io/jaxernst/lasso-rpc`, with native Linux AMD64
+and ARM64 images. Use the Compose attachment from the release you select. It
+requires Docker Compose and OpenSSL for generating local secrets:
 
 ```bash
-docker build -t lasso-rpc .
+mkdir lasso && cd lasso
+curl --fail --location https://github.com/jaxernst/lasso-rpc/releases/download/v0.3.5/compose.yml --output compose.yml
+(umask 077; printf 'SECRET_KEY_BASE=%s\nRELEASE_COOKIE=%s\n' "$(openssl rand -hex 64)" "$(openssl rand -hex 32)" > .env)
+docker compose up -d --wait
+curl --fail http://localhost:4000/api/health
+curl --fail http://localhost:4000/rpc/ethereum \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
 ```
 
-Build with custom tag:
+Open [http://localhost:4000/dashboard](http://localhost:4000/dashboard). Preserve `.env` across restarts and keep it
+private; it contains the signing and Erlang distribution secrets. Compose passes
+its values into the container, including provider credentials you add. Changing
+`.env` requires container recreation with `docker compose up -d --force-recreate
+--wait`; reloading YAML does not change a running container's environment.
+
+Compose binds port 4000 to localhost, runs as UID/GID `10001:10001`, and keeps the
+root filesystem read-only. `/tmp` is temporary; the named `/data` volume retains
+profiles and benchmark history. `docker compose down` retains that volume;
+`docker compose down --volumes` deletes it. Set `LASSO_PORT` in `.env` to choose
+another local port and `LASSO_NODE_ID` to give the instance a stable identity.
+
+#### Verify or pin the image
+
+Each release attaches `container-release.json`, native verification reports, and
+`container-verification.md` with its immutable image digest. Version tags are
+never replaced with different contents. For a digest-pinned installation, set
+this in `.env`, using the digest from the selected release:
+
+```dotenv
+LASSO_IMAGE=ghcr.io/jaxernst/lasso-rpc@sha256:DIGEST
+```
+
+Then run `docker compose pull` and `docker compose up -d --wait`. To verify the
+signed publication attestation, install the GitHub CLI and run:
 
 ```bash
-docker build -t myregistry.com/lasso-rpc:v1.0.0 .
+gh attestation verify oci://ghcr.io/jaxernst/lasso-rpc@sha256:DIGEST \
+  --repo jaxernst/lasso-rpc
 ```
 
-### Running the Container
+The signed attestation identifies the publication workflow. Platform BuildKit
+provenance records the pinned public source used for the build; the index also
+contains SBOMs. Source and publication-tooling revisions are recorded separately
+in `container-release.json`. See [Releasing](https://github.com/jaxernst/lasso-rpc/blob/13b0544d5bbce81e279349737e1531d27e35ee31/docs/RELEASING.md) for the verification
+scope, first-publication access setup, and retry behavior.
 
-Basic run with required environment variables:
+#### Custom profiles and credentials
+
+An empty data volume is seeded with bundled profiles in
+`/data/config/profiles`. Existing files are preserved on restart and upgrade.
+Benchmark snapshots use `/data/benchmark_snapshots`.
+
+To maintain profiles on the host, copy the starting configuration from the
+running container:
 
 ```bash
-docker run --rm \
-  -p 4000:4000 \
-  -e SECRET_KEY_BASE="$(openssl rand -base64 48)" \
-  -e PHX_HOST="rpc.example.com" \
-  -e LASSO_NODE_ID="production-1" \
-  --name lasso-rpc \
-  lasso-rpc
+mkdir profiles
+docker compose cp lasso:/data/config/profiles/. ./profiles
 ```
 
-Run with custom port:
-
-```bash
-docker run --rm \
-  -p 8080:8080 \
-  -e PORT=8080 \
-  -e SECRET_KEY_BASE="your-secret" \
-  -e PHX_HOST="rpc.example.com" \
-  -e LASSO_NODE_ID="production-1" \
-  lasso-rpc
-```
-
-## Environment Variables
-
-### Required for Production
-
-| Variable | Description | Example |
-|----------|-------------|----------|
-| `SECRET_KEY_BASE` | Phoenix signing/encryption secret (64+ bytes) | Generate with `mix phx.gen.secret` |
-| `PHX_HOST` | Public hostname for URL generation | `rpc.example.com` |
-| `LASSO_NODE_ID` | Unique, stable node identifier | `us-east-1` |
-| `PHX_SERVER` | Set to `true` to start HTTP server | `true` (set by default in Dockerfile) |
-
-### Optional Configuration
-
-| Variable | Description | Default |
-|----------|-------------|----------|
-| `PORT` | HTTP listener port | `4000` |
-| `LASSO_VM_METRICS_ENABLED` | Enable VM metrics collection | `true` |
-| `LASSO_DATA_DIR` | Data directory for profile persistence | Not set |
-
-### Provider API Keys
-
-Pass provider API keys as environment variables:
-
-```bash
-docker run --rm \
-  -p 4000:4000 \
-  -e SECRET_KEY_BASE="your-secret" \
-  -e PHX_HOST="rpc.example.com" \
-  -e LASSO_NODE_ID="production-1" \
-  -e ALCHEMY_API_KEY="your-alchemy-key" \
-  -e INFURA_API_KEY="your-infura-key" \
-  lasso-rpc
-```
-
-These are referenced in profile YAML files using `${ENV_VAR}` syntax:
+Create `compose.override.yml` next to `compose.yml`:
 
 ```yaml
-providers:
-  - id: "alchemy_ethereum"
-    url: "https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
-```
-
-## Volume Mounts
-
-### Custom Profiles
-
-Mount a custom profiles directory:
-
-```bash
-docker run --rm \
-  -p 4000:4000 \
-  -v /path/to/profiles:/app/config/profiles:ro \
-  -e SECRET_KEY_BASE="your-secret" \
-  -e PHX_HOST="rpc.example.com" \
-  -e LASSO_NODE_ID="production-1" \
-  lasso-rpc
-```
-
-### Persistent Data Directory
-
-Use `LASSO_DATA_DIR` to persist profile modifications:
-
-```bash
-docker run --rm \
-  -p 4000:4000 \
-  -v lasso-data:/data \
-  -e LASSO_DATA_DIR=/data \
-  -e SECRET_KEY_BASE="your-secret" \
-  -e PHX_HOST="rpc.example.com" \
-  -e LASSO_NODE_ID="production-1" \
-  lasso-rpc
-```
-
-The entrypoint script automatically seeds default profiles to `/data/config/profiles` on first run.
-
-## Docker Compose
-
-Example `docker-compose.yml`:
-
-```yaml
-version: '3.8'
-
 services:
   lasso:
-    build: .
-    ports:
-      - "4000:4000"
     environment:
-      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
-      PHX_HOST: rpc.example.com
-      PHX_SERVER: "true"
-      LASSO_NODE_ID: production-1
-      ALCHEMY_API_KEY: ${ALCHEMY_API_KEY}
-      INFURA_API_KEY: ${INFURA_API_KEY}
+      LASSO_PROFILES_DIR: /profiles
     volumes:
-      - lasso-data:/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-volumes:
-  lasso-data:
+      - type: bind
+        source: ./profiles
+        target: /profiles
+        read_only: true
 ```
 
-Run with:
+Edit the YAML in `profiles/`, retaining a valid `public.yml`. Additional profiles
+need matching filenames and frontmatter slugs. See [Configuration](https://github.com/jaxernst/lasso-rpc/blob/13b0544d5bbce81e279349737e1531d27e35ee31/docs/CONFIGURATION.md)
+for supported settings. Files must be readable by UID 10001 and directories
+traversable by that UID; host directories used for writable history must also be
+writable by UID 10001. Keep credential values in `.env` and reference them as
+`${VARIABLE_NAME}` in provider URLs or headers.
+
+Apply mount changes or environment changes:
 
 ```bash
-docker-compose up -d
+docker compose up -d --force-recreate --wait
 ```
 
-## Health Checks
-
-The health endpoint is available at `/api/health`:
+In v0.3.5, new profiles can reuse connected WebSocket upstreams after reload.
+If you remain on v0.3.4, recreate the container after adding profiles to avoid
+unavailable subscriptions. For new profiles and YAML-only edits in v0.3.5, reload
+the running node:
 
 ```bash
-curl http://localhost:4000/api/health
+docker compose exec -T lasso /app/bin/lasso rpc 'IO.inspect(Lasso.Config.ConfigStore.reload())'
 ```
 
-Configure Docker health checks:
+A successful reload prints `:ok`. A rejected reload reports its error and keeps
+the active configuration. Fix the file before restarting: a cold start cannot
+recover the prior in-memory configuration. Invalid files are logged during startup
+retries and prevent the service becoming ready. Use `docker compose logs lasso`
+to see the specific rejected field. A read-only mount supports loading
+and reloading; application-side configuration saves need a writable mount.
+`LASSO_PROFILES_DIR` overrides profile seeding and selection.
+`LASSO_SNAPSHOTS_DIR` independently overrides the history directory at runtime.
 
-```bash
-docker run --rm \
-  -p 4000:4000 \
-  -e SECRET_KEY_BASE="your-secret" \
-  -e PHX_HOST="rpc.example.com" \
-  -e LASSO_NODE_ID="production-1" \
-  --health-cmd="curl -f http://localhost:4000/api/health || exit 1" \
-  --health-interval=30s \
-  --health-timeout=10s \
-  --health-retries=3 \
-  --health-start-period=40s \
-  lasso-rpc
-```
+#### Upgrade and rollback
 
-## Container Registry
+1. Preserve `.env` and back up profiles and any history you need. For the default
+   volume layout, `docker compose cp lasso:/data/config/profiles ./profiles-backup`
+   and `docker compose cp lasso:/data/benchmark_snapshots ./history-backup` copy
+   them out of the running container.
+2. Read the target release's compatibility notes. Select its exact image tag or
+   digest using `LASSO_IMAGE` in `.env`, and retain the previous value for rollback.
+3. Run `docker compose pull`, then `docker compose up -d --wait`. Check health,
+   an upstream-backed RPC request, and the dashboard.
+4. Existing volume profiles are not replaced by newer bundled defaults. Compare
+   provider changes with the target release's example profiles and merge them
+   deliberately. YAML validation rejects unknown settings; check custom profiles
+   before an upgrade rather than relying on formerly ignored options.
+5. To roll back, restore the previous `LASSO_IMAGE`, pull, and recreate the
+   container with the same environment. If the release changed the storage
+   format, restore the matching backup according to its compatibility notes.
 
-Push to a container registry:
+Do not run `down --volumes` as an upgrade step.
 
-```bash
-# Build and tag
-docker build -t myregistry.com/lasso-rpc:latest .
+When migrating the v0.3.3 example profiles to v0.3.4, remove the ignored provider
+fields `type` and `api_key_required`. Replace the old
+`adapter_config.max_block_range` with `capabilities.limits.max_block_range`.
+Preserve your own provider URLs, credentials, and supported settings. The target
+release's bundled profiles show the supported shape.
 
-# Push
-docker push myregistry.com/lasso-rpc:latest
-```
+Images built before the persistent `/data` layout used `/app/config/profiles`
+and `/app/priv/benchmark_snapshots`. Copy customized configuration and history
+out of the old container before replacing it; a new empty volume cannot recover
+files from a deleted container. Restore the profiles into a readable host mount
+and the history into the new data volume, with ownership suitable for UID/GID
+`10001:10001`. Keep the old container/data and backups until the new deployment
+passes verification.
 
-## Entrypoint Script
+#### Building locally
 
-The container uses `/app/entrypoint.sh` to handle initialization:
+The source repository's `compose.yml` builds from its checkout. From the selected
+Git tag, set `SECRET_KEY_BASE` and run `docker compose up --build -d`. Its local
+image is `lasso-rpc:local`; the downloadable Compose attachment uses the registry
+image instead. The foreground helper `./run-docker.sh` also builds locally and
+persists data in its own `lasso-rpc-data` volume. These source-build paths are
+useful for development or independently rebuilding a release.
 
-```bash
-#!/bin/bash
-set -e
-
-echo "Lasso RPC starting..."
-
-# Seed profiles to data directory if LASSO_DATA_DIR is set
-if [ -n "$LASSO_DATA_DIR" ]; then
-  PROFILE_DIR="${LASSO_DATA_DIR}/config/profiles"
-  mkdir -p "$PROFILE_DIR"
-  
-  if [ -z "$(ls -A "$PROFILE_DIR" 2>/dev/null)" ]; then
-    echo "Seeding profiles to $PROFILE_DIR"
-    cp -r /app/config/profiles/* "$PROFILE_DIR/"
-  fi
-fi
-
-# Start the Elixir release
-exec /app/bin/lasso start
-```
-
-This enables:
-- Automatic profile seeding on first run
-- Persistent profile storage with volume mounts
-- Foreground process execution for container lifecycle
-
-## Next Steps
-
-- [Clustering](/deployment/clustering) - Connect multiple Docker containers
-- [Geo-Distributed Deployment](/deployment/geo-distributed) - Multi-region setup
-- [Production Checklist](/deployment/production-checklist) - Pre-launch verification
+---

@@ -1,189 +1,92 @@
 ---
 title: Supported methods
-description: Ethereum JSON-RPC methods, extensions, transport restrictions, and routing safety in Lasso
+description: The released RPC Core method, transaction, subscription, and affinity contract.
 ---
 
-# Supported methods
+This page describes the self-hosted **v0.3.5** runtime. Lasso Cloud has a separate
+[compatibility contract](https://docs.lasso.sh/cloud/json-rpc-compatibility).
+Do not infer parity from a shared method name or product version.
 
-Lasso routes a broad Ethereum JSON-RPC read surface, a conservative signed
-transaction path, and a defined WebSocket subscription subset. Actual
-availability still depends on the chain, profile, provider plan, transport,
-history, and live capacity.
+## Reads and execution safety
 
-Method names are not assumed to be fungible. Lasso classifies execution safety
-separately from provider capability:
+Common Ethereum reads such as `eth_blockNumber`, `eth_getBalance`, `eth_call`,
+`eth_getTransactionReceipt`, and `eth_getLogs` are routable, subject to provider
+capability, transport availability, history, and request parameters. A routable
+method is not a guarantee that every provider supports it.
 
-- Reviewed replay-safe reads can use bounded failover.
-- `eth_sendRawTransaction` receives one upstream dispatch.
-- Unknown and vendor methods receive one dispatch unless reviewed policy marks
-  them replay-safe.
-- Stateful filter lifecycles and node-local signing methods are rejected.
-
-Read [Ethereum JSON-RPC compatibility](/cloud/json-rpc-compatibility) for the
-versioned standards target and precise compatibility terms.
-
-## Common stateless reads
-
-The following methods are routable over HTTP and as unary WebSocket requests,
-subject to provider capability and profile policy.
-
-### Blocks and transactions
-
-| Method |
-| --- |
-| `eth_blockNumber` |
-| `eth_getBlockByNumber` |
-| `eth_getBlockByHash` |
-| `eth_getBlockTransactionCountByNumber` |
-| `eth_getBlockTransactionCountByHash` |
-| `eth_getTransactionByHash` |
-| `eth_getTransactionReceipt` |
-| `eth_getTransactionByBlockHashAndIndex` |
-| `eth_getTransactionByBlockNumberAndIndex` |
-| `eth_getUncleCountByBlockHash` |
-| `eth_getUncleCountByBlockNumber` |
-| `eth_getUncleByBlockHashAndIndex` |
-| `eth_getUncleByBlockNumberAndIndex` |
-
-### State, execution, and gas
-
-| Method |
-| --- |
-| `eth_getBalance` |
-| `eth_getTransactionCount` |
-| `eth_getCode` |
-| `eth_getStorageAt` |
-| `eth_getProof` |
-| `eth_call` |
-| `eth_estimateGas` |
-| `eth_createAccessList` |
-| `eth_gasPrice` |
-| `eth_maxPriorityFeePerGas` |
-| `eth_feeHistory` |
-| `eth_blobBaseFee` |
-
-Historical state availability varies by provider plan. A method being routable
-does not prove that every eligible provider retains the requested block.
-
-### Logs and network information
-
-| Method | Notes |
-| --- | --- |
-| `eth_getLogs` | Stateless log query. Provider block-range and result-size limits apply. |
-| `eth_chainId` | Served locally after route authentication and chain resolution. |
-| `eth_syncing` | Upstream pass-through. |
-| `net_version` | Upstream pass-through. |
-| `web3_clientVersion` | Upstream pass-through. |
-| `web3_sha3` | Upstream pass-through. |
-
-Node-operator methods such as `net_listening`, `net_peerCount`, and
-`eth_protocolVersion` may be withheld by hosted providers. Their absence does
-not imply that ordinary application reads are unavailable.
-
-## Evolving reads and extensions
-
-Lasso's reviewed registry includes evolving reads such as
-`eth_getBlockReceipts`, `eth_capabilities`, `eth_config`,
-`eth_getStorageValues`, and `eth_simulateV1`. These methods are replay-safe in
-Lasso's execution policy, but remain capability-routed because deployment,
-fork, cost, and access differ across providers.
-
-Debug, trace, transaction-pool, bundler, and chain-specific namespaces may also
-be forwarded when an upstream supports them. Lasso presents them as extensions,
-not as universally supported Ethereum methods.
-
-<Warning>
-Debug and trace calls can be expensive or plan-gated. Test the exact method,
-parameters, provider plan, and timeout before depending on one in production.
-</Warning>
-
-Unknown methods remain forward-compatible. They receive one upstream dispatch
-and no cross-request affinity guarantee unless a reviewed contract states
-otherwise.
+Methods classified as replay-safe by the released `ExecutionEnvelope` can use
+bounded further attempts within the original deadline. Unknown methods receive
+one upstream dispatch. Provider error classification does not override execution
+safety. The registry classifies methods; it does not certify upstream semantics
+or full compliance with every Ethereum specification.
 
 ## Signed transaction submission
 
-`eth_sendRawTransaction` is routable. Lasso sends the signed bytes to one
-selected upstream under one deadline and does not retry or fan out after
-dispatch. A lost response may still mean the upstream accepted the transaction.
+`eth_sendRawTransaction` receives one upstream dispatch. Lasso does not retry or
+fan out after dispatch. A lost response may mean the upstream accepted the
+transaction. Clients remain responsible for signing, nonce management,
+replacement, transaction-hash reconciliation, receipts, and finality.
 
-Your application remains responsible for signing, nonce allocation,
-replacement, transaction-hash reconciliation, receipt tracking, and finality.
+## Node-local methods
+
+The transport policy globally disallows `eth_sendTransaction`, `eth_accounts`,
+`eth_sign`, `eth_signTransaction`, and `personal_sign`. Provider capability
+policy can reject additional methods, including the `local_only` category.
+Do not treat a profile as an authentication or authorization boundary.
+
+## Stateful filters and extensions
+
+RPC Core v0.3.5 can forward provider-local filter methods when capability policy
+permits them. They receive one dispatch per request and have **no cross-request
+affinity guarantee**. A filter ID created on one upstream may be invalid on a
+later selected upstream. Prefer `eth_getLogs` or supported WebSocket subscriptions;
+Core does not advertise a reliable multi-provider filter lifecycle.
+
+Debug, trace, transaction-pool, bundler, and chain-specific methods depend on
+upstream support and configured restrictions. Their presence in a registry does
+not provide sticky sessions, common history, or a universal parameter contract.
 
 ## WebSocket subscriptions
 
-The launch subset supports these exact forms over WebSocket:
+The supported stream kinds are `newHeads` and `logs`. Use:
 
-| Method | Parameters | Recovery |
-| --- | --- | --- |
-| `eth_subscribe` | `["newHeads"]` | Bounded block replay and reorg repair. |
-| `eth_subscribe` | `["logs"]` or `["logs", filter]` | Bounded log replay, retained orphan removal, and duplicate suppression. |
-| `eth_unsubscribe` | `[subscriptionId]` | Removes a subscription owned by the downstream connection. |
+```json
+{"jsonrpc":"2.0","method":"eth_subscribe","params":["newHeads"],"id":1}
+```
 
-Subscription IDs authored by Lasso are lowercase hexadecimal quantities.
-Trailing arguments and unsupported subscription kinds return invalid-params
-errors. A `logs` filter must be an object; the selected upstream remains
-authoritative for its field-level validation.
+```json
+{"jsonrpc":"2.0","method":"eth_subscribe","params":["logs",{}],"id":2}
+```
 
-Pending-transaction and transaction-receipt subscription kinds are not part of
-the launch subset. Recovery that exceeds the configured time, ancestry, replay,
-or memory bounds terminates the affected client explicitly.
+Use `eth_unsubscribe` with the returned subscription ID to stop the stream.
+Pending-transaction subscriptions are not part of this released subset.
+HTTP subscription requests return a method error with a WebSocket URL hint.
 
-HTTP requests for `eth_subscribe` or `eth_unsubscribe` return a method error
-with a WebSocket hint.
+Matching client streams can share upstream subscriptions. Establishment requires
+a usable upstream before returning a subscription ID. Recovery uses bounded HTTP
+replay and a replacement live stream. Recovery beyond its time, replay, attempt,
+or buffer limits terminates the affected downstream connection explicitly; it
+does not promise unbounded or lossless delivery through arbitrary outages.
 
-## Rejected methods
-
-### Provider-local HTTP filters
-
-Lasso rejects the following methods locally with `-32601` across HTTP, batch
-items, unary WebSocket requests, and explicit-provider routes:
-
-- `eth_newFilter`
-- `eth_newBlockFilter`
-- `eth_newPendingTransactionFilter`
-- `eth_getFilterChanges`
-- `eth_getFilterLogs`
-- `eth_uninstallFilter`
-
-Their filter IDs belong to one upstream. Lasso does not advertise a sticky
-affinity lifecycle for them. Use `eth_getLogs` for historical scans or the
-supported WebSocket subscription subset for real-time delivery.
-
-### Wallet, signing, and node-local account methods
-
-Lasso does not hold user signing keys or provide node-local account management.
-It rejects methods such as:
-
-- `eth_accounts`
-- `eth_sign`
-- `eth_signTransaction`
-- `eth_sendTransaction`
-- `personal_sign`
-- mining and work-submission methods
-
-Use a wallet or application signer, then submit the resulting signed bytes with
-`eth_sendRawTransaction`.
-
-## Standards status
-
-| Interface | Lasso posture |
-| --- | --- |
-| JSON-RPC 2.0 | Lasso validates client envelopes and authors conformant local responses. |
-| EIP-1898 | Object block selectors support `blockNumber` or `blockHash`, with `requireCanonical` valid only for `blockHash`. |
-| EIP-234 | `eth_getLogs.blockHash` is mutually exclusive with `fromBlock` and `toBlock`. |
-| EIP-1186 | `eth_getProof` is routable subject to history and provider capability. |
-| EIP-1474 | Used as an influential source for value and error conventions; it is Stagnant, not a complete Final baseline. |
-| Pinned execution APIs | Reviewed at commit `739f9e00806003d2204adca7595f704849b9be30`; inclusion does not imply universal provider availability. |
-
-Successful upstream result objects pass through without field-by-field
-rewriting. This preserves additive fork fields and chain-specific extensions.
+In Core v0.3.5, `subscribe_new_heads` controls automatic block monitoring **and**
+client `newHeads` eligibility. Set it to `true` on intended providers. New profiles
+can reuse an already-connected upstream after a successful configuration reload.
+See [Configuration](/configuration/overview) and [Deployment](/deployment/docker).
 
 ## HTTP batches
 
-Lasso supports JSON-RPC batches over HTTP. Each item is validated and routed
-independently. Valid notifications produce no response item, duplicate IDs are
-preserved, and the exact ID type and value are echoed. Use unique IDs for
-unambiguous client correlation.
+HTTP endpoints accept arrays with up to 50 items by default (`max_batch_requests`).
+Items are validated and routed independently with bounded concurrency. A batch
+is not an atomic state snapshot and does not pin every item to one provider.
+Response items retain request order. Valid notifications produce no response;
+an all-notification batch returns HTTP 204. Use unique IDs for correlation.
 
-WebSocket batching is not part of the advertised launch surface.
+## Deployment boundary
+
+Core does not authenticate clients or enforce incoming customer quotas. Protect
+RPC, metrics, and dashboard endpoints through your network or reverse proxy.
+Profile tester settings do not create API quotas or upstream quota isolation.
+
+The authoritative implementation is `TransportPolicy`, `ExecutionEnvelope`,
+`Capabilities`, `RPCController`, and `RPCSocket.ItemOwner` at the selected release.
+See [API reference](/api/http-endpoints) for routes and metadata.
