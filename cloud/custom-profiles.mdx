@@ -96,3 +96,16 @@ from returning a lower height across the profile's serving regions. Choose a
 block once and reuse its hash through the complete query; ordinary `latest`
 state calls are not automatically grouped. See [Block continuity](/cloud/block-continuity)
 and [Read at one block](/cloud/read-at-one-block).
+
+## Live block monitoring
+
+In a chain's settings, **Live block monitoring** uses the providers selected for
+**Monitor new heads**. Turning it off preserves those selections and uses HTTP
+polling; client subscriptions remain available. Shared providers may still have
+feeds in use by another profile.
+
+Open **Learn more** for polling controls and current status. Custom intervals
+apply to authenticated providers. Public provider polling is managed by Lasso;
+a faster custom interval cannot bypass its minimum cadence. Monitoring tracks
+provider freshness, while **Block continuity** controls the blocks returned to
+callers.
