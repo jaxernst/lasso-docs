@@ -81,7 +81,8 @@ chains:
 |-------|------|----------|-------------|
 | `chain_id` | integer | Yes | EIP-155 chain ID |
 | `name` | string | No | Display name (defaults to chain key) |
-| `block_time_ms` | integer | No | Average block time in milliseconds. Used for optimistic lag calculation |
+| `block_time_ms` | integer | No | Average block time in milliseconds. Used for optimistic lag calculation and the continuity freshness bound |
+| `head_policy` | string | No | `off` (default), `local` (one process), or `global` (enrolled fleet). Global mode requires the [publication journal and fleet setup](/deployment/block-continuity) |
 
 ### Monitoring
 

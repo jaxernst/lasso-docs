@@ -88,3 +88,11 @@ not query Postgres on every call. Operators are expected to test provider URLs
 and intended behavior before applying changes. The normal recovery path for a
 bad provider is to correct or remove it while the remaining eligible providers
 continue to serve traffic where possible.
+
+## Block continuity
+
+Enable **Block continuity** in a chain's settings to keep later block choices
+from returning a lower height across the profile's serving regions. Choose a
+block once and reuse its hash through the complete query; ordinary `latest`
+state calls are not automatically grouped. See [Block continuity](/cloud/block-continuity)
+and [Read at one block](/cloud/read-at-one-block).

@@ -33,6 +33,13 @@ unification contract and claim boundaries.
 Read [Routing and failure semantics](/cloud/routing) before interpreting strategy names as hard
 distribution or availability guarantees.
 
+## Consistent logical reads
+
+Enable [Block continuity](/cloud/block-continuity) to keep later block choices
+from returning lower heights across a custom profile's regions.
+[Choose a block once](/cloud/read-at-one-block) and carry its hash through every
+state read. Ordinary `latest` state calls are not automatically pinned.
+
 ## Managed and custom profiles
 
 - Managed profiles provide a ready-to-use provider pool.
@@ -68,7 +75,7 @@ screenshots, issues, telemetry labels, or client-visible errors.
   activity, and account usage. Recent activity is bounded and not a durable
   request ledger.
 
-See [Routing and usage evidence](observability) for exact evidence modes.
+See [Routing and usage evidence](/cloud/observability) for exact evidence modes.
 
 ## Workload boundaries
 
