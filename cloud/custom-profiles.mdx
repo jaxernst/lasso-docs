@@ -105,7 +105,9 @@ polling; client subscriptions remain available. Shared providers may still have
 feeds in use by another profile.
 
 Open **Learn more** for polling controls and current status. Custom intervals
-apply to authenticated providers. Public provider polling is managed by Lasso;
-a faster custom interval cannot bypass its minimum cadence. Monitoring tracks
+are available when Lasso recognizes credentials in the provider URL. Detection
+uses URL patterns; a private endpoint with an unrecognized short path token still
+receives the managed polling rate. Endpoints classified as public retain Lasso's
+minimum polling interval. Monitoring tracks
 provider freshness, while **Block continuity** controls the blocks returned to
 callers.
