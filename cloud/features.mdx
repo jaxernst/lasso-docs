@@ -33,13 +33,15 @@ unification contract and claim boundaries.
 Read [Routing and failure semantics](/cloud/routing) before interpreting strategy names as hard
 distribution or availability guarantees.
 
-## Consistent logical reads
+## Block heights and consistent state reads
 
-Turn [Block regression protection](/cloud/block-continuity) On to keep sequential
-block choices from going backwards on each running server. Progress is shared
-automatically across the fleet; recovery after a server switch or restart is best effort.
-[Choose a block once](/cloud/read-at-one-block) and carry its hash through every
-state read. Ordinary `latest` state calls are not automatically pinned.
+- [Block regression protection](/cloud/block-continuity) prevents sequential
+  latest-block requests from returning lower heights on the same running Lasso
+  server. Turn it On in a custom profile; fleet sharing is automatic and recovery
+  after a server switch or restart is best effort.
+- [Read at one block](/cloud/read-at-one-block) uses a standard block-hash selector
+  when several balances or contract reads must refer to the same block. It works
+  with protection Off. Ordinary `latest` state calls remain unpinned.
 
 ## Managed and custom profiles
 
