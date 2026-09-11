@@ -7,9 +7,10 @@ Choose a block before a query starts, reuse its hash for every state read, and
 return that identity with the result. This keeps proxy discovery, Multicall,
 and dependent calls on the same state as providers and regions change.
 
-Configure `head_policy: local` for protection on each running instance, or
+Configure `head_policy: local` for protection on each running instance with
+automatic progress sharing across connected peers, or
 `head_policy: global` with its shared journal for the fleet-wide contract. See
-[Block continuity](/advanced/block-continuity) for the scope and freshness bound.
+[Block regression protection](/advanced/block-continuity) for the scope and freshness bound.
 
 ## 1. Choose a block once
 

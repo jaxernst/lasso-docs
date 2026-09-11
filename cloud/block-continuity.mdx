@@ -1,14 +1,14 @@
 ---
-title: Block continuity
-description: Choose local or global protection for later block choices.
+title: Block regression protection
+description: Protect block choices with automatic progress sharing across the fleet.
 ---
 
 Keep each query at one block, and keep later block choices from going backwards.
 
-Choose **Local** under **Block continuity** in your custom profile's chain
-settings to protect sequential block choices on each running instance, with
-best-effort recovery after moving to another instance. **Global** offers the
-stronger coordinated fleet-wide contract when configured. **Off** is the default.
+Turn **Block regression protection** **On** in your custom profile's chain
+settings. Lasso protects sequential block choices on each running server and
+automatically shares progress across the fleet to help preserve it during
+failover. There is no separate fleet setting. **Off** is the default.
 
 Choose a block once with `eth_getBlockByNumber("latest", false)` and pass its
 hash to every state read in your query. Your existing RPC endpoint and standard
@@ -20,28 +20,29 @@ Multicall, and dependent `eth_call` rounds. Follow the
 
 ## What the setting guarantees
 
-After a successful block choice returns height **N**, a later block choice
-returns **N or higher**, or an error. Returning the same height is allowed.
+After a successful block choice returns height **N**, a later block choice on
+the same running server returns **N or higher**, or an error. Returning the same
+height is allowed. After a server switch or restart, recovery is best effort:
+a lower block remains possible.
 
-The scope depends on the selected mode. All API keys using the same profile and
-chain share its floor within that scope. Different profiles and chains remain
+All API keys using the same profile and chain share its floor on that server.
+Different profiles and chains remain
 independent. The guarantee applies when a later request starts after the earlier
 response completes; overlapping requests can finish out of height order.
 
-| Mode | Protected scope | Restart and node-switch behavior |
+| Setting | Block choices | Restart and server-switch behavior |
 | --- | --- | --- |
-| Off | Ordinary provider routing | No monotonic floor. |
-| Local | One running application instance | Peer hints help choose a suitable provider, but recovery is best effort. A restart or node switch can return a lower block. |
-| Global | All admitted serving instances | A durable publication preserves the floor; unavailable members or coordination can prevent advancement. |
+| Off | Ordinary provider routing. | No regression protection. |
+| On | Sequential choices cannot go backwards on the same running server. | Automatically shared progress helps recovery, but an earlier block remains possible. |
 
-Local choices use providers and retain an in-memory floor. Peer hints influence
-provider preference without requiring a database lookup or peer acknowledgment.
-They do not raise the receiving node's mandatory floor. A valid response may
-therefore be below a peer hint. Recovery has no guaranteed maximum time or block
-gap; disconnected peers, lost processes and the fleet's total profile/chain
-inventory affect it. Losing every copy of local state loses that history.
+Each protected choice fetches a provider response. Servers share progress in
+the background. Advancing the protected floor adds no synchronous database
+lookup or peer acknowledgment. Shared progress helps choose a suitable provider
+without making it a mandatory minimum on another server. Recovery has no
+guaranteed maximum time or block gap. Disconnected servers and loss of all
+copies of the history can reduce protection across the fleet.
 
-| Request | Behavior in Local or Global mode |
+| Request | Behavior with protection On |
 | --- | --- |
 | `eth_blockNumber []` | Returns an eligible block number or an error. |
 | `eth_getBlockByNumber ["latest", false]` | Returns an eligible block including its number and hash. Use this to start a query. |
@@ -75,21 +76,17 @@ Your query can therefore finish at block 100 while a newer query reads block 101
 
 ## Freshness and provider lag
 
-A local choice validates a provider response against the floor captured when
+A protected choice validates a provider response against the floor captured when
 that request began. A lower response is rejected; Lasso can try another eligible
-provider within the request's deadline and retry budget. Local mode does not
+provider within the request's deadline and retry budget. Protection does not
 cache block responses to hide provider failures. If a provider regresses and all
 fallbacks are unavailable or quota-limited, the choice fails explicitly.
 
-Global mode retains a published block. It can return 101 again after publishing
-101 even when a provider later reports 100. During a publication change, a choice
-can wait up to one second within its request deadline before failing.
-
-Both modes reject protected block choices older than the greater of **60 seconds or four configured
+Lasso rejects protected block choices older than the greater of **60 seconds or four configured
 block intervals**, measured from the block timestamp. Repeating a block does not
 renew its age. This bounds staleness; it does not promise the newest block on the
 network. Executing state reads still requires a provider with the selected state.
-Hash-pinned reads continue without waiting for block publication.
+Hash-pinned reads continue through ordinary routing at their chosen target.
 
 A provider URL can sit in front of several nodes with different heads. Lasso
 keeps the hash on every attempt; a lagging node must serve that state or return
@@ -105,10 +102,8 @@ longer canonical. Lasso surfaces that conflict; it does not silently replace
 the query's hash. Discard the incomplete query and retry the whole operation
 within your deadline if a fresh result is still useful.
 
-Global publication can report attributed replacements at the previous selected
-height as `anchor_hash_changed`. Local mode rejects a different hash at its
-captured floor height. Neither mechanism detects every reorg, and missing state
-alone is not evidence of one. The floor does not reset downward within its
+Protection rejects a different hash at the captured floor height. This does not
+detect every reorg, and missing state alone is not evidence of one. The floor does not reset downward within its
 protected scope, so a reorg can temporarily prevent new block choices.
 
 Canonicality reflects provider observations at the time of a read. A block can
@@ -124,14 +119,22 @@ without changing the JSON-RPC result. Return the chosen number, hash, and
 collected evidence alongside your application's query result. The
 [guide](/cloud/read-at-one-block#3-return-results-with-evidence) shows what to retain.
 
-Local routing evidence includes the application `generation`, captured
+Routing evidence reports `head_policy.policy=local` for this setting. This is the
+configuration name for protection with automatic fleet sharing. Evidence
+includes the application `generation`, captured
 `minimum_height`, best-effort `recovery_height`, and `recovery_gap_blocks`.
 A missing recovered height is represented by `null`; a nonzero gap is allowed.
 Compare sequential choices within the same generation to assess the local
 invariant. Node changes and new generations have the softer recovery contract.
 
-The local floor survives a recovery-worker restart, but not loss of its owning
+The floor survives a recovery-worker restart, but not loss of its owning
 application. Disabling protection does not cover calls made while it is off.
-Global floors survive service restarts through the journal; changing away from
-Global first completes coordinated shutdown. Choices can keep failing until that
-transition finishes, including when a failed member still needs to be fenced.
+
+## Existing strict configurations
+
+Profiles already configured with `head_policy: global` retain strict fleet
+coordination and display **On** with an explanation of that setting. Their
+durable floor survives service restarts. Coordination failures can delay or
+reject block choices; disabling must finish coordinated shutdown before ordinary
+choices resume. Turning protection on again enables the standard behavior
+described above, rather than restoring the previous strict configuration.

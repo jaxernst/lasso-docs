@@ -1,5 +1,5 @@
 ---
-title: Operating block continuity
+title: Operating block regression protection
 description: Configure the optional journal, serving fleet, and recovery procedures.
 ---
 
@@ -12,9 +12,10 @@ Read the [builder contract](/advanced/block-continuity) before enabling it. Glob
 can return an availability error to preserve continuity. It does not choose one
 block automatically for unrelated state calls.
 
-## Local mode without a journal
+## Protection with automatic peer recovery
 
-For local monotonicity, set `head_policy: local` in each chain's file profile.
+Set `head_policy: local` in each chain's file profile to enable protection with
+automatic progress sharing across connected peers.
 Local routing needs no PostgreSQL publication database. Each application retains
 its accepted floor in memory; connected BEAM peers exchange height hints in the
 background. Those hints prefer suitable providers without blocking requests or

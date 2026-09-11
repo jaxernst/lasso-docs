@@ -1,13 +1,15 @@
 ---
-title: Block continuity
-description: Choose local or global block continuity with RPC Core.
+title: Block regression protection
+description: Protect block choices and share progress across connected RPC Core peers.
 ---
 
 Keep each query at one block, and keep later block choices from going backwards.
 
 Set `head_policy: local` for a chain in your file profile to protect sequential
 block choices on each running instance, with best-effort recovery from connected
-peers. Local mode needs no publication database. Use `global` only when you need
+peers. This is the behavior labeled **Block regression protection: On** in Lasso
+Cloud. Peer sharing is automatic when the runtimes are connected; there is no
+separate protection switch for it. Local mode needs no publication database. Use `global` only when you need
 the stronger fleet-wide contract and have
 [configured its journal and serving fleet](/deployment/block-continuity).
 
