@@ -60,8 +60,11 @@ candidate and selected providers, selection/upstream/end-to-end latency,
 Lasso overhead, retry count, and circuit state when those fields are available.
 `service_profile_id` identifies the original service profile; `profile_id`
 identifies the effective route, including configured fallback. `executed_channel`
-is present only when an upstream served the request. A locally retained block
-choice has `head_policy` evidence and no executing provider. Client metadata
+is present only when an upstream served the request. With **Block regression
+protection** On, provider-backed block choices include `head_policy.policy=local`,
+the application generation, captured floor and recovery evidence. Existing strict
+configurations can return retained block choices with `head_policy.policy=global`
+and no executing provider. Client metadata
 does not include per-attempt error details. Treat the live OpenAPI response and actual record as
 authoritative because optional fields depend on the request path and outcome.
 

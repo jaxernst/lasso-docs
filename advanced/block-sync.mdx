@@ -7,7 +7,8 @@ description: 'Dual-strategy block height tracking with HTTP polling and WebSocke
 
 Provider height monitoring informs routing and lag observations. It does not by
 itself establish a monotonic cross-region block choice or prove chain consensus.
-Use [Block continuity](/advanced/block-continuity) for that explicit policy and
+Use [Block regression protection](/advanced/block-continuity) for its protection
+and recovery contracts, and
 [hash-pinned reads](/advanced/read-at-one-block) for one-block queries.
 
 ## Overview

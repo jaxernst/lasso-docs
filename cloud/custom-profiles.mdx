@@ -89,12 +89,14 @@ and intended behavior before applying changes. The normal recovery path for a
 bad provider is to correct or remove it while the remaining eligible providers
 continue to serve traffic where possible.
 
-## Block continuity
+## Block regression protection
 
-Enable **Block continuity** in a chain's settings to keep later block choices
-from returning a lower height across the profile's serving regions. Choose a
-block once and reuse its hash through the complete query; ordinary `latest`
-state calls are not automatically grouped. See [Block continuity](/cloud/block-continuity)
+Turn **Block regression protection** **On** in a chain's settings to protect
+sequential block choices on each running server. Progress is shared automatically
+across the fleet, with best-effort recovery after a server switch or restart.
+**Off** is the default. Choose a block once and reuse its hash through the complete
+query; ordinary `latest` state calls are not automatically grouped. See
+[Block regression protection](/cloud/block-continuity)
 and [Read at one block](/cloud/read-at-one-block).
 
 ## Live block monitoring
@@ -109,5 +111,5 @@ are available when Lasso recognizes credentials in the provider URL. Detection
 uses URL patterns; a private endpoint with an unrecognized short path token still
 receives the managed polling rate. Endpoints classified as public retain Lasso's
 minimum polling interval. Monitoring tracks
-provider freshness, while **Block continuity** controls the blocks returned to
+provider freshness, while **Block regression protection** controls the blocks returned to
 callers.
