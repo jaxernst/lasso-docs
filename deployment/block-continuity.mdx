@@ -12,6 +12,26 @@ Read the [builder contract](/advanced/block-continuity) before enabling it. Glob
 can return an availability error to preserve continuity. It does not choose one
 block automatically for unrelated state calls.
 
+## Local mode without a journal
+
+For local monotonicity, set `head_policy: local` in each chain's file profile.
+Local routing needs no PostgreSQL publication database. Each application retains
+its accepted floor in memory; connected BEAM peers exchange height hints in the
+background. Those hints prefer suitable providers without blocking requests or
+removing valid fallback providers.
+
+A worker restart retains application-owned state. A complete application restart,
+node switch, partition or loss of all copies can lose continuity. Recovery has no
+promised time or block-gap bound, and the total profile/chain inventory affects
+propagation. Qualify actual provider capacity, hash-selector support and state
+history; a protected choice still fails when every eligible provider is unavailable.
+
+If this installation previously enrolled Global scopes, complete the coordinated
+disable procedure below before changing their contract. Retain its journal and
+member configuration so old durable history continues to be reconciled.
+
+The remaining procedures apply to Global mode.
+
 ## Install the journal
 
 Use one durable PostgreSQL database shared by every serving instance. Use the
