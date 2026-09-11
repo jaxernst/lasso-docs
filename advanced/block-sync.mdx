@@ -3,6 +3,14 @@ title: 'Block Height Monitoring'
 description: 'Dual-strategy block height tracking with HTTP polling and WebSocket subscriptions'
 ---
 
+## Continuity and monitoring
+
+Provider height monitoring informs routing and lag observations. It does not by
+itself establish a monotonic cross-region block choice or prove chain consensus.
+Use [Block regression protection](/advanced/block-continuity) for its protection
+and recovery contracts, and
+[hash-pinned reads](/advanced/read-at-one-block) for one-block queries.
+
 ## Overview
 
 Lasso tracks blockchain state using HTTP polling as a reliable foundation with optional WebSocket subscriptions for sub-second updates. This dual-strategy design enables accurate lag detection for provider selection and subscription gap-filling.

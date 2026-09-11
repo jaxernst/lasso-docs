@@ -60,6 +60,8 @@
             "pages": [
               "cloud/routing",
               "cloud/custom-profiles",
+              "cloud/block-continuity",
+              "cloud/read-at-one-block",
               "cloud/rpc-behavior",
               "cloud/json-rpc-compatibility",
               "cloud/observability"
@@ -116,7 +118,8 @@
                   "deployment/docker",
                   "deployment/clustering",
                   "deployment/geo-distributed",
-                  "deployment/production-checklist"
+                  "deployment/production-checklist",
+                  "deployment/block-continuity"
                 ]
               },
               {
@@ -132,6 +135,8 @@
                 "group": "Advanced",
                 "pages": [
                   "advanced/websocket-subscriptions",
+                  "advanced/block-continuity",
+                  "advanced/read-at-one-block",
                   "advanced/block-sync",
                   "advanced/benchmarking",
                   "advanced/error-classification"

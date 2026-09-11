@@ -42,3 +42,10 @@ Any `${VAR_NAME}` in profile YAML is resolved from environment variables at star
 
 
 Environment changes require a process restart or container recreation. YAML reload reads the environment of the running process. See [Docker deployment](/deployment/docker).
+
+### Block continuity
+
+Global mode requires `LASSO_BLOCK_PUBLICATION_DATABASE_URL`,
+`LASSO_BLOCK_PUBLICATION_MEMBERS`, and a unique stable `LASSO_NODE_ID` on every
+serving instance. Ordinary routing needs no database. Follow the complete
+[journal and fleet setup](/deployment/block-continuity) before enabling it.
