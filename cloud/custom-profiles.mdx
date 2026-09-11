@@ -91,13 +91,16 @@ continue to serve traffic where possible.
 
 ## Block regression protection
 
-Turn **Block regression protection** **On** in a chain's settings to protect
-sequential block choices on each running server. Progress is shared automatically
-across the fleet, with best-effort recovery after a server switch or restart.
-**Off** is the default. Choose a block once and reuse its hash through the complete
-query; ordinary `latest` state calls are not automatically grouped. See
-[Block regression protection](/cloud/block-continuity)
-and [Read at one block](/cloud/read-at-one-block).
+Turn **Block regression protection** **On** in a chain's settings to keep
+sequential `eth_blockNumber` and latest `eth_getBlockByNumber` requests from
+returning a lower height on the same running Lasso server. Progress is shared
+automatically across the fleet, with best-effort recovery after a server switch
+or restart. **Off** is the default. See the
+[protection guide](/cloud/block-continuity) for scope and error behavior.
+
+To read several balances or contract values at the same block, use the separate
+[Read at one block](/cloud/read-at-one-block) pattern. It works with protection
+Off; the setting does not pin ordinary `latest` state calls automatically.
 
 ## Live block monitoring
 
