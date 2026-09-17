@@ -1,0 +1,87 @@
+---
+title: Use Lasso with viem or ethers on Base
+description: Replace one Base RPC URL, verify chain identity, and evaluate Lasso without changing your Ethereum client.
+---
+
+Lasso exposes standard EVM JSON-RPC. Start with one server-side read path in your
+Base application and replace its RPC URL with a Lasso endpoint. Keep your client
+library and application contract calls.
+
+## Prepare the endpoint
+
+Check [live managed chains](https://lasso.sh/api/v1/agent/chains) for Base before
+choosing a managed profile. If you have existing Base provider URLs, configure a
+[custom provider pool](/cloud/bring-your-own-rpc) instead. Use the
+[quickstart](/cloud/quickstart) or the available [agent workflow](/cloud/agent-flows)
+to obtain an endpoint.
+
+Store the complete endpoint as `LASSO_RPC_URL` in your existing server-side secret
+manager. Keep the previous RPC URL for rollback. An endpoint containing a key is a
+credential; exposing it in a browser bundle lets visitors use its access and quota.
+
+## viem
+
+```typescript
+import { createPublicClient, http } from "viem";
+import { base } from "viem/chains";
+
+const url = process.env.LASSO_RPC_URL;
+if (!url) throw new Error("LASSO_RPC_URL is required");
+
+const client = createPublicClient({
+  chain: base,
+  transport: http(url),
+});
+
+if ((await client.getChainId()) !== base.id) {
+  throw new Error("Unexpected RPC chain");
+}
+const blockNumber = await client.getBlockNumber();
+console.log({ blockNumber: blockNumber.toString() });
+```
+
+See the [viem public client reference](https://viem.sh/docs/clients/public) for
+client options. Configure application timeouts and retries around the operations
+you actually perform; transaction submission has different recovery needs from a
+read.
+
+## ethers v6
+
+```typescript
+import { JsonRpcProvider } from "ethers";
+
+const url = process.env.LASSO_RPC_URL;
+if (!url) throw new Error("LASSO_RPC_URL is required");
+
+const provider = new JsonRpcProvider(url, undefined, {
+  batchMaxCount: 1,
+  polling: true,
+});
+
+try {
+  if ((await provider.getNetwork()).chainId !== 8453n) {
+    throw new Error("Unexpected RPC chain");
+  }
+  console.log({ blockNumber: await provider.getBlockNumber() });
+} finally {
+  provider.destroy();
+}
+```
+
+This evaluation sends individual requests and uses polling rather than
+provider-local HTTP filters. Lasso rejects those filters. Once the flow works,
+choose batching within the live Lasso and upstream limits. The
+[ethers JSON-RPC provider reference](https://docs.ethers.org/v6/api/providers/jsonrpc/)
+describes these options.
+
+## Verify the application flow
+
+Run a representative read with the same block selector against both endpoints.
+For related state values, [select one block hash](/cloud/read-at-one-block) so head
+movement does not masquerade as a routing discrepancy. Record latency, error rate
+and [routing evidence](/cloud/observability) without logging credentials.
+
+Move one request flow first. If its behavior fails your acceptance criteria,
+restore the previous URL. Test transaction sending, historical ranges and
+WebSocket subscriptions separately; an `eth_blockNumber` response does not
+qualify those workloads.

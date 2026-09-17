@@ -5,3 +5,8 @@
 # Draft content
 drafts/
 *.draft.mdx
+
+# Local agent configuration is not product documentation
+AGENTS.md
+.codex/
+skills-lock.json

@@ -1,0 +1,77 @@
+---
+title: Route across two RPC providers
+description: Bring existing EVM RPC URLs into one custom profile and evaluate routing, provider checks, and safe updates.
+---
+
+Use a custom profile when you already have provider contracts or run your own nodes.
+Your application keeps a standard JSON-RPC client. Lasso Cloud manages the provider
+pool behind its endpoint, so changing an upstream does not require an application
+redeployment.
+
+## Start with one request flow
+
+Choose one chain and a stateless read your app already uses. Keep the existing
+endpoint available for rollback. Record its latency, errors and request volume
+before changing the route. Two providers can improve your options during an
+outage, but they may share infrastructure or disagree about the chain head.
+
+Custom access and upstream provider charges are separate. Check
+[live pricing](https://lasso.sh/pricing) and your provider quotas before the trial.
+
+## Configure the pool
+
+1. Create a custom profile in the [dashboard](https://lasso.sh/dashboard).
+2. Add the chosen chain and the two HTTP URLs from your existing providers.
+3. Check that each URL serves the intended chain and methods. Start with
+   `eth_chainId`, `eth_blockNumber` and the exact read your app needs.
+4. Choose your block policy using the guidance below, then activate the profile.
+5. Send the same read through the profile endpoint and inspect its
+   [routing evidence](/cloud/observability).
+
+Keep provider credentials in the configuration secret store. Do not put them in
+support screenshots, chat transcripts or application logs. Check the
+[supported connection settings](/cloud/custom-profiles#supported-provider-connection-settings)
+if a provider needs header authentication or a distinct WebSocket endpoint.
+
+Dashboard capability probes and management API probes have different scopes.
+The management probe, when advertised by the live API, checks chain identity and
+head with at most two calls. It does not establish archive, WebSocket or method
+coverage. Test those requirements separately.
+
+## Choose behavior for your workload
+
+| Requirement | Starting point | What to verify |
+| --- | --- | --- |
+| Responsive current reads | `fastest` strategy with block regression protection off | Tail latency, errors and head freshness under your traffic |
+| Sequential latest-block observations | Enable block regression protection for the chain | Lag behavior and how your app handles a continuity error |
+| Several values from one state | Select a block hash and reuse it for all reads | Upstream support for the block-hash selector |
+| Real-time logs | Account-backed WebSocket endpoint | Reconnect, duplicate handling and bounded replay recovery |
+
+[Block regression protection](/cloud/block-continuity) does not make independent
+`latest` contract calls a snapshot. Use [Read at one block](/cloud/read-at-one-block)
+for related balances, nonces or contract values. Neither feature guarantees finality.
+
+## Update without changing the app endpoint
+
+Start by adding or adjusting one provider. Verify its behavior, apply the profile
+change, then inspect routing evidence from the application. Cluster publication is
+not instantaneous; a successful local reconciliation does not prove every region
+has observed the change.
+
+For agent-managed changes, follow the [management workflow](/cloud/agent-flows).
+Read the current revision, preview the complete desired configuration, and retain
+one request UUID for an apply and its retries. Omitting a provider from the desired
+list removes it; omitting an existing provider's secret preserves that secret.
+
+If a provider performs poorly, remove or correct it while other eligible providers
+remain available. Keep an application rollback for the evaluation. Provider outages,
+quota exhaustion across the whole pool and unsupported methods can still prevent a
+successful request.
+
+## Decide whether the trial worked
+
+Compare the same request flow before and after the change: successful responses,
+p95/p99 latency, head freshness, upstream request volume and operational effort.
+Expand only when the evidence supports your workload. Add transaction broadcasting,
+historical queries and subscriptions as separate tests with their own
+[recovery behavior](/cloud/rpc-behavior).
