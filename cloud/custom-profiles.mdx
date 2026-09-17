@@ -9,6 +9,9 @@ A custom profile is an account-owned pool of upstream providers. It uses the
 same routing engine as a managed profile while keeping its membership,
 credentials, billing lifecycle, and route identity separate.
 
+Start with the [two-provider evaluation](/cloud/bring-your-own-rpc), or use the
+[agent management workflow](/cloud/agent-flows) when available on your deployment.
+
 ## Operator journey
 
 1. Create a draft and choose its display name. Review the generated slug before
@@ -49,6 +52,8 @@ authorized merely because it knows the profile slug.
 The current Lasso Cloud editor accepts provider URLs. Use the endpoint URL supplied by your provider and verify the required methods with a probe and a test request.
 
 The editor does not currently expose custom authentication headers or independent HTTP and WebSocket endpoint pairing. A provider that requires header-only authentication, or different HTTP and WebSocket hosts or paths, cannot be fully configured through this editor. Do not assume that changing `https` to `wss` creates a valid WebSocket endpoint, or move a header credential into a URL unless your provider explicitly supports that authentication method.
+
+The preview management API advertises connection fields in its live configuration schema, including independent HTTP and WebSocket URLs when supported. Check that deployment contract separately from the editor. Neither path promises support for arbitrary provider authentication.
 
 Lasso RPC Core supports more transport configuration options when self-hosted; those options are separate from the current Cloud editor.
 

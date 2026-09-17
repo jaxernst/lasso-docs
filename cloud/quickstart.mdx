@@ -5,8 +5,10 @@ description: Create a key, make a harmless RPC call, and stage the first endpoin
 
 # First endpoint quickstart
 
-This flow evaluates Lasso with a standard JSON-RPC call. Creating an external
-key changes service state; an agent should ask before doing it for a user.
+This flow evaluates Lasso with a standard JSON-RPC call. Agents should operate
+within the user’s existing resource and spending authority. The preview
+[agent workflow](/cloud/agent-flows) provides separate management credentials and
+recoverable CLI onboarding when enabled.
 
 ## 1. Check live support
 
@@ -86,8 +88,9 @@ curl -sS -X POST \
   "https://lasso.sh/api/v1/agent/keys/$LASSO_KEY/claim-link"
 ```
 
-Give the short-lived `claim_url` to the user. Linking adds the account management
-surface; it should not be performed without the user's approval.
+Give the short-lived `claim_url` to the user. Claiming keeps the RPC endpoint and premium scope, moves purchased credit to the
+account’s shared balance, and ends anonymous management. Grant later agent
+management and funding access separately; claiming does not broaden the app key.
 
 For exact key, funding, claim, and session-payment payloads, use
 [`/openapi.json`](https://lasso.sh/openapi.json) and

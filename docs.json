@@ -68,6 +68,13 @@
             ]
           },
           {
+            "group": "Application guides",
+            "pages": [
+              "cloud/bring-your-own-rpc",
+              "cloud/base-rpc-integration"
+            ]
+          },
+          {
             "group": "Automation and reference",
             "pages": [
               "cloud/agent-flows",
