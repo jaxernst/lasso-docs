@@ -78,9 +78,11 @@ method is unsupported. No sustained-load or availability guarantee follows.
 1. Retain known positive values, block numbers/hashes and receipt/log identities
    for your actual contracts, ages, storage slots and log ranges. Test both
    selector forms your client uses; do not replace failures with easier witnesses.
-2. Check those witnesses against your intended upstreams, then through the exact
-   Lasso endpoint and credential. Inspect [routing evidence](/cloud/observability)
-   to confirm the service and effective profile; preserve failures separately.
+2. For providers you own or bring to Lasso, compare direct upstream results with
+   the exact Lasso endpoint and credential. For managed profiles, qualify that
+   Lasso endpoint and credential directly; access to the managed upstreams is not
+   required. Inspect [routing evidence](/cloud/observability) to confirm the service
+   and effective profile; preserve failures separately.
 3. Repeat from your deployment regions under representative load and an isolated
    test upstream failure. Measure correctness, latency, request volume and quota use.
    Keep the previous endpoint available during a [staged rollout](/cloud/adoption).
