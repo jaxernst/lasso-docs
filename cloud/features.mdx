@@ -58,14 +58,21 @@ screenshots, issues, telemetry labels, or client-visible errors.
 
 ## Keys and access
 
-- Anonymous keys can be created without signup and can later be funded or
-  claimed by an account without changing the RPC endpoint.
+- Anonymous keys can be created without signup and later claimed by an account
+  without changing the RPC endpoint. Funding depends on the deployment.
 - Account keys support dashboard management, profile authorization, and shared
   account usage.
 - Entitlements, balances, and rate limits are enforced before upstream routing.
-- Stripe-backed account billing and Tempo-compatible key or session payments
-  serve different human and agent workflows. Fetch the live pricing catalog
-  before quoting price or making a purchase decision.
+- Stripe-backed account billing is separate from anonymous-key funding and
+  paid RPC sessions. Production currently disables MPP funding and sessions
+  (checked September 20, 2026). The implemented legacy Tempo session protocol
+  is not a promise of compatibility with the current Tempo CLI. Check the live
+  [service manifest](https://lasso.sh/agent.json) and
+  [deployment guide](https://lasso.sh/SKILL.md) before attempting payment.
+- Fetch the live [pricing catalog](https://lasso.sh/api/v1/agent/pricing) for
+  anonymous method prices and the [account plans](https://lasso.sh/pricing) for
+  account billing. Those CU models are different; see
+  [Usage units](/cloud/observability#usage-units).
 
 ## Evidence
 

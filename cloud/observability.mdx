@@ -23,6 +23,23 @@ Operational fallback between system profiles preserves the authorized service
 profile's `x-lasso-profile` identity. Internal routing metadata can separately
 describe the attempt that served the request.
 
+## Usage units
+
+The credential and service determine what a compute unit (CU) means:
+
+| Usage path | Unit and evidence |
+| --- | --- |
+| Anonymous key | Method-based cost, adjusted by routing strategy. Read the live [method pricing catalog](https://lasso.sh/api/v1/agent/pricing) and applicable response headers. |
+| Account key | Request and response byte-based accounting with method multipliers. Account usage is recorded by the service; the anonymous method catalog and per-request USD headers do not describe this balance. |
+| Custom profile | Usage observations and the account's billable balance are separate. Your upstream provider can also charge for traffic. |
+| Paid session | Deployment-dependent method pricing. Production currently disables this path; check [service discovery](https://lasso.sh/agent.json). |
+
+Do not sum CU from different models or infer an account charge by multiplying
+anonymous-key prices by request count. Retain the credential class, profile,
+request count, measurement window, and available service usage evidence when
+comparing a client run with the dashboard. Dashboard freshness and retained
+request evidence do not establish immediate settlement.
+
 ## Opt-in metadata
 
 Use `?include_meta=headers` or `X-Lasso-Include-Meta: headers` to preserve the
@@ -68,6 +85,11 @@ and no executing provider. Client metadata
 does not include per-attempt error details. Treat the live OpenAPI response and actual record as
 authoritative because optional fields depend on the request path and outcome.
 
+Provider fields can be withheld for managed profiles or unavailable on a request
+path. A selected candidate is not proof that it served the final response. Retain
+missing terminal attribution as unknown; do not reconstruct it from candidate
+order or dashboard health.
+
 WebSocket callers can add `"lasso_meta":"notify"` to a JSON-RPC request to ask
 for a follow-up `lasso_meta` notification.
 
@@ -107,8 +129,8 @@ choice, not a requirement for consistent reads.
 1. Capture the request ID at the client boundary.
 2. Compare the requested route with `x-lasso-profile` and, when present,
    `x-lasso-effective-strategy`.
-3. Decode opt-in metadata to identify the serving provider, transport, latency,
-   and retry count.
+3. Decode opt-in metadata and retain the available terminal provider, transport,
+   latency, and retry evidence. Record unavailable fields explicitly.
 4. Check the dashboard's regional provider state and recent activity.
 5. Correlate the request ID with application and service telemetry for a durable
    incident record.

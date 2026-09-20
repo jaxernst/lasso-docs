@@ -1,0 +1,73 @@
+---
+title: Versions, availability, and evidence
+description: Choose between released RPC Core and managed Cloud, with versioned proof and workload limits.
+---
+
+Use **Lasso RPC Core** when you want to operate the routing engine and its
+network boundary. Use **Lasso Cloud** when you want managed routing, accounts,
+keys, billing, and provider operations. A shared engine does not mean that a
+Core release and the hosted service have identical behavior.
+
+## Version reference
+
+Checked September 20, 2026:
+
+| Surface | Version or observation | What it establishes |
+| --- | --- | --- |
+| RPC Core | [v0.4.2](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.4.2), source `54943f91f85a9a461fcf73e18f383d400b24368a` | The released artifact described by the Core installation and API guides. The [release manifest](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.2/container-release.json) binds source and image digests. Repository main can be newer. |
+| Managed Cloud | Public health reported source `89ade5b9be5745f09ee09f0c394223549e5f0085` at `2026-09-20T18:46:30Z` | A dated deployment observation. Recheck [health](https://lasso.sh/api/health) and [service discovery](https://lasso.sh/agent.json) for your evaluation. Process health does not qualify your workload. |
+| Cloud APIs and payment availability | Live [OpenAPI](https://lasso.sh/openapi.json), [manifest](https://lasso.sh/agent.json), and [deployment guide](https://lasso.sh/SKILL.md) | Available routes, credential classes, and enabled payment rails on that deployment. An implemented API can still be disabled. |
+
+## Workload and ownership matrix
+
+“Supported” here identifies an interface and its documented boundary. It does
+not certify every provider pool, chain, request parameter, or sustained load.
+
+| Capability | RPC Core v0.4.2 | Managed Cloud | Qualification boundary |
+| --- | --- | --- | --- |
+| HTTP reads and batches | Supported; you configure and operate upstreams. | Managed or account-owned provider pools. | History, method support, quotas, and parameters depend on eligible upstreams. Batches route items independently and do not pin a snapshot. |
+| Signed transactions | One upstream dispatch for `eth_sendRawTransaction`. | Conservative single dispatch. | An acknowledgment is not inclusion or finality. Reconcile an indeterminate result by transaction hash. |
+| WebSocket unary requests, `newHeads`, and `logs` | Supported; enable intended providers and protect your endpoint. | Account-key WebSocket access is advertised. Anonymous-key WebSocket access is not. | Recovery is bounded. Reconnect and reconcile application checkpoints after termination. Pending-transaction subscriptions are outside the released subset. |
+| Historical state and log ranges | Forwarded subject to provider capabilities. | Provider capability and availability constrain routing. | No universal archive depth or log-range guarantee. Qualify your exact historical witnesses. |
+| Stateful filters | No cross-request upstream affinity guarantee. | Provider-local state is not made portable. | Prefer `eth_getLogs` or supported subscriptions when switching providers. |
+| Block regression protection | Opt-in `local` policy with best-effort peer recovery; optional coordinated policy requires its own operating setup. | Custom-profile On/Off control for local protection. | Local protection covers sequential choices within one running application generation. A server switch or restart can return a lower block. |
+| Hash-selected state reads | Explicit selectors are retained through routing and retries. | Same documented application pattern. | Choose and carry one hash through every read; upstream state and selector support are required. This is not finality or execution proof. |
+| Identity, billing, incoming customer quotas | Outside Core. Protect exposed endpoints through your network or reverse proxy. | Account, key, entitlement, and usage services. | Profiles do not multiply an upstream account's quota. [Account and anonymous CU differ](/cloud/observability#usage-units). |
+| MPP funding and paid sessions | Outside Core. | Implemented paths, disabled in production at the observation above. | Check the live manifest before attempting payment. Legacy Tempo protocol support does not imply current CLI compatibility. |
+| Sustained workload capacity | Depends on your deployment and providers. | Depends on workload, profile, providers, and service policy. | The linked evidence does not establish a general 24-hour, seven-day, or 30-day operating envelope across these workloads. |
+
+Use the detailed [Core method contract](/api/supported-methods),
+[Cloud workload behavior](/cloud/rpc-behavior), and
+[Cloud compatibility contract](/cloud/json-rpc-compatibility) for execution and
+failure semantics. Before adoption, evaluate one real application flow using
+[the two-provider guide](/cloud/bring-your-own-rpc), including its recovery path.
+
+## Public release evidence
+
+The v0.4.2 [container verification summary](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.2/container-verification.md)
+records 19 installation and recovery checks on each native AMD64 and ARM64
+image. It covers installation, custom profiles, HTTP/WebSocket routing,
+container replacement, retained history, and optional journal recovery.
+The [release](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.4.2) also links
+the exact-source CI run and machine-readable platform results.
+
+The [feature validation report](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.2/feature-validation.md)
+records controlled and managed-service block-choice and hash-read checks. It
+preserves failed quota and latency populations, cold-channel limitations, and
+cross-server backsteps alongside the final warmed-channel pass. Those bounded
+checks do not establish a customer-capacity estimate, a fleet-wide monotonicity
+guarantee, or an SLA. They do not separately qualify arbitrary log reorg recovery
+or your transaction lifecycle.
+
+## Routing benchmark
+
+The published [routing-overhead report](https://lasso.sh/benchmarks/routing-overhead.html)
+measures added p95 latency of 0.70–1.08 ms across five short synthetic-provider
+trials at 10,000 requests per second. A separate 60-second instrumented run
+measured 2.29 ms. The [raw evidence ledger](https://lasso.sh/benchmarks/lasso-routing-overhead-ledger-2026-08-24.tar.gz)
+preserves accepted, rejected, and sustained runs.
+
+This is a routing-engine measurement. It excludes hosted authentication,
+database metering, Internet/provider latency, multiple regions, and WebSockets.
+Use client-observed latency, correctness, recovery, and upstream volume from
+your own workload when deciding whether to adopt Lasso.
