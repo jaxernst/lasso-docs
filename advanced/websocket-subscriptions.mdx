@@ -59,7 +59,8 @@ Before production adoption, exercise the intended chain, provider pool, filter
 cardinality, event rate, and downstream consumption rate:
 
 1. Confirm real block or log notifications after establishment.
-2. Interrupt the active upstream and retain received frames through recovery.
+2. In an isolated environment with test-owned upstreams, interrupt the active
+   upstream and retain received frames through recovery.
 3. Compare frames with the expected blocks and logs, including removals and
    replacement events during a controlled reorg.
 4. Exercise slow consumers, unavailable HTTP history, and recovery exhaustion.
