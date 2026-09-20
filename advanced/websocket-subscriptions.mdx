@@ -1,321 +1,79 @@
 ---
-title: 'WebSocket subscriptions'
-description: 'Multiplexing with bounded failover and recovery for blockchain event subscriptions'
+title: WebSocket subscriptions
+description: Operate and qualify bounded subscription recovery in RPC Core v0.4.2.
 ---
 
-## Overview
-
-Lasso's WebSocket subscription system multiplexes compatible clients and runs
-bounded recovery when an upstream fails. Recovery either restores the stream
-within its deadline, ancestry, replay, and memory limits or terminates the
-affected client explicitly.
-
-## Architecture
-
-### Subscription Flow
-
-```
-Client (Viem/Wagmi)
-     ↓
-RPCSocket (Phoenix Channel)
-     ↓
-SubscriptionRouter
-     ↓
-UpstreamSubscriptionPool (multiplexing)
-     ↓
-WSConnection (upstream provider)
-     ↓
-StreamCoordinator (per-subscription key)
-     ↓
-├─→ GapFiller (HTTP backfill)
-└─→ ClientSubscriptionRegistry (fan-out)
-```
-
-### Key Components
-
-**UpstreamSubscriptionPool**
-- Per-(profile, chain) GenServer multiplexing client subscriptions
-- Resolves `provider_id` → `instance_id` via Catalog
-- Calls `InstanceSubscriptionManager.ensure_subscription` to share upstream subscriptions across profiles
-- Registers in `InstanceSubscriptionRegistry` to receive events
-
-**InstanceSubscriptionManager**
-- Per-instance GenServer managing upstream WebSocket subscriptions
-- Handles subscription lifecycle (`eth_subscribe`, `eth_unsubscribe`) with the upstream provider
-- Receives events from WSConnection via PubSub topic `ws:subs:instance:{instance_id}`
-- Dispatches events to consumers via `InstanceSubscriptionRegistry` (duplicate-key Registry)
-
-**StreamCoordinator**
-- Per-subscription-key GenServer managing continuity and gap-filling
-- Orchestrates failover with synchronous state transitions
-- Orders bounded replay and suppresses overlap with buffered live events
-- Location: `lib/lasso/core/streaming/stream_coordinator.ex`
-
-**WSConnection**
-- GenServer managing persistent WebSocket connection
-- Started via `start_shared_link/1` under InstanceSupervisor
-- Shared across all profiles using the same upstream
-
-## Multiplexing
-
-### N:1 Client-to-Upstream Ratio
-
-100 clients subscribing to `eth_subscribe("newHeads")` share a single upstream subscription.
-
-**Benefits:**
-- Reduced provider API usage
-- Lower latency (no connection setup per client)
-- Efficient resource utilization
-
-**Implementation:**
-
-The UpstreamSubscriptionPool tracks subscription reference counts:
-
-```elixir
-# First client subscribes
-eth_subscribe("newHeads") → upstream provider
-
-# Clients 2-100 subscribe
-eth_subscribe("newHeads") → reuse existing upstream subscription
-
-# Last client unsubscribes
-eth_unsubscribe(subscription_id) → cleanup upstream subscription
-```
-
-## Failover with Gap-Filling
-
-### Failover State Machine
-
-StreamCoordinator implements a synchronous state machine:
-
-**States:**
-- `:active` - Normal event processing
-- `:backfilling` - Fetching missed blocks/logs via HTTP
-- `:switching` - Resubscribing to new provider
-- `:degraded` - Circuit breaker triggered (max failover attempts exceeded)
-
-**Transitions:**
-
-```
-:active → :backfilling
-  ↓
-:backfilling → :switching
-  ↓
-:switching → :active (success)
-:switching → :backfilling (cascade to next provider)
-```
-
-### Gap-Filling Process
-
-On provider failure mid-stream:
-
-1. **Detect Failure**: StreamCoordinator receives `{:provider_unhealthy, failed_id, proposed_new_id}`
-2. **Compute Gap**: Calculate `last_seen_block` to current head using consensus height (&lt;1ms vs 200-500ms blocking request)
-3. **Backfill via HTTP**: GapFiller fetches missed blocks/logs from independent HTTP provider (decoupled from WebSocket provider selection)
-4. **Buffer Incoming Events**: Events from new provider are buffered during backfill
-5. **Resubscribe**: Request new WebSocket subscription to proposed provider
-6. **Drain Buffer**: Deduplicate and emit buffered events after transition
-
-**Result**: Recovery resumes an ordered stream within the configured bounds.
-If Lasso cannot prove that recovery is complete, it terminates continuity
-instead of silently continuing after a partial backfill.
-
-### Continuity Policy
-
-The current continuity contract uses a chain-time-aware replay allowance. It
-takes the greater of the configured block allowance and the blocks expected
-during the recovery deadline. Recovery fails explicitly if the effective
-allowance, retained ancestry, deadline, or memory budget is exceeded.
-
-Configuration:
-
-```elixir
-# StreamCoordinator initialization
-max_backfill_blocks: 32,
-backfill_timeout: 30_000
-```
-
-## Deduplication
-
-StreamCoordinator maintains a dedupe cache to filter duplicate events during failover:
-
-**newHeads Deduplication:**
-- Key: Block hash
-- Max items: 256 (configurable)
-- Max age: 30 seconds
-
-**logs Deduplication:**
-- Key: `{blockNumber, transactionIndex, logIndex}`
-- Same cache limits
-
-**Buffer Ordering:**
-
-Before deduplication, buffered events are sorted deterministically:
-
-```elixir
-# newHeads: sort by block number
-ordered_buffer = Enum.sort_by(buffer, fn payload ->
-  decode_hex(Map.get(payload, "number", "0x0"))
-end)
-
-# logs: sort by (blockNumber, transactionIndex, logIndex)
-ordered_buffer = Enum.sort_by(buffer, fn log ->
-  {decode_hex(Map.get(log, "blockNumber", "0x0")),
-   decode_hex(Map.get(log, "transactionIndex", "0x0")),
-   decode_hex(Map.get(log, "logIndex", "0x0"))}
-end)
-```
-
-## Circuit Breaker Protection
-
-### Failover Rate Limiting
-
-StreamCoordinator implements exponential backoff for rapid failover attempts:
-
-**Thresholds:**
-- `max_failover_attempts`: 3 (default)
-- `failover_cooldown_ms`: 5,000ms window
-
-**Behavior:**
-
-If 3 failover attempts occur within 5 seconds:
-1. Transition to `:degraded` state
-2. Drop incoming events (emit telemetry for monitoring)
-3. Schedule retry after 30 seconds
-4. Clear failure history and attempt recovery
-
-**Event Buffering During Failover:**
-- Max buffer size: 100 events (configurable)
-- Overflow strategy: Drop oldest, keep newest
-- Buffer preserved during cascade (multi-provider failover)
-
-## Provider Selection for Failover
-
-### Decoupled HTTP Backfill
-
-Gap-filling uses independent HTTP provider selection:
-
-```elixir
-# WebSocket failover: priority strategy (configured order)
-pick_next_provider(excluded_providers, protocol: :ws, strategy: :priority)
-
-# HTTP backfill: fastest strategy (lowest latency)
-pick_best_http_provider(excluded_providers, protocol: :http, strategy: :fastest)
-```
-
-**Rationale**: The best WebSocket provider for subscriptions may not be the fastest for bulk historical queries.
-
-### Cascade Failover
-
-If resubscription to the proposed provider fails:
-
-1. Check circuit breaker (recent failures < max attempts?)
-2. Select next provider from priority list (excluding all previously failed)
-3. Preserve event buffer from failed attempt
-4. Initiate new failover cycle
-5. If no providers available → enter degraded mode
-
-## Telemetry Events
-
-StreamCoordinator emits detailed telemetry:
-
-```elixir
-[:lasso, :subs, :failover, :initiated]
-# Metadata: chain, key, old_provider, new_provider
-
-[:lasso, :subs, :failover, :backfill_started]
-# Measurements: count (blocks to backfill)
-# Metadata: chain, provider_id, from_block, to_block
-
-[:lasso, :subs, :failover, :backfill_completed]
-# Measurements: count (blocks fetched)
-# Metadata: chain, from_block, to_block
-
-[:lasso, :subs, :failover, :resubscribe_initiated]
-# Metadata: chain, key, provider_id
-
-[:lasso, :subs, :failover, :completed]
-# Measurements: duration_ms
-# Metadata: chain, key
-
-[:lasso, :subs, :failover, :degraded]
-# Metadata: chain, key
-
-[:lasso, :stream, :dropped_event]
-# Measurements: count
-# Metadata: chain, reason (:degraded_mode)
-```
-
-## Supported Subscription Types
-
-### newHeads
-
-```javascript
-await provider.send('eth_subscribe', ['newHeads'])
-```
-
-**Continuity Tracking:**
-- Last seen: block number
-- Gap calculation: current head - last seen
-- Backfill: `eth_getBlockByNumber` for each missing block
-
-### logs
-
-```javascript
-await provider.send('eth_subscribe', ['logs', {
-  address: '0x....',
-  topics: ['0x....']
-}])
-```
-
-**Continuity Tracking:**
-- Last seen: highest block number in logs or last newHeads block
-- Gap calculation: current head - last log block
-- Backfill: `eth_getLogs` with same filter + block range
-
-## Performance Characteristics
-
-**Overhead:**
-- Deduplication check: &lt;0.1ms (in-memory cache lookup)
-- Gap calculation: &lt;1ms (consensus height from ETS)
-- Failover latency: 200-500ms (backfill + resubscribe)
-
-Capacity depends on the deployed node size, event rate, filter cardinality,
-and downstream consumption rate. Validate the intended subscription mix under
-load instead of deriving capacity from the multiplexing ratio alone.
-
-## Configuration
-
-```yaml
-# Per-chain WebSocket subscription settings
-chains:
-  ethereum:
-    subscription:
-      max_backfill_blocks: 32
-      backfill_timeout: 30000
-      dedupe_max_items: 256
-      dedupe_max_age_ms: 30000
-      max_failover_attempts: 3
-      failover_cooldown_ms: 5000
-      max_event_buffer: 100
-```
-
-## Best Practices
-
-### For Production Deployments
-
-1. **Monitor failover metrics**: Track `[:lasso, :subs, :failover, :degraded]` events
-2. **Configure provider priorities**: Order providers by subscription reliability
-3. **Set appropriate backfill limits**: Balance continuity vs latency (32 blocks ≈ 6 minutes on Ethereum)
-4. **Test fast chains separately**: A nominal block allowance represents less recovery time on a faster chain
-
-### For Development
-
-1. **Test failover scenarios**: Trigger provider failures to verify bounded recovery
-2. **Monitor telemetry**: Use the dashboard to observe failover state transitions
-
-## Related Documentation
-
-- [Block Sync](/advanced/block-sync) - Block height monitoring for gap calculation
-- [Error Classification](/advanced/error-classification) - Provider failure detection
-- [Benchmarking](/advanced/benchmarking) - Provider selection for HTTP backfill
+Lasso RPC Core v0.4.2 multiplexes matching `newHeads` and `logs` streams and
+attempts bounded recovery when an upstream fails. An open socket or a successful
+subscription response does not prove that your application received every event.
+Use [WebSocket endpoints](/api/websocket-endpoints) for connection examples and
+[Supported methods](/api/supported-methods) for the released method contract.
+
+## Configure the provider pool
+
+Configure both HTTP and WebSocket endpoints for providers that support your
+chain and workload. Set `subscribe_new_heads: true` on providers intended to
+serve `newHeads`; a WebSocket URL alone does not enable this opt-in. See
+[Provider configuration](/configuration/providers).
+
+Identical subscriptions can share upstream work. Different log filters can
+create distinct streams, and HTTP replay consumes upstream requests. A high
+client-to-upstream sharing ratio does not establish capacity for many distinct
+filters or dense logs. Shared resources do not create quota isolation.
+
+## Recovery behavior
+
+Recovery establishes a replacement live subscription, buffers incoming events,
+and uses HTTP to replay the missing range. HTTP replay and WebSocket delivery
+can use different eligible upstreams. The coordinator merges replay with its
+buffered live events and suppresses overlap within retained deduplication state.
+
+Recovery has a deadline, a replay allowance, an attempt budget, and a memory
+bound. Buffer exhaustion terminates the affected downstream connection; it does
+not silently discard the oldest buffered event and claim uninterrupted delivery.
+Unavailable history, failed replay, or exhausted recovery can also terminate
+continuity. The application must reconnect and reconcile its durable checkpoint.
+
+Use the [v0.4.2 configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.4.2/docs/CONFIGURATION.md)
+for supported configuration keys. The released
+[stream coordinator](https://github.com/jaxernst/lasso-rpc/blob/v0.4.2/lib/lasso/core/streaming/stream_coordinator.ex)
+is the implementation reference. Internal process defaults are not necessarily
+YAML settings, and increasing a limit cannot supply missing provider history.
+
+## Application checkpoints and reorgs
+
+Persist the last successfully processed block and its hash outside the socket
+connection. Handle reconnection and `removed` log events. Reconcile your state
+against canonical blocks after an outage or reorg; block height alone cannot
+distinguish a replacement block from the one your application processed.
+
+Do not infer lossless or exactly-once processing from multiplexing or replay.
+Verify the received sequence for removed and replacement logs, replay/live
+overlap, and sparse filters against the exact released artifact you deploy.
+Keep application-fetched repairs separate from events delivered by Lasso when
+reporting recovery results.
+
+## Qualify your workload
+
+Before production adoption, exercise the intended chain, provider pool, filter
+cardinality, event rate, and downstream consumption rate:
+
+1. Confirm real block or log notifications after establishment.
+2. In an isolated environment with test-owned upstreams, interrupt the active
+   upstream and retain received frames through recovery.
+3. Compare frames with the expected blocks and logs, including removals and
+   replacement events during a controlled reorg.
+4. Exercise slow consumers, unavailable HTTP history, and recovery exhaustion.
+   Confirm your client notices termination and restores its checkpoint.
+5. Restart or replace your Lasso instance and measure application recovery.
+
+Record first failures, missing ranges, duplicate/removal ordering, recovery
+duration, application repairs, and upstream request volume. Test fast chains
+separately: the same number of blocks represents a shorter outage window.
+No general failover-latency or subscription-capacity number is established by
+the routing HTTP microbenchmark.
+
+See [Versions, availability, and evidence](/releases-and-availability) for the
+public installation checks and their limits. Lasso Cloud has a separately
+deployed [workload contract](/cloud/rpc-behavior); do not assume stream recovery
+changes reach a Core release at the same time.
