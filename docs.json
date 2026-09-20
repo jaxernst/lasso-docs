@@ -64,6 +64,7 @@
               "cloud/block-continuity",
               "cloud/read-at-one-block",
               "cloud/rpc-behavior",
+              "cloud/historical-workloads",
               "cloud/json-rpc-compatibility",
               "cloud/observability"
             ]
