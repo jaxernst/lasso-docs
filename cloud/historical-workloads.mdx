@@ -1,0 +1,88 @@
+---
+title: Qualify historical RPC workloads
+description: Measured historical-state samples, known gaps, and a practical archive-workload acceptance path.
+---
+
+Test the exact historical methods, blocks and selectors your application needs.
+A successful old header or log query does not prove that an upstream can serve
+state at that block—or that customer routing will reach it.
+
+## What we measured
+
+On **September 20, 2026**, we sampled the production configuration from **one SJC
+node**, source `89ade5b9be5745f09ee09f0c394223549e5f0085`. Direct upstream probes
+ran from the investigator's network, not from Lasso's deployed nodes. This is
+dated evidence, not a claim about a later deployment.
+
+The study made **3,404 direct requests**, including reference acquisition and
+retained-witness checks, without retries. Positive witnesses covered Ethereum,
+Optimism, Unichain, Polygon, World, Base and Arbitrum at **1/7/30/365-day** timestamp
+targets relative to `2026-09-20T19:21:18Z`. Tempo and Robinhood covered **1/7/30 days**;
+the year target predates their observed block-1 history and is inapplicable.
+
+State methods and logs used block-number and block-hash selectors; receipts used
+transaction hashes. Results were checked against retained positive values and
+block identities. Empty or null results did not establish coverage.
+
+The inventory contained 118 HTTP profile-route slots and 92 distinct endpoint
+authentication identities. Credentials initially matched 90 slots / 70 identities;
+later matching reached 103 / 78 for supplemental runs only. A credential match
+is not a successful probe. Unmatched or untested endpoints remain unknown.
+
+## Direct upstream results
+
+A **cell** is one witnessed chain × depth × selector × witness. A positive cell
+has at least one anchored exact match, including reference-only matches. Missing
+witnesses are excluded. These fractions are **not uptime or overall archive
+coverage**. Primary profile routes are counted here; reserve results are separate.
+
+| Method | Public positive | Public with 2+ families | Premium positive | Premium with 2+ families |
+| --- | ---: | ---: | ---: | ---: |
+| `eth_call` | 56/68 | 27/68 | 68/68 | 60/68 |
+| `eth_getCode` | 54/68 | 29/68 | 68/68 | 60/68 |
+| `eth_getStorageAt` | 48/56 | 26/56 | 56/56 | 48/56 |
+| `eth_getBalance` | 40/40 | 18/40 | 40/40 | 40/40 |
+| `eth_getTransactionReceipt` | 50/50 | 24/50 | 50/50 | 50/50 |
+| `eth_getLogs` | 54/54 | 28/54 | 54/54 | 54/54 |
+
+“Families” are observed operator groupings, generally inferred from configuration,
+with some endpoint-identity attribution. They do not prove independent
+infrastructure, accounts or quotas. Positive endpoints with unknown attribution
+must not be treated as proof of single-operator dependence. Receipt cells include
+additional positive-log transaction witnesses at the same ages.
+
+Download the [dated aggregate evidence](/files/historical-qualification-2026-09-20.json).
+
+## Customer routing and remaining gaps
+
+A separate **119-request production Premium check matched 54/56 positive call
+cells** across the seven common chains. Arbitrum's day/hash call returned `-32000`
+and month/number returned `-32603`, although a directly tested upstream answered
+both witnesses. This study did **not** qualify customer routing through Public.
+Direct capability and successful customer routing are separate acceptance gates.
+
+Arbitrum Public direct calls matched **0/8** cells, with all three configured
+primary endpoints tested; Premium matched **8/8** without a second corroborating
+operator family. Positive Arbitrum logs did not establish historical state.
+Only one of three Robinhood Public endpoints was credential-matched and tested;
+the other two remain unknown.
+
+**BSC, testnets and early-chain history remain unqualified.** Tempo and Robinhood
+lack positive storage, balance, receipt and log witnesses here. World and
+Arbitrum lack positive balance witnesses; Base lacks a month-depth positive-log
+witness in the bounded search. These gaps are unknown coverage, not proof that a
+method is unsupported. No sustained-load or availability guarantee follows.
+
+## Qualify your application
+
+1. Retain known positive values, block numbers/hashes and receipt/log identities
+   for your actual contracts, ages, storage slots and log ranges. Test both
+   selector forms your client uses; do not replace failures with easier witnesses.
+2. For providers you own or bring to Lasso, compare direct upstream results with
+   the exact Lasso endpoint and credential. For managed profiles, qualify that
+   Lasso endpoint and credential directly; access to the managed upstreams is not
+   required. Inspect [routing evidence](/cloud/observability) to confirm the service
+   and effective profile; preserve failures separately.
+3. Repeat from your deployment regions under representative load and an isolated
+   test upstream failure. Measure correctness, latency, request volume and quota use.
+   Keep the previous endpoint available during a [staged rollout](/cloud/adoption).

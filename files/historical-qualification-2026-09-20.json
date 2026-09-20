@@ -1,0 +1,193 @@
+{
+  "schemaVersion": 1,
+  "studyDate": "2026-09-20",
+  "referenceTimeUtc": "2026-09-20T19:21:18.255Z",
+  "productionSource": "89ade5b9be5745f09ee09f0c394223549e5f0085",
+  "inventorySource": "One production SJC node, around 19:00 UTC",
+  "probeOrigin": "Investigator network, not Lasso deployment nodes",
+  "scope": [
+    {
+      "chains": [
+        "Ethereum",
+        "Optimism",
+        "Unichain",
+        "Polygon",
+        "World",
+        "Base",
+        "Arbitrum"
+      ],
+      "targetAgesDays": [
+        1,
+        7,
+        30,
+        365
+      ]
+    },
+    {
+      "chains": [
+        "Tempo",
+        "Robinhood"
+      ],
+      "targetAgesDays": [
+        1,
+        7,
+        30
+      ],
+      "yearTarget": "Predates observed block-1 history; inapplicable"
+    }
+  ],
+  "inventory": {
+    "configuredHttpProfileRouteSlots": 118,
+    "distinctEndpointAuthenticationIdentities": 92,
+    "initialCredentialMatchedSlots": 90,
+    "initialMatchedIdentities": 70,
+    "supplementCredentialMatchedSlots": 103,
+    "supplementMatchedIdentities": 78,
+    "interpretation": "Credential matching does not establish testing or success. Original runs retain original matching denominators; additional matches apply only to supplements."
+  },
+  "directRequests": 3404,
+  "directPrimaryProfileMethodCells": [
+    {
+      "method": "eth_call",
+      "selectors": [
+        "hash",
+        "number"
+      ],
+      "public": {
+        "witnessedCells": 68,
+        "positiveCells": 56,
+        "cellsWithAtLeastTwoObservedOperatorFamilies": 27
+      },
+      "premium": {
+        "witnessedCells": 68,
+        "positiveCells": 68,
+        "cellsWithAtLeastTwoObservedOperatorFamilies": 60
+      }
+    },
+    {
+      "method": "eth_getCode",
+      "selectors": [
+        "hash",
+        "number"
+      ],
+      "public": {
+        "witnessedCells": 68,
+        "positiveCells": 54,
+        "cellsWithAtLeastTwoObservedOperatorFamilies": 29
+      },
+      "premium": {
+        "witnessedCells": 68,
+        "positiveCells": 68,
+        "cellsWithAtLeastTwoObservedOperatorFamilies": 60
+      }
+    },
+    {
+      "method": "eth_getStorageAt",
+      "selectors": [
+        "hash",
+        "number"
+      ],
+      "public": {
+        "witnessedCells": 56,
+        "positiveCells": 48,
+        "cellsWithAtLeastTwoObservedOperatorFamilies": 26
+      },
+      "premium": {
+        "witnessedCells": 56,
+        "positiveCells": 56,
+        "cellsWithAtLeastTwoObservedOperatorFamilies": 48
+      }
+    },
+    {
+      "method": "eth_getBalance",
+      "selectors": [
+        "hash",
+        "number"
+      ],
+      "public": {
+        "witnessedCells": 40,
+        "positiveCells": 40,
+        "cellsWithAtLeastTwoObservedOperatorFamilies": 18
+      },
+      "premium": {
+        "witnessedCells": 40,
+        "positiveCells": 40,
+        "cellsWithAtLeastTwoObservedOperatorFamilies": 40
+      }
+    },
+    {
+      "method": "eth_getTransactionReceipt",
+      "selectors": [
+        "transaction_hash"
+      ],
+      "public": {
+        "witnessedCells": 50,
+        "positiveCells": 50,
+        "cellsWithAtLeastTwoObservedOperatorFamilies": 24
+      },
+      "premium": {
+        "witnessedCells": 50,
+        "positiveCells": 50,
+        "cellsWithAtLeastTwoObservedOperatorFamilies": 50
+      }
+    },
+    {
+      "method": "eth_getLogs",
+      "selectors": [
+        "hash",
+        "number"
+      ],
+      "public": {
+        "witnessedCells": 54,
+        "positiveCells": 54,
+        "cellsWithAtLeastTwoObservedOperatorFamilies": 28
+      },
+      "premium": {
+        "witnessedCells": 54,
+        "positiveCells": 54,
+        "cellsWithAtLeastTwoObservedOperatorFamilies": 54
+      }
+    }
+  ],
+  "cellDefinition": "Eligible witnessed chain x depth x selector x witness; missing witnesses excluded. Positive means at least one anchored exact match, including a reference-only match. Primary profiles only; reserve results excluded.",
+  "operatorFamilyBoundary": "Inferred or endpoint-attributed groupings; not proof of independent infrastructure, accounts or quotas. Unknown attribution does not establish single-operator dependence.",
+  "productionCustomerRoute": {
+    "serviceProfile": "Premium",
+    "requests": 119,
+    "positiveCallCells": 54,
+    "witnessedCallCells": 56,
+    "chains": [
+      "Ethereum",
+      "Optimism",
+      "Unichain",
+      "Polygon",
+      "World",
+      "Base",
+      "Arbitrum"
+    ],
+    "failedCallCells": [
+      {
+        "chain": "Arbitrum",
+        "ageDays": 1,
+        "selector": "hash",
+        "errorCode": -32000
+      },
+      {
+        "chain": "Arbitrum",
+        "ageDays": 30,
+        "selector": "number",
+        "errorCode": -32603
+      }
+    ],
+    "publicCustomerRoute": "Not qualified by this study"
+  },
+  "limits": [
+    "No BSC, testnet or early-chain-history qualification",
+    "Missing positive method witnesses and unmatched endpoints remain unknown",
+    "No availability, sustained capacity, SLA or post-change deployment claim"
+  ],
+  "retainedInputSha256": {
+    "coverage.json": "cf53451c58f60dcbdac53cc8f8a8bc2bc829a6b7be4949ff7ef158f197f65861",
+    "outcomes.json": "f65f9cb8ed5966d44cc5208e1c603ebbd4d6a49202821a52480fae3369aba48f"
+  }
+}
