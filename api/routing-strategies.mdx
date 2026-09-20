@@ -1,9 +1,9 @@
 ---
 title: 'Routing strategy endpoints'
-description: 'Choose a released Core v0.4.3 routing strategy through the URL'
+description: 'Choose a released Core v0.4.4 routing strategy through the URL'
 ---
 
-This is the HTTP route reference for **Lasso RPC Core v0.4.3**. The
+This is the HTTP route reference for **Lasso RPC Core v0.4.4**. The
 [routing strategy contract](/concepts/routing-strategies) defines ranking, health
 tiers and execution limits. [Cloud RPC behavior](/cloud/rpc-behavior) separately
 describes the managed service.
@@ -13,7 +13,7 @@ describes the managed service.
 | POST route | Behavior |
 | --- | --- |
 | `/rpc/:chain` | Application default; shipped as `load_balanced` |
-| `/rpc/load-balanced/:chain` | Randomized channel order |
+| `/rpc/load-balanced/:chain` | Randomized order with distinct-instance first pass for replay-safe calls |
 | `/rpc/fastest/:chain` | Recent reliability-qualified latency order |
 | `/rpc/latency-weighted/:chain` | Relative-latency weighted permutation |
 | `/rpc/provider/:provider_id/:chain` | Explicit configured provider |
@@ -51,4 +51,4 @@ and generated success/failover examples. A candidate list alone does not prove
 which provider handled a request.
 
 Routes are defined in the released
-[Core router](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/lib/lasso_web/router.ex).
+[Core router](https://github.com/jaxernst/lasso-rpc/blob/v0.4.4/lib/lasso_web/router.ex).

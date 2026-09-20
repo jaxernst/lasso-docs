@@ -3,7 +3,7 @@ title: 'Performance benchmarking'
 description: 'Distinguish recent routing evidence from operational performance summaries'
 ---
 
-In **Lasso RPC Core v0.4.3**, request execution supplies performance observations
+In **Lasso RPC Core v0.4.4**, request execution supplies performance observations
 without requiring a separate benchmark request for every user call. Background
 health and head probes are separate upstream traffic. Measure their cost alongside
 your workload when qualifying a deployment.
@@ -36,8 +36,10 @@ boundary, not a success-rate multiplier. There is no weight floor or hidden
 exploration share. Available latency priors can still order unqualified fallbacks;
 unmeasured channels are shuffled.
 
-**Load balanced** shuffles channels in released v0.4.3; it does not rank by a
-benchmark score. **Priority** uses configured order. All strategies then apply
+**Load balanced** starts from a randomized order and gives distinct physical
+instances a [bounded first pass](/concepts/routing-strategies#load-balanced) for
+replay-safe calls within each health tier. It does not rank by a benchmark score.
+**Priority** uses configured order. All strategies apply
 [health tiering](/concepts/routing-strategies#health-based-tiering) and live admission.
 
 The supported latency control is `LW_BETA` (positive number, default `3.0`).
@@ -60,17 +62,17 @@ latency or successful service.
 
 BenchmarkStore uses bounded retention and cleanup; it is not a durable complete
 request journal. Its implementation details and APIs are in the released
-[BenchmarkStore source](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/lib/lasso/core/benchmarking/benchmark_store.ex).
+[BenchmarkStore source](https://github.com/jaxernst/lasso-rpc/blob/v0.4.4/lib/lasso/core/benchmarking/benchmark_store.ex).
 Measure process/ETS memory and request overhead for your configured workload.
 This page does not assign a fixed per-call overhead or memory footprint to every
 deployment.
 
 The historical [routing-overhead report](https://lasso.sh/benchmarks/routing-overhead.html)
 is a dated engine benchmark. Preserve its source and environment attribution;
-it is not v0.4.3 hosted capacity or an SLA. [Versions and evidence](/releases-and-availability)
+it is not v0.4.4 hosted capacity or an SLA. [Versions and evidence](/releases-and-availability)
 links the current release acceptance evidence.
 
 Implementation references:
-[Fastest](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/lib/lasso/core/selection/strategies/fastest.ex),
-[LatencyWeighted](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/lib/lasso/core/selection/strategies/latency_weighted.ex),
-and [routing evidence](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/lib/lasso/core/routing_evidence.ex).
+[Fastest](https://github.com/jaxernst/lasso-rpc/blob/v0.4.4/lib/lasso/core/selection/strategies/fastest.ex),
+[LatencyWeighted](https://github.com/jaxernst/lasso-rpc/blob/v0.4.4/lib/lasso/core/selection/strategies/latency_weighted.ex),
+and [routing evidence](https://github.com/jaxernst/lasso-rpc/blob/v0.4.4/lib/lasso/core/routing_evidence.ex).

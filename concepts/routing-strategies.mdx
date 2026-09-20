@@ -1,9 +1,9 @@
 ---
 title: 'Routing strategies'
-description: 'How released Core v0.4.3 ranks eligible upstream channels'
+description: 'How released Core v0.4.4 ranks eligible upstream channels'
 ---
 
-This page describes **Lasso RPC Core v0.4.3**. See [versions and evidence](/releases-and-availability)
+This page describes **Lasso RPC Core v0.4.4**. See [versions and evidence](/releases-and-availability)
 for release identity and [Cloud RPC behavior](/cloud/rpc-behavior) for the managed service.
 
 ## Strategy selection
@@ -13,7 +13,7 @@ Select a strategy in the request URL:
 | Route | Selection |
 | --- | --- |
 | `/rpc/:chain` | Application default; shipped as `load_balanced` |
-| `/rpc/load-balanced/:chain` | Randomized channel order |
+| `/rpc/load-balanced/:chain` | Randomized order with distinct-instance first pass for replay-safe calls |
 | `/rpc/fastest/:chain` | Recent reliability-qualified latency |
 | `/rpc/latency-weighted/:chain` | Weighted random order |
 | `/rpc/profile/:profile/fastest/:chain` | Explicit file profile and strategy |
@@ -29,10 +29,26 @@ strategy route. Strategy names in metadata use underscores, such as `load_balanc
 
 ## Load balanced
 
-Released v0.4.3 shuffles eligible **channels**, then applies health tiers. A
-provider's HTTP and WebSocket channels can both appear in the fallback order.
-Random ordering does not promise equal provider shares, independent operators,
-capacity-aware balancing or a particular provider within the dispatch budget.
+Core starts from a randomized channel order. For replay-safe unary calls, it
+tries distinct **physical provider instances** before alternate transports of an
+already considered instance within each health tier. HTTP and WebSocket routes
+to the same instance do not count as two physical providers. Distinct instances
+do not establish independent operators or account quotas.
+
+Health tiers and explicit recovered-head preference take precedence. A healthy
+alternate transport still precedes a different provider in a lower tier. The lazy
+cursor bounds healthy-sibling deferral by its remaining candidate limit; live
+admission still applies when a deferred channel is selected.
+
+Alternate transports remain available, but trying another instance first can
+delay a working alternate on the previous instance. Unsafe and unknown methods
+retain their shuffled order and existing dispatch limits. Other strategies are
+unchanged.
+
+This ordering does not increase the three-dispatch limit or original deadline,
+infer archive capability, or promise equal provider shares or capacity-aware
+balancing. A hash selector can leave more distinct providers eligible than the
+dispatch budget can reach. Qualify historical reads against your actual upstreams.
 
 ## Fastest
 
@@ -100,7 +116,8 @@ Health tier order takes precedence over strategy rank:
 3. Closed circuit, rate-limited.
 4. Half-open circuit, rate-limited.
 
-Open circuits are excluded. Strategy order is preserved within each tier.
+Open circuits are excluded. Each strategy defines its within-tier order;
+load balanced applies the bounded distinct-instance first pass described above.
 For example, a half-open channel without a rate limit precedes a closed channel
 already marked rate-limited. Live admission can still reject a candidate whose
 state changes after selection.
@@ -138,7 +155,7 @@ Use [supported methods](/api/supported-methods) for execution-safety boundaries
 and [request metadata](/observability/request-metadata) to distinguish candidates
 from actual recorded attempts.
 
-This contract is grounded in the released [routing guide](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/docs/ROUTING.md),
-[Fastest](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/lib/lasso/core/selection/strategies/fastest.ex),
-[LatencyWeighted](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/lib/lasso/core/selection/strategies/latency_weighted.ex)
-and [execution envelope](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/lib/lasso/core/request/execution_envelope.ex).
+This contract is grounded in the released [routing guide](https://github.com/jaxernst/lasso-rpc/blob/v0.4.4/docs/ROUTING.md),
+[Fastest](https://github.com/jaxernst/lasso-rpc/blob/v0.4.4/lib/lasso/core/selection/strategies/fastest.ex),
+[LatencyWeighted](https://github.com/jaxernst/lasso-rpc/blob/v0.4.4/lib/lasso/core/selection/strategies/latency_weighted.ex)
+and [execution envelope](https://github.com/jaxernst/lasso-rpc/blob/v0.4.4/lib/lasso/core/request/execution_envelope.ex).

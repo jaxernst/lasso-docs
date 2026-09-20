@@ -1,9 +1,9 @@
 ---
 title: 'Request metadata'
-description: 'Released Core v0.4.3 routing fields and reproducible response examples'
+description: 'Released Core v0.4.4 routing fields and reproducible response examples'
 ---
 
-This page describes **Lasso RPC Core v0.4.3** metadata. It is opt-in and describes
+This page describes **Lasso RPC Core v0.4.4** metadata. It is opt-in and describes
 request execution, not an upstream-capacity or availability guarantee.
 [Cloud RPC behavior](/cloud/rpc-behavior) and [versions and evidence](/releases-and-availability)
 separate managed-service fields and deployment state from this Core contract.
@@ -22,7 +22,7 @@ curl 'http://localhost:4000/rpc/ethereum?include_meta=body' \
 
 ## Metadata fields
 
-The released [metadata builder](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/lib/lasso/observability/observability.ex)
+The released [metadata builder](https://github.com/jaxernst/lasso-rpc/blob/v0.4.4/lib/lasso/observability/observability.ex)
 removes **top-level nil values**. Nested attempt fields can still be `null`.
 Treat missing optional evidence as unknown, and tolerate additional fields.
 
@@ -50,7 +50,7 @@ A channel identity contains `profile`, `provider_id`, `instance_id`, `transport`
 and `route_generation`. Instance/profile identifiers are opaque. The recorded
 attempt contains `channel`, `outcome`, `category` and `code`; successful attempts
 can have null category/code. See the released
-[request context](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/lib/lasso/core/request/request_context.ex).
+[request context](https://github.com/jaxernst/lasso-rpc/blob/v0.4.4/lib/lasso/core/request/request_context.ex).
 
 Core generates an opaque request ID when needed; its fallback is 32 lowercase
 hexadecimal characters. Do not validate all IDs against that fallback shape or
@@ -63,8 +63,8 @@ JSON response when you need this outer field: SDK methods commonly return only
 `result` and discard the envelope.
 
 These examples were generated with the v0.4.3 metadata builder and channel-history
-helpers. Provider identities and timings are fixed hermetic fixture inputs, not
-live performance measurements. The fixtures follow the released
+helpers, which are unchanged in v0.4.4. Provider identities and timings are fixed
+hermetic fixture inputs, not live performance measurements. The fixtures follow the released
 [success and failover test setup](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/test/integration/request_pipeline_integration_test.exs).
 
 ### Successful first attempt

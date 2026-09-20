@@ -1,9 +1,9 @@
 ---
 title: WebSocket subscriptions
-description: Operate and qualify bounded subscription recovery in RPC Core v0.4.3.
+description: Operate and qualify bounded subscription recovery in RPC Core v0.4.4.
 ---
 
-Lasso RPC Core v0.4.3 multiplexes matching `newHeads` and `logs` streams and
+Lasso RPC Core v0.4.4 multiplexes matching `newHeads` and `logs` streams and
 attempts bounded recovery when an upstream fails. An open socket or a successful
 subscription response does not prove that your application received every event.
 Use [WebSocket endpoints](/api/websocket-endpoints) for connection examples and
@@ -34,9 +34,9 @@ not silently discard the oldest buffered event and claim uninterrupted delivery.
 Unavailable history, failed replay, or exhausted recovery can also terminate
 continuity. The application must reconnect and reconcile its durable checkpoint.
 
-Use the [v0.4.3 configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/docs/CONFIGURATION.md)
+Use the [v0.4.4 configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.4.4/docs/CONFIGURATION.md)
 for supported configuration keys. The released
-[stream coordinator](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/lib/lasso/core/streaming/stream_coordinator.ex)
+[stream coordinator](https://github.com/jaxernst/lasso-rpc/blob/v0.4.4/lib/lasso/core/streaming/stream_coordinator.ex)
 is the implementation reference. Internal process defaults are not necessarily
 YAML settings, and increasing a limit cannot supply missing provider history.
 
@@ -47,7 +47,7 @@ connection. Handle reconnection and `removed` log events. Reconcile your state
 against canonical blocks after an outage or reorg; block height alone cannot
 distinguish a replacement block from the one your application processed.
 
-In v0.4.3, buffered orphan-log additions and removals drain in their original
+In v0.4.4, buffered orphan-log additions and removals drain in their original
 per-log order before replacement-block additions, including across block heights.
 Positive and removed events have separate deduplication state. Repeated removal
 and re-addition of the same log within that window is not fully modeled; reconcile
