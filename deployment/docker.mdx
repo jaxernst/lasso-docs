@@ -3,13 +3,16 @@ title: Docker deployment
 description: Run, verify, configure, upgrade, and roll back the public RPC Core image.
 ---
 
+The example below installs v0.4.3. See [release evidence](/releases-and-availability)
+for its image digest and native installation checks.
+
 The primary distribution is `ghcr.io/jaxernst/lasso-rpc`, with native Linux AMD64
 and ARM64 images. Use the Compose attachment from the release you select. It
 requires Docker Compose and OpenSSL for generating local secrets:
 
 ```bash
 mkdir lasso && cd lasso
-curl --fail --location https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.2/compose.yml --output compose.yml
+curl --fail --location https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.3/compose.yml --output compose.yml
 (umask 077; printf 'SECRET_KEY_BASE=%s\nRELEASE_COOKIE=%s\n' "$(openssl rand -hex 64)" "$(openssl rand -hex 32)" > .env)
 docker compose up -d --wait
 curl --fail http://localhost:4000/api/health
@@ -32,8 +35,9 @@ another local port and `LASSO_NODE_ID` to give the instance a stable identity.
 
 #### Verify or pin the image
 
-Each release attaches `container-release.json`, native verification reports, and
-`container-verification.md` with its immutable image digest. Version tags are
+Completed container publication attaches `container-release.json`, native
+verification reports, and `container-verification.md` with its immutable image
+digest. Version tags are
 never replaced with different contents. For a digest-pinned installation, set
 this in `.env`, using the digest from the selected release:
 
@@ -52,7 +56,7 @@ gh attestation verify oci://ghcr.io/jaxernst/lasso-rpc@sha256:DIGEST \
 The signed attestation identifies the publication workflow. Platform BuildKit
 provenance records the pinned public source used for the build; the index also
 contains SBOMs. Source and publication-tooling revisions are recorded separately
-in `container-release.json`. See [Releasing](https://github.com/jaxernst/lasso-rpc/blob/v0.4.2/docs/RELEASING.md) for the verification
+in `container-release.json`. See [Releasing](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/docs/RELEASING.md) for the verification
 scope, first-publication access setup, and retry behavior.
 
 #### Custom profiles and credentials
@@ -84,7 +88,7 @@ services:
 ```
 
 Edit the YAML in `profiles/`, retaining a valid `public.yml`. Additional profiles
-need matching filenames and frontmatter slugs. See [Configuration](https://github.com/jaxernst/lasso-rpc/blob/v0.4.2/docs/CONFIGURATION.md)
+need matching filenames and frontmatter slugs. See [Configuration](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/docs/CONFIGURATION.md)
 for supported settings. Files must be readable by UID 10001 and directories
 traversable by that UID; host directories used for writable history must also be
 writable by UID 10001. Keep credential values in `.env` and reference them as
@@ -96,9 +100,9 @@ Apply mount changes or environment changes:
 docker compose up -d --force-recreate --wait
 ```
 
-In v0.4.2, new profiles can reuse connected WebSocket upstreams after reload.
+In v0.4.3, new profiles can reuse connected WebSocket upstreams after reload.
 If you remain on v0.3.4, recreate the container after adding profiles to avoid
-unavailable subscriptions. For new profiles and YAML-only edits in v0.4.2, reload
+unavailable subscriptions. For new profiles and YAML-only edits in v0.4.3, reload
 the running node:
 
 ```bash
