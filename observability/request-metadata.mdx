@@ -1,511 +1,230 @@
 ---
-title: 'Request Metadata'
-description: 'Client-visible routing metadata with include_meta parameter for debugging and monitoring'
+title: 'Request metadata'
+description: 'Released Core v0.4.3 routing fields and reproducible response examples'
 ---
 
-## Overview
+This page describes **Lasso RPC Core v0.4.3** metadata. It is opt-in and describes
+request execution, not an upstream-capacity or availability guarantee.
+[Cloud RPC behavior](/cloud/rpc-behavior) and [versions and evidence](/releases-and-availability)
+separate managed-service fields and deployment state from this Core contract.
 
-Lasso can optionally include routing metadata in RPC responses, allowing clients to inspect provider selection, retry behavior, and request timing. This is useful for debugging, monitoring, and understanding routing decisions.
+## Request metadata
 
-**Metadata is opt-in only** — responses do not include metadata by default.
-
-## Opt-In Mechanisms
-
-Clients control metadata visibility via:
-
-### Query Parameter
+Choose `include_meta=body` or `include_meta=headers`. The equivalent request
+header is `X-Lasso-Include-Meta: body` or `headers`; the query parameter takes
+precedence. Omit both to keep the ordinary response format.
 
 ```bash
-curl "http://localhost:4000/rpc/ethereum?include_meta=headers" \
+curl 'http://localhost:4000/rpc/ethereum?include_meta=body' \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
 ```
 
-### Request Header
+## Metadata fields
 
-```bash
-curl "http://localhost:4000/rpc/ethereum" \
-  -H 'Content-Type: application/json' \
-  -H 'X-Lasso-Include-Meta: body' \
-  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
-```
+The released [metadata builder](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/lib/lasso/observability/observability.ex)
+removes **top-level nil values**. Nested attempt fields can still be `null`.
+Treat missing optional evidence as unknown, and tolerate additional fields.
 
-**Values:**
-- `headers` - Metadata in response headers
-- `body` - Metadata in response body
-- Omit parameter - No metadata (default)
+| Field | Meaning |
+| --- | --- |
+| `version` | Metadata schema version, currently `"1.0"`. |
+| `request_id` | Opaque bounded correlation string, not a UUID-v4 contract. |
+| `chain_id` | Numeric chain identity, not a chain-name `chain` field. |
+| `profile_id`, `service_profile_id` | Effective and service file-profile identities; Core uses the same profile value for both. |
+| `strategy` | Strategy name, such as `priority`, `fastest` or `load_balanced`. |
+| `transport` | Request transport. The selected/executed channel identifies the upstream transport. |
+| `candidate_providers` | Candidate labels considered by selection; not a dispatch log. |
+| `selected_provider` | Optional selected provider identity (`id`) and `protocol`; no guaranteed name or region. |
+| `executed_channel` | Optional channel that successfully executed the request. |
+| `attempted_channels` | Ordered recorded success/error attempts, with channel identity and error category/code where present. |
+| `selection_latency_ms` | Optional selection timing. |
+| `upstream_latency_ms` | Optional measured upstream I/O timing. |
+| `end_to_end_latency_ms` | Optional end-to-end timing; not `total_latency_ms`. |
+| `lasso_overhead_ms` | Optional computed internal overhead. |
+| `retries` | Pipeline retry counter; not a count of candidate providers or proof of exact dispatch count. |
+| `circuit_breaker_state` | Reported circuit state, or `unknown`. |
+| `head_policy` | Optional [block protection evidence](#block-protection-metadata). |
 
-## Headers Mode
+A channel identity contains `profile`, `provider_id`, `instance_id`, `transport`
+and `route_generation`. Instance/profile identifiers are opaque. The recorded
+attempt contains `channel`, `outcome`, `category` and `code`; successful attempts
+can have null category/code. See the released
+[request context](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/lib/lasso/core/request/request_context.ex).
 
-**Request:**
+Core generates an opaque request ID when needed; its fallback is 32 lowercase
+hexadecimal characters. Do not validate all IDs against that fallback shape or
+confuse this correlation ID with the JSON-RPC request's `id`.
 
-```bash
-curl -i "http://localhost:4000/rpc/ethereum?include_meta=headers" \
-  -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
-```
+## Body mode
 
-**Response:**
+`include_meta=body` adds `lasso_meta` beside `result` or `error`. Read the raw HTTP
+JSON response when you need this outer field: SDK methods commonly return only
+`result` and discard the envelope.
 
-```
-HTTP/1.1 200 OK
-Content-Type: application/json
-X-Lasso-Request-ID: d12fd341cc14fc97ce9f09876fffa7a3
-X-Lasso-Meta: eyJ2ZXJzaW9uIjoiMS4wIiwicmVxdWVzdF9pZCI6ImQxMmZkMzQxY2MxNGZjOTdjZTlmMDk4NzZmZmZhN2EzIiwic3RyYXRlZ3kiOiJsb2FkX2JhbGFuY2VkIiwiY2hhaW4iOiJldGhlcmV1bSIsInRyYW5zcG9ydCI6Imh0dHAiLCJzZWxlY3RlZF9wcm92aWRlciI6eyJpZCI6ImV0aGVyZXVtX2xsYW1hcnBjIiwicHJvdG9jb2wiOiJodHRwIn0sImNhbmRpZGF0ZV9wcm92aWRlcnMiOlsiZXRoZXJldW1fY2xvdWRmbGFyZTpodHRwIiwiZXRoZXJldW1fbGxhbWFycGM6aHR0cCJdLCJ1cHN0cmVhbV9sYXRlbmN5X21zIjo1MjUsInJldHJpZXMiOjEsImNpcmN1aXRfYnJlYWtlcl9zdGF0ZSI6ImNsb3NlZCIsImVuZF90b19lbmRfbGF0ZW5jeV9tcyI6NTI4fQ==
+These examples were generated with the v0.4.3 metadata builder and channel-history
+helpers. Provider identities and timings are fixed hermetic fixture inputs, not
+live performance measurements. The fixtures follow the released
+[success and failover test setup](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/test/integration/request_pipeline_integration_test.exs).
 
-{"jsonrpc":"2.0","id":1,"result":"0x8471c9a"}
-```
-
-### Decoding X-Lasso-Meta
-
-The `X-Lasso-Meta` header contains base64url-encoded JSON:
-
-```javascript
-const base64url = response.headers.get('x-lasso-meta');
-const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
-const json = atob(base64);
-const meta = JSON.parse(json);
-
-console.log(meta);
-```
-
-**Decoded metadata:**
+### Successful first attempt
 
 ```json
 {
-  "version": "1.0",
-  "request_id": "d12fd341cc14fc97ce9f09876fffa7a3",
-  "strategy": "load_balanced",
-  "chain": "ethereum",
-  "transport": "http",
-  "selected_provider": {
-    "id": "ethereum_llamarpc",
-    "protocol": "http"
-  },
-  "candidate_providers": [
-    "ethereum_cloudflare:http",
-    "ethereum_llamarpc:http"
-  ],
-  "upstream_latency_ms": 525,
-  "retries": 1,
-  "circuit_breaker_state": "closed",
-  "end_to_end_latency_ms": 528
-}
-```
-
-### Size Limit
-
-If encoded metadata exceeds `max_meta_header_bytes` (default 4KB), only `X-Lasso-Request-ID` is included.
-
-**Configuration:**
-
-```elixir
-config :lasso, :observability,
-  max_meta_header_bytes: 4096  # Default: 4KB
-```
-
-**Fallback to body mode:**
-
-```bash
-# If headers mode exceeds limit, switch to body mode
-curl "http://localhost:4000/rpc/ethereum?include_meta=body" \
-  -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"fromBlock":"0x0","toBlock":"latest"}],"id":1}'
-```
-
-## Body Mode
-
-**Request:**
-
-```bash
-curl "http://localhost:4000/rpc/ethereum?include_meta=body" \
-  -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
-```
-
-**Response:**
-
-```json
-{
-  "jsonrpc": "2.0",
   "id": 1,
-  "result": "0x8471c9a",
+  "jsonrpc": "2.0",
   "lasso_meta": {
     "version": "1.0",
-    "request_id": "d12fd341cc14fc97ce9f09876fffa7a3",
-    "strategy": "load_balanced",
-    "chain": "ethereum",
+    "strategy": "priority",
+    "chain_id": 1,
     "transport": "http",
+    "request_id": "fixture-request",
+    "candidate_providers": [
+      "primary:http",
+      "backup:http"
+    ],
+    "circuit_breaker_state": "closed",
+    "selection_latency_ms": 1.0,
+    "upstream_latency_ms": 20.0,
+    "end_to_end_latency_ms": 23.0,
+    "lasso_overhead_ms": 3.0,
+    "retries": 0,
     "selected_provider": {
-      "id": "ethereum_llamarpc",
+      "id": "primary",
       "protocol": "http"
     },
-    "candidate_providers": [
-      "ethereum_cloudflare:http",
-      "ethereum_llamarpc:http"
+    "attempted_channels": [
+      {
+        "code": null,
+        "category": null,
+        "channel": {
+          "profile": "public",
+          "provider_id": "primary",
+          "instance_id": "fixture-primary",
+          "transport": "http",
+          "route_generation": 7
+        },
+        "outcome": "success"
+      }
     ],
-    "upstream_latency_ms": 525,
-    "retries": 1,
-    "circuit_breaker_state": "closed",
-    "end_to_end_latency_ms": 525
-  }
-}
-```
-
-**No size limit** — body mode always includes full metadata.
-
-## Metadata Fields
-
-### Complete Schema
-
-```typescript
-interface LassoMeta {
-  version: string;                    // Metadata schema version ("1.0")
-  request_id: string;                 // UUID v4 request identifier
-  strategy: string;                   // Routing strategy used
-  chain: string;                      // Chain name
-  transport: string;                  // "http" or "ws"
-  selected_provider: {                // Chosen provider
-    id: string;                       // Provider ID
-    protocol: string;                 // "http" or "ws"
-  };
-  candidate_providers: string[];      // Providers considered ("id:protocol")
-  upstream_latency_ms: number;        // Provider response time
-  retries: number;                    // Retry count (0 = first try)
-  circuit_breaker_state: string;      // "closed", "open", "half_open"
-  end_to_end_latency_ms: number;      // Total request duration
-}
-```
-
-### Field Descriptions
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `version` | string | Metadata schema version (always "1.0") |
-| `request_id` | string | UUID v4 for request tracking |
-| `strategy` | string | Routing strategy: `fastest`, `load_balanced`, `latency_weighted` |
-| `chain` | string | Chain name (e.g., "ethereum", "base") |
-| `transport` | string | Transport protocol: `http` or `ws` |
-| `selected_provider` | object | Provider that fulfilled the request |
-| `selected_provider.id` | string | Provider identifier |
-| `selected_provider.protocol` | string | Transport used: `http` or `ws` |
-| `candidate_providers` | array | Providers considered (format: `"provider_id:protocol"`) |
-| `upstream_latency_ms` | number | Time waiting for provider response |
-| `retries` | number | Number of retry attempts (0 = first try succeeded) |
-| `circuit_breaker_state` | string | Circuit state: `closed`, `open`, `half_open`, `unknown` |
-| `end_to_end_latency_ms` | number | Total request duration (selection + upstream + overhead) |
-
-## Use Cases
-
-### 1. Debugging Provider Selection
-
-**Scenario:** Understand why a specific provider was chosen.
-
-```bash
-curl "http://localhost:4000/rpc/ethereum?include_meta=body" \
-  -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' | jq '.lasso_meta'
-```
-
-**Output:**
-
-```json
-{
-  "strategy": "fastest",
-  "candidate_providers": [
-    "ethereum_alchemy:http",
-    "ethereum_infura:http"
-  ],
-  "selected_provider": {
-    "id": "ethereum_alchemy",
-    "protocol": "http"
+    "executed_channel": {
+      "profile": "public",
+      "provider_id": "primary",
+      "instance_id": "fixture-primary",
+      "transport": "http",
+      "route_generation": 7
+    },
+    "profile_id": "public",
+    "service_profile_id": "public"
   },
-  "upstream_latency_ms": 95
+  "result": "0x64"
 }
 ```
 
-**Insight:** Alchemy selected because it has lowest latency for `eth_blockNumber`.
+### Successful failover
 
-### 2. Monitoring Retry Behavior
-
-**Scenario:** Track failover attempts.
-
-```typescript
-const response = await fetch('http://localhost:4000/rpc/ethereum?include_meta=body', {
-  method: 'POST',
-  headers: {'Content-Type': 'application/json'},
-  body: JSON.stringify({jsonrpc: '2.0', method: 'eth_call', params: [...], id: 1})
-});
-
-const data = await response.json();
-
-if (data.lasso_meta.retries > 0) {
-  console.warn(`Request required ${data.lasso_meta.retries} retries`);
-  console.log('Providers tried:', data.lasso_meta.candidate_providers);
-}
-```
-
-**Example output:**
-
-```
-Request required 2 retries
-Providers tried: ['ethereum_cloudflare:http', 'ethereum_llamarpc:http', 'ethereum_alchemy:http']
-```
-
-### 3. Performance Analysis
-
-**Scenario:** Identify slow requests and upstream latency.
-
-```javascript
-const meta = response.lasso_meta;
-
-const overhead = meta.end_to_end_latency_ms - meta.upstream_latency_ms;
-
-console.log({
-  total: meta.end_to_end_latency_ms,
-  upstream: meta.upstream_latency_ms,
-  overhead: overhead,
-  provider: meta.selected_provider.id
-});
-```
-
-**Output:**
+The failed primary and successful backup are both in `attempted_channels`.
+`executed_channel` identifies the backup. A candidate label alone would not
+establish either attempt.
 
 ```json
 {
-  "total": 595,
-  "upstream": 592,
-  "overhead": 3,
-  "provider": "ethereum_llamarpc"
+  "id": 1,
+  "jsonrpc": "2.0",
+  "lasso_meta": {
+    "version": "1.0",
+    "strategy": "priority",
+    "chain_id": 1,
+    "transport": "http",
+    "request_id": "fixture-request",
+    "candidate_providers": [
+      "primary:http",
+      "backup:http"
+    ],
+    "circuit_breaker_state": "closed",
+    "selection_latency_ms": 1.0,
+    "upstream_latency_ms": 20.0,
+    "end_to_end_latency_ms": 23.0,
+    "lasso_overhead_ms": 3.0,
+    "retries": 1,
+    "selected_provider": {
+      "id": "backup",
+      "protocol": "http"
+    },
+    "attempted_channels": [
+      {
+        "code": -32000,
+        "category": "server_error",
+        "channel": {
+          "profile": "public",
+          "provider_id": "primary",
+          "instance_id": "fixture-primary",
+          "transport": "http",
+          "route_generation": 7
+        },
+        "outcome": "error"
+      },
+      {
+        "code": null,
+        "category": null,
+        "channel": {
+          "profile": "public",
+          "provider_id": "backup",
+          "instance_id": "fixture-backup",
+          "transport": "http",
+          "route_generation": 7
+        },
+        "outcome": "success"
+      }
+    ],
+    "executed_channel": {
+      "profile": "public",
+      "provider_id": "backup",
+      "instance_id": "fixture-backup",
+      "transport": "http",
+      "route_generation": 7
+    },
+    "profile_id": "public",
+    "service_profile_id": "public"
+  },
+  "result": "0x64"
 }
 ```
 
-**Insight:** 592ms spent waiting for provider, 3ms Lasso overhead.
+## Headers mode
 
-### 4. Circuit Breaker Monitoring
+`include_meta=headers` puts the same metadata object in `X-Lasso-Meta` as
+base64url-encoded JSON without padding. `X-Lasso-Request-ID` is the correlation
+ID. There is no promised `X-Lasso-Latency` header.
 
-**Scenario:** Detect when providers are degraded.
-
-```typescript
-if (data.lasso_meta.circuit_breaker_state === 'open') {
-  console.error('Circuit breaker OPEN for', data.lasso_meta.selected_provider.id);
-}
-
-if (data.lasso_meta.circuit_breaker_state === 'half_open') {
-  console.warn('Circuit breaker HALF-OPEN (recovery attempt)');
-}
-```
-
-### 5. Client-Side Request Tracing
-
-**Scenario:** Correlate client requests with server logs.
+Decode the header and handle its absence explicitly:
 
 ```javascript
-const response = await fetch('http://localhost:4000/rpc/ethereum?include_meta=headers', {
-  method: 'POST',
-  body: JSON.stringify({jsonrpc: '2.0', method: 'eth_getLogs', params: [...], id: 1})
-});
-
-const requestId = response.headers.get('x-lasso-request-id');
-
-// Send to your monitoring service
-analytics.track('rpc_request', {
-  request_id: requestId,
-  latency: parseInt(response.headers.get('x-lasso-latency')),
-  provider: JSON.parse(atob(response.headers.get('x-lasso-meta'))).selected_provider.id
-});
-```
-
-**Server-side log lookup:**
-
-```bash
-cat logs/app.log | grep 'd12fd341cc14fc97ce9f09876fffa7a3'
-```
-
-## Client Library Examples
-
-### JavaScript/TypeScript
-
-```typescript
-import { ethers } from 'ethers';
-
-const provider = new ethers.JsonRpcProvider(
-  'http://localhost:4000/rpc/ethereum?include_meta=body'
-);
-
-const blockNumber = await provider.getBlockNumber();
-console.log('Block number:', blockNumber);
-
-// Access metadata (custom ethers extension)
-const meta = (await provider.send('eth_blockNumber', [])).lasso_meta;
-console.log('Provider:', meta.selected_provider.id);
-console.log('Latency:', meta.upstream_latency_ms, 'ms');
-```
-
-### Python (web3.py)
-
-```python
-from web3 import Web3
-import base64
-import json
-
-w3 = Web3(Web3.HTTPProvider('http://localhost:4000/rpc/ethereum?include_meta=body'))
-
-block_number = w3.eth.block_number
-print(f'Block number: {block_number}')
-
-# Access metadata from raw request
-response = w3.provider.make_request('eth_blockNumber', [])
-meta = response.get('lasso_meta', {})
-print(f'Provider: {meta.get("selected_provider", {}).get("id")}')
-print(f'Latency: {meta.get("upstream_latency_ms")}ms')
-```
-
-### Go (go-ethereum)
-
-```go
-package main
-
-import (
-	"context"
-	"encoding/json"
-	"fmt"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/rpc"
-)
-
-type LassoMeta struct {
-	RequestID          string `json:"request_id"`
-	Strategy           string `json:"strategy"`
-	SelectedProvider   struct {
-		ID       string `json:"id"`
-		Protocol string `json:"protocol"`
-	} `json:"selected_provider"`
-	UpstreamLatencyMs int `json:"upstream_latency_ms"`
+const encoded = response.headers.get('x-lasso-meta');
+let metadata = null;
+if (encoded) {
+  const base64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
+  const bytes = Uint8Array.from(atob(padded), char => char.charCodeAt(0));
+  metadata = JSON.parse(new TextDecoder().decode(bytes));
 }
-
-func main() {
-	rpcClient, _ := rpc.Dial("http://localhost:4000/rpc/ethereum?include_meta=body")
-	client := ethclient.NewClient(rpcClient)
-
-	var result struct {
-		Result    string     `json:"result"`
-		LassoMeta LassoMeta  `json:"lasso_meta"`
-	}
-
-	err := rpcClient.CallContext(context.Background(), &result, "eth_blockNumber")
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Printf("Block number: %s\n", result.Result)
-	fmt.Printf("Provider: %s\n", result.LassoMeta.SelectedProvider.ID)
-	fmt.Printf("Latency: %dms\n", result.LassoMeta.UpstreamLatencyMs)
-}
+console.log({requestId: response.headers.get('x-lasso-request-id'), metadata});
 ```
 
-## Performance Impact
-
-### Overhead Breakdown
-
-| Operation | Overhead | Notes |
-|-----------|----------|-------|
-| Header encoding | &lt;2ms | JSON encode + base64url |
-| Body enrichment | &lt;1ms | Map.put operation |
-| **Total (headers)** | **~2ms** | Added to end-to-end latency |
-| **Total (body)** | **~1ms** | Added to end-to-end latency |
-| **Total (none)** | **0ms** | No metadata overhead |
-
-**Metadata only computed when requested** — no overhead when `include_meta` is omitted.
-
-## Configuration
-
-### Observability Settings
+If the encoded metadata exceeds `max_meta_header_bytes` (default 4,096 bytes),
+Core omits `X-Lasso-Meta` and retains `X-Lasso-Request-ID`. Body mode avoids this
+metadata-header limit; it is not a promise of unlimited response size.
 
 ```elixir
-# config/config.exs
-config :lasso, :observability,
-  # Maximum size for X-Lasso-Meta header
-  # If exceeded, only X-Lasso-Request-ID is sent
-  max_meta_header_bytes: 4096
+config :lasso, :observability, max_meta_header_bytes: 4096
 ```
 
-**Increase limit for complex metadata:**
+## Record evidence safely
 
-```elixir
-config :lasso, :observability,
-  max_meta_header_bytes: 8192  # 8KB
-```
-
-## Troubleshooting
-
-### Metadata Not in Response
-
-**Symptom:** Response does not include metadata despite `include_meta` parameter.
-
-**Verify parameter:**
-
-```bash
-# Correct
-curl "http://localhost:4000/rpc/ethereum?include_meta=headers" ...
-
-# Incorrect (missing parameter)
-curl "http://localhost:4000/rpc/ethereum" ...
-```
-
-**Check ObservabilityPlug:**
-
-```elixir
-# lib/lasso_web/router.ex
-pipeline :api do
-  plug LassoWeb.Plugs.ObservabilityPlug  # Must be present
-end
-```
-
-### Large Metadata Missing from Headers
-
-**Symptom:** `X-Lasso-Request-ID` present but `X-Lasso-Meta` absent.
-
-**Cause:** Metadata exceeds `max_meta_header_bytes`.
-
-**Solution 1:** Use body mode instead:
-
-```bash
-curl "http://localhost:4000/rpc/ethereum?include_meta=body" ...
-```
-
-**Solution 2:** Increase header size limit:
-
-```elixir
-config :lasso, :observability,
-  max_meta_header_bytes: 8192
-```
-
-### Invalid Base64 Decoding
-
-**Symptom:** JavaScript `atob()` fails with "Invalid character" error.
-
-**Cause:** Header uses base64url encoding (not standard base64).
-
-**Fix:** Replace `-` and `_` before decoding:
-
-```javascript
-const base64url = response.headers.get('x-lasso-meta');
-const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
-const meta = JSON.parse(atob(base64));
-```
-
-## Summary
-
-Lasso's request metadata provides:
-
-- **Opt-in visibility** into routing decisions and performance
-- **Two delivery modes**: headers (compact) or body (no size limit)
-- **Comprehensive data**: provider selection, retries, circuit state, timing
-- **Client library support** for JavaScript, Python, Go
-- **Low overhead** (&lt;2ms for headers, &lt;1ms for body)
-- **Request tracing** via UUID request IDs
-- **Production-safe** with configurable size limits
+Store the correlation ID, result/error, source revision and available timing and
+channel fields. Record missing metadata explicitly. A successful request proves
+neither independent operator redundancy nor that every candidate was attempted.
+Do not use `candidate_providers` as an upstream amplification counter.
 
 ## Block protection metadata
 

@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": -32000,
+    "data": {
+      "retry_after_ms": 5000
+    },
+    "message": "No available channels for method: eth_blockNumber. All circuits open, retry after 5s"
+  },
+  "id": "client-request-42",
+  "jsonrpc": "2.0"
+}

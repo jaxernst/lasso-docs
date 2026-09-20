@@ -171,40 +171,50 @@ When subscription methods are called over HTTP, Lasso provides the correct WebSo
 }
 ```
 
-### -32603: Internal Error
+### -32603: Internal error
 
-**Meaning:** Internal JSON-RPC error. Typically indicates an upstream provider failure.
+An internal JSON-RPC error. Do not classify every provider failure or routing
+exhaustion as `-32603`; upstream errors retain their own semantics.
 
-**Common Causes:**
-- All providers failed (circuit breakers open)
-- Upstream provider returned an error
-- Timeout waiting for provider response
-- Network connectivity issues
+### Core routing exhaustion
 
-**Example:**
+Released Core v0.4.3 returns routing exhaustion as a JSON-RPC `-32000` error over
+HTTP 200 and preserves the client's request ID. It does not publish
+`attempted_providers` or `circuit_breaker_states` in the error payload.
+Use opt-in [request metadata](/observability/request-metadata) for recorded
+channel attempts where available.
+
+The all-circuits-open case can include `retry_after_ms`. This generated serializer
+example uses a fixed five-second retry interval; the actual interval depends on
+the current circuit state:
 
 ```json
 {
-  "jsonrpc": "2.0",
-  "id": 1,
   "error": {
-    "code": -32603,
-    "message": "Internal error: All providers failed for chain ethereum",
+    "code": -32000,
     "data": {
-      "attempted_providers": ["alchemy_eth", "infura_eth", "llamarpc_eth"],
-      "circuit_breaker_states": {
-        "alchemy_eth": "open",
-        "infura_eth": "open",
-        "llamarpc_eth": "half_open"
-      }
-    }
-  }
+      "retry_after_ms": 5000
+    },
+    "message": "No available channels for method: eth_blockNumber. All circuits open, retry after 5s"
+  },
+  "id": "client-request-42",
+  "jsonrpc": "2.0"
 }
 ```
+
+The shape matches the released [controller regression](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/test/lasso_web/controllers/rpc_controller_test.exs)
+and [error contract](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/docs/API_REFERENCE.md#error-responses).
+Other exhaustion paths need not have this retry field or message.
 
 ### -32000: Server Error
 
 **Meaning:** Server-side error specific to Lasso's operation.
+
+<Note>
+Core has no built-in incoming customer authentication or quota enforcement.
+Access, billing and plan examples below are not a self-hosted Core contract;
+consult [Cloud RPC behavior](/cloud/rpc-behavior) for managed-service boundaries.
+</Note>
 
 **Common Causes:**
 - Rate limit exceeded
