@@ -1,0 +1,96 @@
+---
+title: Support, security, incidents, and lifecycle
+description: Public support paths, security reporting, incident expectations, and version boundaries for Lasso Cloud and RPC Core.
+---
+
+Use the channel that matches the surface and the sensitivity of the report.
+Lasso is an early product and project. Public support is currently best-effort.
+There is no general response-time, restoration-time, uptime, or advance-notice
+commitment unless you have a separate written agreement.
+
+## Get help or report a problem
+
+| Need | Public path | Include |
+| --- | --- | --- |
+| Lasso Cloud product question or incident | [Open a Lasso documentation issue](https://github.com/jaxernst/lasso-docs/issues/new) | UTC time, affected route shape without credentials, chain, RPC method, response code, request ID, and whether retry or rollback restored service |
+| RPC Core bug or feature request | [Open an RPC Core issue](https://github.com/jaxernst/lasso-rpc/issues/new) | Core version or commit, deployment shape, minimal configuration with secrets removed, reproduction, expected result, and actual result |
+| Documentation problem | [Open a Lasso documentation issue](https://github.com/jaxernst/lasso-docs/issues/new) | Page URL, the unclear or incorrect text, and the behavior you observed |
+| Security vulnerability | Follow the private reporting instructions below | Affected surface, reproduction, likely impact, and suggested mitigation if available |
+
+GitHub issues are an asynchronous support channel. They are not an emergency
+pager. Do not post Lasso keys, cookies, provider URLs, provider credentials,
+billing details, database connection strings, or personal data. If a public
+report needs sensitive evidence, first open a redacted issue asking for a private
+handoff path.
+
+For a Cloud availability check, inspect [`/api/health`](https://lasso.sh/api/health)
+and [`/agent.json`](https://lasso.sh/agent.json). Process health establishes only
+the checks reported by that response. It does not prove that a particular chain,
+provider, method, historical query, or subscription is working.
+
+Lasso does not currently publish a separate public status page or a contractual
+incident-response target. During an incident, keep the previous RPC endpoint or
+self-hosted deployment available as an application rollback when your workload
+requires that option.
+
+## Report a security vulnerability
+
+Do not use a public issue for a suspected vulnerability in Lasso Cloud or RPC
+Core. Email `jaxernst@gmail.com`. This is also the private reporting channel in
+the current [RPC Core security policy](https://github.com/jaxernst/lasso-rpc/security/policy).
+
+Include enough detail to reproduce and assess the report, but do not send active
+production credentials unless a separate secure exchange has been arranged.
+The current policy does not promise a response or disclosure deadline. Confirmed
+issues are investigated, fixed, and disclosed on a timeline coordinated with the
+reporter when practical.
+
+For operating guidance, see the Core
+[security considerations](https://github.com/jaxernst/lasso-rpc/blob/main/SECURITY.md#security-considerations-for-self-hosting)
+and [production checklist](/deployment/production-checklist). RPC Core has no
+built-in client authentication or incoming customer quotas. Protect its RPC,
+metrics, and dashboard endpoints at your network or reverse proxy.
+
+## Versions and lifecycle
+
+### RPC Core
+
+RPC Core supports the latest published release with security updates. Upgrade
+older versions before deploying them or requesting a security fix. The project
+is pre-1.0, so review the target release's compatibility section before every
+upgrade instead of assuming that all minor releases are interchangeable.
+
+Use a versioned GitHub release and its recorded container digest for production.
+Repository `main`, a moving container tag, and the separately deployed Cloud
+service can contain different code. Release notes state known configuration,
+storage, migration, and rollback boundaries. See
+[Versions, availability, and evidence](/releases-and-availability).
+
+There is no published long-term-support branch, backport window, or fixed release
+cadence today. Older releases remain available as historical artifacts, but their
+availability does not mean they receive fixes.
+
+### Lasso Cloud
+
+Cloud is a continuously deployed managed service. Check the live
+[`/openapi.json`](https://lasso.sh/openapi.json) for request contracts and
+[`/agent.json`](https://lasso.sh/agent.json) for advertised capabilities before
+automation. A route present in source or documentation can still be disabled in
+the deployed service.
+
+There is no general public deprecation-notice window or fixed Cloud release
+cadence today. Preserve the request and response behavior your integration
+depends on, keep a rollback path, and recheck the live contracts during
+qualification and before expanding traffic.
+
+## Repository and license boundaries
+
+| Surface | Purpose | Repository and license boundary |
+| --- | --- | --- |
+| Lasso RPC Core | Self-hosted routing engine, dashboard, configuration, and release artifacts | Public [`jaxernst/lasso-rpc`](https://github.com/jaxernst/lasso-rpc), licensed under Apache-2.0. The repository license applies to the Core source and its distributed artifacts. |
+| Lasso Cloud | Managed accounts, keys, billing, entitlements, profiles, and hosted operations around the routing engine | The implementation is maintained in a private repository that currently declares AGPL-3.0. Availability of the managed service and access to that repository are separate from the Apache-2.0 Core distribution. Cloud does not necessarily run the latest Core release. |
+| Lasso documentation | Source for this documentation site | Public [`jaxernst/lasso-docs`](https://github.com/jaxernst/lasso-docs), licensed under MIT. That license covers the documentation source, not RPC Core or the managed service. |
+
+The live Cloud service, the latest Core release, and repository `main` are
+separate evidence surfaces. When evaluating behavior, record which one you
+tested, its reported source or version, the time, region, route, and workload.

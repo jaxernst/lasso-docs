@@ -37,6 +37,19 @@
             "href": "/introduction"
           }
         ]
+      },
+      {
+        "header": "Trust",
+        "items": [
+          {
+            "label": "Support and lifecycle",
+            "href": "/support-security-lifecycle"
+          },
+          {
+            "label": "Versions and evidence",
+            "href": "/releases-and-availability"
+          }
+        ]
       }
     ]
   },
@@ -51,6 +64,7 @@
             "group": "Start here",
             "pages": [
               "cloud/overview",
+              "support-security-lifecycle",
               "releases-and-availability",
               "cloud/adoption",
               "cloud/quickstart"
@@ -97,6 +111,7 @@
                 "group": "Get Started",
                 "pages": [
                   "introduction",
+                  "support-security-lifecycle",
                   "releases-and-availability",
                   "quickstart",
                   "installation"
