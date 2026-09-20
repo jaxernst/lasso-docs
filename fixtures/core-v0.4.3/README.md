@@ -31,3 +31,11 @@ examples against the fixture files and rejects invalid JSON examples.
 The exhaustion example uses the released error serializer and matches the
 all-circuits-open controller regression, with a fixed five-second retry input.
 It does not claim every exhaustion error has the same message or retry field.
+
+## Compatibility with v0.4.4
+
+All ten source-file SHA-256 values in `source.json` also match released source
+`291c57162f382e5680cc218c7627972a9c5204f2` (`v0.4.4`). The retained outputs therefore
+continue to describe the unchanged metadata, serializer and profile-schema
+contracts. Their generation provenance remains v0.4.3; they do not exercise the
+v0.4.4 fallback-order change.

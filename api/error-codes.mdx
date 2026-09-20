@@ -111,7 +111,7 @@ does not send a JSON-RPC response to a valid notification.
 - Blocked node-local wallet or signing method
 - Chain-specific method not available on requested chain
 
-Core v0.4.3 can forward provider-local filter methods when capability policy
+Core v0.4.4 can forward provider-local filter methods when capability policy
 permits, with one dispatch per request and no cross-request upstream affinity.
 Lasso Cloud rejects its documented filter lifecycle locally. See the separate
 [Core method contract](/api/supported-methods#stateful-filters-and-extensions) and
@@ -187,7 +187,7 @@ exhaustion as `-32603`; upstream errors retain their own semantics.
 
 ### Core routing exhaustion
 
-Released Core v0.4.3 returns routing exhaustion as a JSON-RPC `-32000` error over
+Released Core v0.4.4 returns routing exhaustion as a JSON-RPC `-32000` error over
 HTTP 200 and preserves the client's request ID. It does not publish
 `attempted_providers` or `circuit_breaker_states` in the error payload.
 Use opt-in [request metadata](/observability/request-metadata) for recorded
@@ -211,8 +211,8 @@ the current circuit state:
 }
 ```
 
-The shape matches the released [controller regression](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/test/lasso_web/controllers/rpc_controller_test.exs)
-and [error contract](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/docs/API_REFERENCE.md#error-responses).
+The shape matches the released [controller regression](https://github.com/jaxernst/lasso-rpc/blob/v0.4.4/test/lasso_web/controllers/rpc_controller_test.exs)
+and [error contract](https://github.com/jaxernst/lasso-rpc/blob/v0.4.4/docs/API_REFERENCE.md#error-responses).
 Other exhaustion paths need not have this retry field or message.
 
 ### -32000: Server Error

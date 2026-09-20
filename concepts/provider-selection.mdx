@@ -1,9 +1,9 @@
 ---
 title: 'Provider selection'
-description: 'Eligibility, ranking and live admission in Core v0.4.3'
+description: 'Eligibility, ranking and live admission in Core v0.4.4'
 ---
 
-**Lasso RPC Core v0.4.3** selects upstream channels from the requested file profile
+**Lasso RPC Core v0.4.4** selects upstream channels from the requested file profile
 and chain. A configured provider and an executing channel are different: one
 provider can offer HTTP and WebSocket transports, and multiple configuration
 entries can refer to the same physical upstream.
@@ -57,13 +57,14 @@ chains:
 
 `selection` belongs under the chain. The profile body accepts only the `chains`
 mapping. A `routing.method_overrides` block is not supported. See the released
-[file schema](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/lib/lasso/config/file_schema.ex)
-and [configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/docs/CONFIGURATION.md#provider-capabilities).
+[file schema](https://github.com/jaxernst/lasso-rpc/blob/v0.4.4/lib/lasso/config/file_schema.ex)
+and [configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.4.4/docs/CONFIGURATION.md#provider-capabilities).
 
 ## Strategy ranking
 
 [Routing strategies](/concepts/routing-strategies) define channel order:
-random shuffle, recent reliability-qualified latency, relative latency weights,
+randomized load balancing with a bounded distinct-instance first pass for
+replay-safe calls, recent reliability-qualified latency, relative latency weights,
 or configured priority. Fastest and latency-weighted use recent local routing
 evidence, not lifetime dashboard averages or an implicit exploration floor.
 
@@ -78,7 +79,8 @@ The released order is:
 | 3 | Closed | Yes |
 | 4 | Half-open | Yes |
 
-Open circuits are excluded. Strategy order remains intact within each tier.
+Open circuits are excluded. Each strategy defines its within-tier order, including
+[load-balanced instance diversity](/concepts/routing-strategies#load-balanced).
 A channel in tier 2 precedes one in tier 3 even if the latter has a better
 latency or configured priority. Half-open admission is controlled; appearing
 in the candidate order does not reserve permission to send.
