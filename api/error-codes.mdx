@@ -65,10 +65,13 @@ Lasso implements the complete JSON-RPC 2.0 error code specification:
 **Meaning:** The JSON sent is not a valid Request object.
 
 **Common Causes:**
-- Missing required fields (`jsonrpc`, `method`, `id`)
+- Missing required `method` field
 - Invalid field types
 - Batch request exceeds maximum size (default: 50)
 - Invalid `jsonrpc` version (must be "2.0")
+
+A valid request without `id` is a notification, not an invalid request. Lasso
+does not send a JSON-RPC response to a valid notification.
 
 **Examples:**
 
@@ -105,8 +108,14 @@ Lasso implements the complete JSON-RPC 2.0 error code specification:
 **Common Causes:**
 - Method name typo
 - Subscription method called over HTTP (use WebSocket)
-- Blocked method (wallet, signing, filters)
+- Blocked node-local wallet or signing method
 - Chain-specific method not available on requested chain
+
+Core v0.4.3 can forward provider-local filter methods when capability policy
+permits, with one dispatch per request and no cross-request upstream affinity.
+Lasso Cloud rejects its documented filter lifecycle locally. See the separate
+[Core method contract](/api/supported-methods#stateful-filters-and-extensions) and
+[Cloud filter policy](/cloud/rpc-behavior#stateful-http-filters).
 
 **Examples:**
 
@@ -171,40 +180,50 @@ When subscription methods are called over HTTP, Lasso provides the correct WebSo
 }
 ```
 
-### -32603: Internal Error
+### -32603: Internal error
 
-**Meaning:** Internal JSON-RPC error. Typically indicates an upstream provider failure.
+An internal JSON-RPC error. Do not classify every provider failure or routing
+exhaustion as `-32603`; upstream errors retain their own semantics.
 
-**Common Causes:**
-- All providers failed (circuit breakers open)
-- Upstream provider returned an error
-- Timeout waiting for provider response
-- Network connectivity issues
+### Core routing exhaustion
 
-**Example:**
+Released Core v0.4.3 returns routing exhaustion as a JSON-RPC `-32000` error over
+HTTP 200 and preserves the client's request ID. It does not publish
+`attempted_providers` or `circuit_breaker_states` in the error payload.
+Use opt-in [request metadata](/observability/request-metadata) for recorded
+channel attempts where available.
+
+The all-circuits-open case can include `retry_after_ms`. This generated serializer
+example uses a fixed five-second retry interval; the actual interval depends on
+the current circuit state:
 
 ```json
 {
-  "jsonrpc": "2.0",
-  "id": 1,
   "error": {
-    "code": -32603,
-    "message": "Internal error: All providers failed for chain ethereum",
+    "code": -32000,
     "data": {
-      "attempted_providers": ["alchemy_eth", "infura_eth", "llamarpc_eth"],
-      "circuit_breaker_states": {
-        "alchemy_eth": "open",
-        "infura_eth": "open",
-        "llamarpc_eth": "half_open"
-      }
-    }
-  }
+      "retry_after_ms": 5000
+    },
+    "message": "No available channels for method: eth_blockNumber. All circuits open, retry after 5s"
+  },
+  "id": "client-request-42",
+  "jsonrpc": "2.0"
 }
 ```
+
+The shape matches the released [controller regression](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/test/lasso_web/controllers/rpc_controller_test.exs)
+and [error contract](https://github.com/jaxernst/lasso-rpc/blob/v0.4.3/docs/API_REFERENCE.md#error-responses).
+Other exhaustion paths need not have this retry field or message.
 
 ### -32000: Server Error
 
 **Meaning:** Server-side error specific to Lasso's operation.
+
+<Note>
+Core has no built-in incoming customer authentication or quota enforcement.
+Access, billing and plan examples below are not a self-hosted Core contract;
+consult [Cloud RPC behavior](/cloud/rpc-behavior) for managed-service boundaries.
+</Note>
 
 **Common Causes:**
 - Rate limit exceeded
@@ -387,41 +406,22 @@ Lasso sends WebSocket pings every 30 seconds. If no pong is received within 5 se
 
 ### Retry Strategy
 
-**Retryable Errors:**
-- `-32603` Internal Error (temporary upstream failure)
-- `-32000` Rate Limit Exceeded (with exponential backoff)
-- `-32000` Server Error (check `data` for specifics)
+An error code or `retry_after_ms` hint does not establish that a request is safe
+to repeat. Core can fail over reviewed replay-safe reads within one request's
+dispatch limit and absolute deadline. A new application request starts a new
+execution envelope; bound any application retries and their total elapsed time.
+
+Do not automatically replay signed transaction submissions, stateful filter
+operations or unknown methods based on these error fields. A lost transaction
+response may follow upstream acceptance; reconcile by transaction hash. Use the
+[Core execution-safety contract](/api/supported-methods) and the separate
+[Cloud workload contract](/cloud/rpc-behavior) before choosing a retry policy.
 
 **Non-Retryable Errors:**
 - `-32700` Parse Error (fix request format)
 - `-32600` Invalid Request (fix request structure)
 - `-32601` Method Not Found (use correct method/transport)
 - `-32602` Invalid Params (fix parameters)
-
-### Exponential Backoff
-
-For rate limit errors, implement exponential backoff using `retry_after_ms`:
-
-```javascript
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function callWithRetry(request, maxRetries = 3) {
-  for (let i = 0; i < maxRetries; i++) {
-    const response = await fetch(url, request);
-    const json = await response.json();
-    
-    if (json.error?.code === -32000 && json.error.data?.retry_after_ms) {
-      const backoff = json.error.data.retry_after_ms * Math.pow(2, i);
-      await sleep(backoff);
-      continue;
-    }
-    
-    return json;
-  }
-}
-```
 
 ### Circuit Breaker Awareness
 

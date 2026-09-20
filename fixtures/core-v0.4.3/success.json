@@ -1,0 +1,49 @@
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "lasso_meta": {
+    "version": "1.0",
+    "strategy": "priority",
+    "chain_id": 1,
+    "transport": "http",
+    "request_id": "fixture-request",
+    "candidate_providers": [
+      "primary:http",
+      "backup:http"
+    ],
+    "circuit_breaker_state": "closed",
+    "selection_latency_ms": 1.0,
+    "upstream_latency_ms": 20.0,
+    "end_to_end_latency_ms": 23.0,
+    "lasso_overhead_ms": 3.0,
+    "retries": 0,
+    "selected_provider": {
+      "id": "primary",
+      "protocol": "http"
+    },
+    "attempted_channels": [
+      {
+        "code": null,
+        "category": null,
+        "channel": {
+          "profile": "public",
+          "provider_id": "primary",
+          "instance_id": "fixture-primary",
+          "transport": "http",
+          "route_generation": 7
+        },
+        "outcome": "success"
+      }
+    ],
+    "executed_channel": {
+      "profile": "public",
+      "provider_id": "primary",
+      "instance_id": "fixture-primary",
+      "transport": "http",
+      "route_generation": 7
+    },
+    "profile_id": "public",
+    "service_profile_id": "public"
+  },
+  "result": "0x64"
+}

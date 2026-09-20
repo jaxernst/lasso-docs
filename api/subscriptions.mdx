@@ -356,4 +356,8 @@ Use specific filters to reduce network traffic:
 
 ### Rate Limiting
 
-Subscriptions count toward your API rate limit. Monitor your usage and adjust filters accordingly.
+Lasso RPC Core has no built-in incoming customer quota mechanism. Enforce ingress
+connection/request limits at your proxy and account for upstream-provider limits
+and subscription volume. Use bounded filters and follow the
+[recovery and checkpoint guide](/advanced/websocket-subscriptions).
+[Cloud limits](/cloud/rpc-behavior) are a separate managed-service contract.

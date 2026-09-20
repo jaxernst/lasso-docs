@@ -1,0 +1,19 @@
+{
+  "repository": "https://github.com/jaxernst/lasso-rpc",
+  "source": "42415b421c1af2e5e582130e96ee0688f2b21fd0",
+  "tag": "v0.4.3",
+  "generator": "scripts/core-reference-fixtures.exs",
+  "sourceFileSha256": {
+    "lib/lasso/observability/observability.ex": "10db6f06a51ab51135e31d56dc13a9bdb7aca90fc1c6eb966f8c2fadd0cb9f42",
+    "lib/lasso/core/request/request_context.ex": "4984ff8fdfeba602ff685eefa42c1077a02955674e53484aba8963134131020e",
+    "lib/lasso/core/request/request_options.ex": "f5ecaa7dd7a4e02a163f31f2dfad1f68c9a21da3969ffb1c9c84698189a98b4a",
+    "lib/lasso/core/request/bounded_identifier.ex": "aee7a5142f7e4527ee6735d6d1b12a0ebdbd6689da88056d027d4fa05f1bf7ba",
+    "lib/lasso/core/request/head_policy.ex": "1e6b12bab993aaa811cb6a4102b814fde1708d0565089e34840fd2afb804b45a",
+    "lib/lasso/core/transport/channel.ex": "4c6f9c8460523d805de45a37c606697015c6373bb4950168457dd0f7e8928397",
+    "lib/lasso_web/plugs/observability_plug.ex": "15533560309463d255436ea02cd159d3c190151f60468dc4db4607c31d59616f",
+    "lib/lasso/jsonrpc/error.ex": "71bce761e6ce0a9e148286ef1adf3501f4871007f0525ee3ecb8b2a02fc2692c",
+    "lib/lasso/config/file_schema.ex": "cb07f44b869f2c0a44375acd24e1f51d184913e118f4ff4762e04528f694cc37",
+    "lib/lasso/config/chain_config.ex": "2915d34abcfc7243357a70082da945e161d26ea0b3cfc8e2587260e778fc8334"
+  },
+  "evidence": "Hermetic builder/context/serializer outputs with fixed inputs; no live RPC or performance measurement."
+}
