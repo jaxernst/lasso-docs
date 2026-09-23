@@ -59,16 +59,14 @@ screenshots, issues, telemetry labels, or client-visible errors.
 ## Keys and access
 
 - Anonymous keys can be created without signup and later claimed by an account
-  without changing the RPC endpoint. Funding depends on the deployment.
+  without changing the RPC endpoint.
 - Account keys support dashboard management, profile authorization, and shared
   account usage.
 - Entitlements, balances, and rate limits are enforced before upstream routing.
-- Stripe-backed account billing is separate from anonymous-key funding and
-  paid RPC sessions. Production currently disables MPP funding and sessions
-  (checked September 20, 2026). The implemented legacy Tempo session protocol
-  is not a promise of compatibility with the current Tempo CLI. Check the live
-  [service manifest](https://lasso.sh/agent.json) and
-  [deployment guide](https://lasso.sh/SKILL.md) before attempting payment.
+- Agent-managed keys can buy prepaid premium credit with USDC over Tempo MPP or
+  Base x402, capped per quote. Stripe-backed account billing is separate. Legacy
+  MPP session RPC is disabled. The live [service manifest](https://lasso.sh/agent.json)
+  lists enabled rails; see [Operate RPC with an agent](/cloud/agent-flows).
 - Fetch the live [pricing catalog](https://lasso.sh/api/v1/agent/pricing) for
   anonymous method prices and the [account plans](https://lasso.sh/pricing) for
   account billing. Those CU models are different; see
