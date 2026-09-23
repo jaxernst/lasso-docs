@@ -10,13 +10,13 @@ Core release and the hosted service have identical behavior.
 
 ## Version reference
 
-Checked September 20, 2026:
+Core checked September 20, 2026; Cloud checked September 23, 2026:
 
 | Surface | Version or observation | What it establishes |
 | --- | --- | --- |
 | RPC Core source | [v0.4.4](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.4.4), source `291c57162f382e5680cc218c7627972a9c5204f2` | The released source described by the Core API guides. [Exact-source CI](https://github.com/jaxernst/lasso-rpc/actions/runs/35537374714) passed; repository main can be newer. |
 | RPC Core container | v0.4.4, image index `sha256:4e000226f83680ec472cca937fcbcf839add7b4aecc4f31e15cbaf5e35f8a1c7` | The [release manifest](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.4/container-release.json) binds source and image digests. Native AMD64 and ARM64 installation checks passed before [publication completed](https://github.com/jaxernst/lasso-rpc/actions/runs/35537711234). |
-| Managed Cloud | Public health reported source `89ade5b9be5745f09ee09f0c394223549e5f0085` at `2026-09-20T18:46:30Z` | A dated deployment observation. Recheck [health](https://lasso.sh/api/health) and [service discovery](https://lasso.sh/agent.json) for your evaluation. Process health does not qualify your workload. |
+| Managed Cloud | Public health reported source `1a9c93ae18f855000a65a4b01854d482b0a224ea` in four regions at `2026-09-23T23:01:09Z` | A dated deployment observation. Recheck [health](https://lasso.sh/api/health) and [service discovery](https://lasso.sh/agent.json) for your evaluation. Process health does not qualify your workload. |
 | Cloud APIs and payment availability | Live [OpenAPI](https://lasso.sh/openapi.json), [manifest](https://lasso.sh/agent.json), and [deployment guide](https://lasso.sh/SKILL.md) | Available routes, credential classes, and enabled payment rails on that deployment. An implemented API can still be disabled. |
 
 ## Workload and ownership matrix
@@ -34,7 +34,7 @@ not certify every provider pool, chain, request parameter, or sustained load.
 | Block regression protection | Opt-in `local` policy with best-effort peer recovery; optional coordinated policy requires its own operating setup. | Custom-profile On/Off control for local protection. | Local protection covers sequential choices within one running application generation. A server switch or restart can return a lower block. |
 | Hash-selected state reads | Explicit selectors are retained through routing and retries. | Same documented application pattern. | Choose and carry one hash through every read; upstream state and selector support are required. This is not finality or execution proof. |
 | Identity, billing, incoming customer quotas | Outside Core. Protect exposed endpoints through your network or reverse proxy. | Account, key, entitlement, and usage services. | Profiles do not multiply an upstream account's quota. [Account and anonymous CU differ](/cloud/observability#usage-units). |
-| MPP funding and paid sessions | Outside Core. | Implemented paths, disabled in production at the observation above. | Check the live manifest before attempting payment. Legacy Tempo protocol support does not imply current CLI compatibility. |
+| Prepaid funding | Outside Core. | Agent-managed keys can buy premium credit over Tempo MPP or Base x402, capped per quote. Legacy MPP session RPC is disabled. | Check `payments.prepaid` in the live manifest before paying. |
 | Sustained workload capacity | Depends on your deployment and providers. | Depends on workload, profile, providers, and service policy. | The linked evidence does not establish a general 24-hour, seven-day, or 30-day operating envelope across these workloads. |
 
 Use the detailed [Core method contract](/api/supported-methods),
