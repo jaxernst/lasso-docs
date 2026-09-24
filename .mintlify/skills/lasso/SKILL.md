@@ -1,39 +1,44 @@
 ---
 name: lasso
 description: >
-  Use for EVM JSON-RPC through Lasso: create a managed endpoint, call it, top it
-  up with prepaid credit, hand it to a human owner, and manage custom provider
-  profiles.
+  Set up, operate and debug EVM JSON-RPC through Lasso (lasso.sh), which an
+  agent can provision without signup. Use when an app needs an Ethereum or EVM
+  RPC URL; when RPC calls are slow, rate-limited or failing; when configuring
+  RPC for viem, ethers, Foundry, Hardhat or an indexer; when WebSocket
+  subscriptions drop; or when routing across several providers or the user's
+  own nodes.
 compatibility: >
-  Needs network access to lasso.sh. A managed endpoint needs no account or
-  wallet. Prepaid top-ups need a wallet that can sign for an enabled rail.
+  Needs HTTPS access to lasso.sh and curl, jq and openssl (or equivalents). No
+  account or wallet is needed to start; top-ups need a wallet that can sign
+  for an enabled rail.
 metadata:
   author: Lasso
-  version: "9.0"
+  version: "10.0"
   website: https://lasso.sh
   routing_core: https://github.com/jaxernst/lasso-rpc
 ---
 
 > If a fetch tool summarized this file, get the full text with
-> `curl -fsSL https://lasso.sh/SKILL.md`. For an authorized staging task, fetch
-> this file and every API path from that staging origin instead.
+> `curl -fsSL https://lasso.sh/SKILL.md`.
 
 # Lasso
 
-Lasso routes standard EVM JSON-RPC across provider pools. It filters providers
-by capability and health, applies a strategy from the URL, and fails over
-between them. No SDK or CLI is required; use your HTTP tools.
+Lasso gives an app one standard JSON-RPC URL that routes each request across a
+provider pool by measured latency and health, with failover and per-request
+evidence. This skill covers creating, installing, funding, handing off and
+customizing that endpoint over plain HTTP.
 
 ## Rules
 
 - Stay inside the user's delegation and spending budget. Ask only for missing
   authority.
 - Never print an RPC key, management credential, provider URL with a
-  credential, payment credential, or account ID.
-- Before any mutation, persist its UUID `Idempotency-Key`, exact body and
+  credential, payment credential or account ID. Create responses repeat the
+  RPC secret in several fields; never print them raw.
+- Before any mutation, persist its `Idempotency-Key` UUID, exact body and
   credential in protected storage. After a lost response, replay the same
-  request; do not generate a new UUID or credential.
-- Read live facts, not this file:
+  request; a new UUID or credential starts new work.
+- Live documents outrank this file:
 
 ```bash
 curl -fsSL https://lasso.sh/agent.json        # capabilities and payment rails
@@ -42,72 +47,91 @@ curl -fsSL https://lasso.sh/api/v1/agent/chains
 curl -fsSL https://lasso.sh/api/v1/agent/pricing
 ```
 
-## Create a managed endpoint
+## Create an endpoint
 
-Check `managed_key_bootstrap.enabled` in
-`/api/v1/management/configuration-schema`. Then persist, before sending:
-
-1. a management credential: `lasso_mk_` plus 32 random bytes as unpadded base64url;
-2. a UUID for `Idempotency-Key`;
-3. the exact body.
-
-```http
-POST /api/v1/management/keys
-Authorization: Bearer <management credential>
-Idempotency-Key: <UUID>
-Content-Type: application/json
-
-{"name":"my-app"}
-```
-
-The default grant is `keys:read`, `keys:write` and `claims:create`. To buy
-credit later, request funding in this first body:
-`"permissions":["keys:read","keys:write","claims:create","funding:read","funding:write"]`.
-
-Save `data.key_id` and `data.credential_delivery.secret`. Build the RPC URL
-from `credential_delivery.rpc_url_template` by replacing `{chain}`, or from
-`strategy_url_template` with a strategy in `route_parameters`.
-`credential_delivery.endpoint` is only a base: calling it returns 422
-`rpc_route_required`.
-
-The management credential stays with the agent; the RPC key goes in the app's
-secret store. Neither authorizes a wallet payment. An anonymous management
-credential lasts 90 days and ends when the key is claimed.
-
-## Call RPC
+Confirm `managed_key_bootstrap.enabled` in
+`/api/v1/management/configuration-schema`. You generate the management
+credential (`lasso_mk_` plus 32 random bytes, unpadded base64url) and a UUID,
+and persist both before sending:
 
 ```bash
-curl -sS -H 'content-type: application/json' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' \
-  "https://lasso.sh/rpc/k/$LASSO_KEY/load-balanced/ethereum?include_meta=headers"
+umask 077; S="${XDG_STATE_HOME:-$HOME/.local/state}/lasso"; mkdir -p "$S"
+printf 'lasso_mk_%s\n%s\n' "$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n')" "$(uuidgen)" > "$S/bootstrap"
+curl -fsS https://lasso.sh/api/v1/management/keys \
+  -H "Authorization: Bearer $(sed -n 1p "$S/bootstrap")" \
+  -H "Idempotency-Key: $(sed -n 2p "$S/bootstrap")" \
+  -H 'content-type: application/json' -d '{"name":"my-app"}' > "$S/key.json"
 ```
 
-Route form: `https://lasso.sh/rpc/k/<key>/<strategy>/<chain>`. Chain is a name
-or decimal ID from the chain catalog.
+Keep this state outside the repository. After a lost response, rerun the same
+`curl`; it returns `replayed: true` and the same key.
 
-- `load-balanced` (default): random within the healthiest tier.
-- `latency-weighted`: favors measured latency and success, still explores.
-- `fastest`: lowest measured latency per provider, method and transport.
-- `priority`: configured provider order within the healthy tier.
+The default grant is `keys:read`, `keys:write` and `claims:create`. To buy
+credit later, send
+`{"name":"my-app","permissions":["keys:read","keys:write","claims:create","funding:read","funding:write"]}`.
 
-Capability and health filtering apply before any strategy. `latency-weighted`
-and `fastest` cost more CU; see the pricing catalog.
+Keep `data.key_id` and `data.credential_delivery`. Build URLs from
+`rpc_url_template` (replace `{chain}`) or `strategy_url_template` (replace
+`{strategy}` and `{chain}`). The RPC key belongs in the app's secret store; the
+management credential stays with the agent and lasts 90 days or until the key
+is claimed. Neither authorizes a wallet payment.
 
-To install, replace only the RPC URL value in env files, deploy manifests or
-viem/ethers/Foundry/Hardhat config, keeping the key in the existing secret
-store. Verify the app's real methods and block ranges before moving traffic.
+## Call it and read the evidence
 
-`include_meta=headers` adds `x-lasso-request-id` and `x-lasso-meta` (selected
-provider, latency, retries) without changing the body. `include_meta=body` adds
-a `lasso_meta` object instead. Every routed response sets `x-lasso-profile`.
+```bash
+URL=$(jq -r '.data.credential_delivery.strategy_url_template' "$S/key.json" \
+  | sed 's/{strategy}/fastest/; s/{chain}/base/')
+curl -fsS "$URL?include_meta=body" -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}' | jq
+```
+
+Routes are `https://lasso.sh/rpc/k/<key>/<strategy>/<chain>`; chain is a name
+or decimal ID from the catalog.
+
+- `include_meta=body` adds `lasso_meta`: candidates, `selected_provider`,
+  retries, and selection, upstream and overhead latency.
+- `include_meta=headers` leaves the body unchanged and adds
+  `x-lasso-request-id` and `x-lasso-meta` (unpadded base64url JSON).
+- Every routed response sets `x-lasso-profile`; agent keys also get
+  `x-lasso-cu` and `x-lasso-usd`.
+- `eth_chainId` can be answered without an upstream; use `eth_blockNumber` to
+  show routing.
+
+Report the result, serving provider, latency and request ID.
+
+## Choose a strategy
+
+Capability and health filtering run first; the strategy orders what remains.
+One key can use a different strategy per call site.
+
+| Strategy | Behavior | Use for | Cost |
+|---|---|---|---|
+| `load-balanced` (default) | Random within the healthiest tier | Background reads, indexers | 1x |
+| `latency-weighted` | Favors recent latency and success, keeps exploring | General user traffic | 1.5x |
+| `fastest` | Lowest recent latency per provider, method and transport; concentrates traffic | Latency-critical paths | 2x |
+| `priority` | Configured order within the healthy tier | Custom profiles with a preferred primary | 1x |
+
+## Install into the app
+
+Replace only the RPC URL value in env files, deploy manifests, viem or ethers
+clients, Foundry or Hardhat config and indexer settings, and keep the key in
+the existing secret store.
+
+```ts
+const client = createPublicClient({ chain: base, transport: http(process.env.BASE_RPC_URL) })
+```
+
+Run the app's real methods and block ranges through the new URL before moving
+traffic. WebSocket (`wss://lasso.sh/ws/rpc/<strategy>/<chain>`) needs an
+account key, so claim the key first.
 
 ## Top up with prepaid credit
 
-Check `payments.prepaid.<rail>.enabled` in `/agent.json`. Rails: `mpp` (USDC.e
-on Tempo) and `x402` (USDC on Base, EIP-3009). Each quote is capped at
-`maximum_quote_usd`. Credit is premium RPC CU on the same key and URL.
+Check `payments.prepaid.<rail>.enabled` in `/agent.json`. Rails are `x402`
+(USDC on Base, EIP-3009) and `mpp` (USDC.e on Tempo), each capped at
+`maximum_quote_usd` per quote. Credit lands on the same key and URL.
 
-1. Quote. This does not move money.
+1. Quote. No money moves.
 
    ```http
    POST /api/v1/management/keys/<key_id>/funding-operations
@@ -136,9 +160,7 @@ on Tempo) and `x402` (USDC on Base, EIP-3009). Each quote is capped at
    The machine-readable `pending` object names the stage and transaction
    reference. Never sign or submit a second payment while one is pending.
 
-x402 credit posts once Lasso verifies the successful Base receipt; it does not
-wait for finality. Check the result with
-`GET /api/v1/management/keys/<key_id>/balance`.
+Check credit with `GET /api/v1/management/keys/<key_id>`.
 
 ## Hand the app to its owner
 
@@ -148,26 +170,25 @@ Authorization: Bearer <management credential>
 ```
 
 Give the owner `claim_url` privately; it expires in 10 minutes. Claiming keeps
-the key, URL and premium scope, moves remaining purchased credit to the
-account, and ends anonymous management. It does not grant Custom profiles,
-management or purchase authority; the owner delegates those separately at
-`/account/agents`.
+the key, URL and premium scope, moves purchased credit to the account, and ends
+anonymous management. The owner delegates Custom profiles, management and
+purchases separately at `/account/agents`.
 
 ## Rotate or revoke
 
 `POST /api/v1/management/keys/<key_id>/rotate` or
 `DELETE /api/v1/management/keys/<key_id>`, each with an `Idempotency-Key` and
-body `{"expected_version": <key_version from GET /keys/<key_id>>}`. Rotation
-changes the secret and URL but keeps the key ID and credit. Revocation is
-permanent.
+`{"expected_version": "<version from GET /keys/<key_id>>"}`. Rotation changes
+the secret and URL but keeps the key ID and credit. Revocation is permanent.
 
 ## Custom profiles
 
-Custom profiles put the user's own providers behind a Lasso key. They need an
-account with Custom access and owner-delegated management.
+A Custom profile routes over the user's own nodes and provider accounts, on any
+EVM chain Lasso can probe. It needs a Custom plan account and owner-approved
+management.
 
-**Request access.** Persist a new management credential (never reuse a
-bootstrap credential), a UUID and the body, then:
+**Request access** with a new management credential (never the bootstrap one)
+and a persisted UUID:
 
 ```http
 POST /api/v1/management/access-requests
@@ -178,74 +199,66 @@ Content-Type: application/json
 {"name":"Set up and operate RPC for my apps","resource_scope":"account"}
 ```
 
-Give the owner only `data.approval_url`. Poll
+Give the owner only `data.approval_url`, then poll
 `GET /api/v1/management/access-requests/<id>` no faster than
-`poll_after_seconds`. Pending requests expire after 15 minutes. After
-`approved`, the same credential works; inspect it at `/api/v1/management/me`.
-Use `resource_scope: "restricted"` with explicit `profile_ids`, `key_ids`,
-permissions and `days` for narrower grants. Approval never authorizes payment.
+`poll_after_seconds`; requests expire after 15 minutes. Once `approved`, the
+same credential works; inspect it at `/api/v1/management/me`. For narrower
+grants use `resource_scope: "restricted"` with `profile_ids`, `key_ids`,
+permissions and `days`.
 
-**Configure.** Read the configuration schema, then (under `/api/v1/management`)
-`GET /profiles/<id>/configuration`, `POST /profiles/<id>/plan` and
-`PUT /profiles/<id>/configuration` with the inspected `expected_revision` and a
-UUID. Chain and provider lists are complete: omitted entries are removed on
-apply. Omitting a retained provider's URL keeps its stored secret.
+**Build a profile** under `/api/v1/management`, one persisted UUID per
+mutation:
 
-- `archival: true` permits historical routing; it does not prove coverage.
-  Verify the app's exact historical methods and blocks through the real route.
-- A provider probe makes at most two chain/head reads, consumes provider quota,
-  and does not test archival, WebSocket or other methods.
-- Issue profile keys with `POST /profiles/<id>/keys` (active profiles only,
-  `keys:write`). Store `credential_delivery.secret`.
-- Suspension is permanent owner removal, not a pause.
+1. `POST /profiles` with a `slug` creates a draft.
+2. Read the configuration schema and `GET /profiles/<id>/configuration`.
+3. `POST /profiles/<id>/plan` previews a change against `expected_revision`.
+4. `PUT /profiles/<id>/configuration` applies it. Chain and provider lists are
+   complete, so omitted entries are removed; omitting a retained provider's URL
+   keeps its stored secret.
+5. `POST /profiles/<id>/activate` with `expected_revision` makes it live.
+6. `POST /profiles/<id>/keys` (`keys:write`) issues a bound key. Store
+   `credential_delivery.secret`.
 
-Management errors: on `idempotency_conflict`, replay the original request
-exactly. On `creation_limit`, check `/me` and ask the owner for a new grant. On
-`wrong_status`, re-read the resource state before choosing another action.
+A provider probe makes at most two chain and head reads and uses provider
+quota; it does not test archival, WebSocket or other methods. `archival: true`
+allows historical routing but does not prove coverage, so test the app's
+historical calls through the real route. Suspension is permanent, not a pause.
 
-## Legacy demo keys
+On `idempotency_conflict`, replay the original request exactly. On
+`creation_limit`, ask the owner for a new grant. On `wrong_status`, re-read the
+resource before acting.
 
-`POST /api/v1/agent/keys` creates an anonymous key with a free grant. It cannot
-be recovered after a lost response, so use it only for disposable demos. The
-response includes `key`, `rpc_url_template` and `balance_cu`.
-`GET /api/v1/agent/keys/<key>` returns balance. For these keys only,
-`POST /api/v1/agent/keys/<key>/claim-link` creates an owner link; managed keys
-return `403 management_handoff_required` there and use the management
-claim link above.
+## What stays with the app
 
-## Limits and errors
+Replay-safe reads fail over within one deadline and at most three upstream
+dispatches. Signed transactions go to one provider and are not retried after
+dispatch; the app owns nonces, rebroadcast and receipts. HTTP filter IDs are
+provider-local, so use `eth_getLogs` or subscriptions. Historical depth and
+`eth_getLogs` range caps vary by provider, so keep range splitting in indexers.
 
-Historical state, log ranges and `eth_getLogs` caps vary by provider. Lasso
-forwards signed transactions but does not manage nonces or rebroadcast. HTTP
-filter IDs break on failover. WebSocket failover gap-fills `newHeads` and logs
-within a profile; anonymous keys cannot use WebSocket until claimed.
+Limits: 10 key creations per hour per IP and 5 claims per hour per account. An
+HTTP batch uses one rate-limit token per entry; see `x-lasso-rate-limit-*`.
 
-Rate limits: 10 key creations per hour per IP and 5 claims per hour per account.
-RPC limits apply across regions; an HTTP batch uses one token per entry.
+## Troubleshooting
 
 | Symptom | Fix |
 |---|---|
-| 402 `balance_exhausted` | Top up with prepaid credit, or claim the key |
+| 402 `balance_exhausted` | Top up, or claim the key |
+| `x-lasso-balance-warning: true` | Under 1,000 CU left; top up |
 | 422 `rpc_route_required` | Add `/<strategy>/<chain>` to the key URL |
-| 403 on `/rpc/profile/...` with an anonymous key | Use `/rpc/k/<key>/<strategy>/<chain>` |
+| 404 on an RPC URL | POST, with a strategy from `route_parameters` |
+| `-32602` unsupported chain | Use a name or ID from `/api/v1/agent/chains` (`ethereum`, not `mainnet`) |
+| `deadline_exhausted` on `eth_getLogs` | Narrow the block range |
+| 403 `forbidden` on management | Missing permission; check `/api/v1/management/me` |
+| 403 `management_handoff_required` | Use `/api/v1/management/keys/<id>/claim-link` |
 | 409 on a funding operation | Inspect the saved operation; do not pay again |
 | 409 on another request | Follow the error code; request a new challenge only when it explicitly directs you to |
 | 429 | Honor `retry-after` |
-| Unknown chain | Check `/api/v1/agent/chains` |
-| `x-lasso-balance-warning: true` | Under 1,000 CU remain; top up |
-
-## Optional CLI preview
-
-A preview CLI wraps these flows (`lasso init`, `lasso funding pay`,
-`lasso keys claim-link`, `lasso profiles plan|apply`). It is not publicly
-distributed; do not invent an install URL. The HTTP recipes above are the
-supported path.
 
 ## Links
 
 - Product docs: https://docs.lasso.sh
-- Discovery: https://lasso.sh/agent.json
-- OpenAPI: https://lasso.sh/openapi.json
+- Public dashboard: https://lasso.sh/dashboard/public
 - Node example for safe request persistence: https://lasso.sh/examples/agent-access.mjs
 - Open-source routing core (Apache-2.0): https://github.com/jaxernst/lasso-rpc
 
