@@ -18,7 +18,7 @@ assert(!Object.hasOwn(failover, 'head_policy'));
 for (const file of ['concepts/routing-strategies.mdx', 'concepts/provider-selection.mdx', 'api/routing-strategies.mdx', 'advanced/benchmarking.mdx']) {
   assert(!/FASTEST_MIN_|LW_MS_FLOOR|LW_EXPLORE_FLOOR|LW_MIN_CALLS|LW_MIN_SR/.test(page(file)), file);
 }
-const exhaustion = JSON.parse(page('fixtures/core-v0.4.3/exhaustion.json'));
+const exhaustion = JSON.parse(page('fixtures/core-v0.4.5/exhaustion.json'));
 assert(blocks(page('api/error-codes.mdx')).some(actual => JSON.stringify(actual) === JSON.stringify(exhaustion)));
-assert.deepEqual(Object.keys(exhaustion.error.data), ['retry_after_ms']);
+assert.deepEqual(Object.keys(exhaustion.error.data), ['reason', 'retry_after_ms', 'upstream_attempts']);
 console.log('Core reference examples: JSON, schema fixture parity, header encoding and removed controls passed');

@@ -2,7 +2,9 @@
   "error": {
     "code": -32000,
     "data": {
-      "retry_after_ms": 5000
+      "reason": "no_eligible_providers",
+      "retry_after_ms": 5000,
+      "upstream_attempts": 0
     },
     "message": "No available channels for method: eth_blockNumber. All circuits open, retry after 5s"
   },
