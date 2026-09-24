@@ -34,6 +34,9 @@ JSON-RPC batch, put the selector on **every item**.
 
 - Providers must support [block-hash selectors](https://eips.ethereum.org/EIPS/eip-1898)
   and retain the requested state. Lasso preserves the hash through retries.
+- Lasso sends block-hash state reads only to providers declared archival, because
+  a hash's age is unknown before dispatch. A chain without one rejects them with
+  [`archive_required`](/api/error-codes#core-routing-exhaustion).
 - `requireCanonical: true` asks the provider to reject a block it knows was
   removed from the canonical chain. It does not guarantee finality or prove
   execution correctness.

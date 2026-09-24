@@ -1,9 +1,9 @@
 ---
 title: 'Provider selection'
-description: 'Eligibility, ranking and live admission in Core v0.4.4'
+description: 'Eligibility, ranking and live admission in Core v0.4.5'
 ---
 
-**Lasso RPC Core v0.4.4** selects upstream channels from the requested file profile
+**Lasso RPC Core v0.4.5** selects upstream channels from the requested file profile
 and chain. A configured provider and an executing channel are different: one
 provider can offer HTTP and WebSocket transports, and multiple configuration
 entries can refer to the same physical upstream.
@@ -21,8 +21,12 @@ establish a connected transport. Method support and parameter limits can differ
 between providers and transports.
 
 Historical age is inferred where the request and available head evidence allow
-it. An old numeric selector can require a declared archival provider. A block
-hash alone does not establish age. An `archival: true` flag is configuration,
+it. A numeric selector older than `archival_threshold` requires a declared
+archival provider; one whose age cannot be established does not. A state read
+selected by block hash (EIP-1898) always requires a declared archival provider,
+because its age is unknown before dispatch. Without one, Core returns a
+non-retriable [`archive_required`](/api/error-codes#core-routing-exhaustion)
+error without contacting an upstream. An `archival: true` flag is configuration,
 not measured proof of state, receipts, logs or every selector shape.
 
 Lag selection uses Core's head observations and configured lag allowance.
@@ -57,8 +61,8 @@ chains:
 
 `selection` belongs under the chain. The profile body accepts only the `chains`
 mapping. A `routing.method_overrides` block is not supported. See the released
-[file schema](https://github.com/jaxernst/lasso-rpc/blob/v0.4.4/lib/lasso/config/file_schema.ex)
-and [configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.4.4/docs/CONFIGURATION.md#provider-capabilities).
+[file schema](https://github.com/jaxernst/lasso-rpc/blob/v0.4.5/lib/lasso/config/file_schema.ex)
+and [configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.4.5/docs/CONFIGURATION.md#provider-capabilities).
 
 ## Strategy ranking
 

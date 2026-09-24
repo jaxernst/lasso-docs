@@ -111,7 +111,7 @@ does not send a JSON-RPC response to a valid notification.
 - Blocked node-local wallet or signing method
 - Chain-specific method not available on requested chain
 
-Core v0.4.4 can forward provider-local filter methods when capability policy
+Core v0.4.5 can forward provider-local filter methods when capability policy
 permits, with one dispatch per request and no cross-request upstream affinity.
 Lasso Cloud rejects its documented filter lifecycle locally. See the separate
 [Core method contract](/api/supported-methods#stateful-filters-and-extensions) and
@@ -187,22 +187,36 @@ exhaustion as `-32603`; upstream errors retain their own semantics.
 
 ### Core routing exhaustion
 
-Released Core v0.4.4 returns routing exhaustion as a JSON-RPC `-32000` error over
+Released Core v0.4.5 returns routing exhaustion as a JSON-RPC `-32000` error over
 HTTP 200 and preserves the client's request ID. It does not publish
 `attempted_providers` or `circuit_breaker_states` in the error payload.
 Use opt-in [request metadata](/observability/request-metadata) for recorded
 channel attempts where available.
 
-The all-circuits-open case can include `retry_after_ms`. This generated serializer
-example uses a fixed five-second retry interval; the actual interval depends on
-the current circuit state:
+`data.reason` says why no upstream was eligible, and `data.upstream_attempts`
+counts dispatches made before exhaustion:
+
+| `reason` | Meaning | Retry |
+| --- | --- | --- |
+| `no_eligible_providers` | Providers exist but are unavailable, such as all circuits open. | After `retry_after_ms` when present |
+| `archive_required` | The block needs archival support and no provider on the requested transport declares it. Block-hash state reads always need it. | Not retriable; configure an archival provider |
+| `transport_unavailable` | No remaining provider supports the requested transport. | Not retriable |
+| `no_providers_configured` | The profile has no providers for the chain. | Not retriable |
+| `providers_excluded` | Every provider was explicitly excluded. | Not retriable |
+| `routing_configuration_changed` | The profile's routing changed during selection. | Retry the request |
+
+Only `no_eligible_providers` can include `retry_after_ms`. This generated
+serializer example uses a fixed five-second retry interval; the actual interval
+depends on the current circuit state:
 
 ```json
 {
   "error": {
     "code": -32000,
     "data": {
-      "retry_after_ms": 5000
+      "reason": "no_eligible_providers",
+      "retry_after_ms": 5000,
+      "upstream_attempts": 0
     },
     "message": "No available channels for method: eth_blockNumber. All circuits open, retry after 5s"
   },
@@ -211,9 +225,8 @@ the current circuit state:
 }
 ```
 
-The shape matches the released [controller regression](https://github.com/jaxernst/lasso-rpc/blob/v0.4.4/test/lasso_web/controllers/rpc_controller_test.exs)
-and [error contract](https://github.com/jaxernst/lasso-rpc/blob/v0.4.4/docs/API_REFERENCE.md#error-responses).
-Other exhaustion paths need not have this retry field or message.
+The shape matches the released [controller regression](https://github.com/jaxernst/lasso-rpc/blob/v0.4.5/test/lasso_web/controllers/rpc_controller_test.exs)
+and [request pipeline](https://github.com/jaxernst/lasso-rpc/blob/v0.4.5/lib/lasso/core/request/request_pipeline.ex).
 
 ### -32000: Server Error
 

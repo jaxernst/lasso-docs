@@ -10,13 +10,13 @@ Core release and the hosted service have identical behavior.
 
 ## Version reference
 
-Core checked September 20, 2026; Cloud checked September 23, 2026:
+Checked September 24, 2026:
 
 | Surface | Version or observation | What it establishes |
 | --- | --- | --- |
-| RPC Core source | [v0.4.4](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.4.4), source `291c57162f382e5680cc218c7627972a9c5204f2` | The released source described by the Core API guides. [Exact-source CI](https://github.com/jaxernst/lasso-rpc/actions/runs/35537374714) passed; repository main can be newer. |
-| RPC Core container | v0.4.4, image index `sha256:4e000226f83680ec472cca937fcbcf839add7b4aecc4f31e15cbaf5e35f8a1c7` | The [release manifest](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.4/container-release.json) binds source and image digests. Native AMD64 and ARM64 installation checks passed before [publication completed](https://github.com/jaxernst/lasso-rpc/actions/runs/35537711234). |
-| Managed Cloud | Public health reported source `1a9c93ae18f855000a65a4b01854d482b0a224ea` in four regions at `2026-09-23T23:01:09Z` | A dated deployment observation. Recheck [health](https://lasso.sh/api/health) and [service discovery](https://lasso.sh/agent.json) for your evaluation. Process health does not qualify your workload. |
+| RPC Core source | [v0.4.5](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.4.5), source `c29795fdd35d4ca7c413619e68988f4e13b43ad5` | The released source described by the Core API guides. [Exact-source CI](https://github.com/jaxernst/lasso-rpc/actions/runs/35941488884) passed; repository main can be newer. |
+| RPC Core container | v0.4.5, image index `sha256:b9d54d6548dfd416030ff3e21937c1966a59e05ee460a08c904680550c4ac60b` | The [release manifest](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.5/container-release.json) binds source and image digests. Native AMD64 and ARM64 installation checks passed before [publication completed](https://github.com/jaxernst/lasso-rpc/actions/runs/35941933439). |
+| Managed Cloud | Public health reported source `1c90940535342bc892b843961ed7ba393e4712d4` in four regions at `2026-09-24T01:18:50Z` | A dated deployment observation. Recheck [health](https://lasso.sh/api/health) and [service discovery](https://lasso.sh/agent.json) for your evaluation. Process health does not qualify your workload. |
 | Cloud APIs and payment availability | Live [OpenAPI](https://lasso.sh/openapi.json), [manifest](https://lasso.sh/agent.json), and [deployment guide](https://lasso.sh/SKILL.md) | Available routes, credential classes, and enabled payment rails on that deployment. An implemented API can still be disabled. |
 
 ## Workload and ownership matrix
@@ -24,7 +24,7 @@ Core checked September 20, 2026; Cloud checked September 23, 2026:
 “Supported” here identifies an interface and its documented boundary. It does
 not certify every provider pool, chain, request parameter, or sustained load.
 
-| Capability | RPC Core v0.4.4 | Managed Cloud | Qualification boundary |
+| Capability | RPC Core v0.4.5 | Managed Cloud | Qualification boundary |
 | --- | --- | --- | --- |
 | HTTP reads and batches | Supported; you configure and operate upstreams. | Managed or account-owned provider pools. | History, method support, quotas, and parameters depend on eligible upstreams. Batches route items independently and do not pin a snapshot. |
 | Signed transactions | One upstream dispatch for `eth_sendRawTransaction`. | Conservative single dispatch. | An acknowledgment is not inclusion or finality. Reconcile an indeterminate result by transaction hash. |
@@ -45,6 +45,17 @@ failure semantics. Before adoption, evaluate one real application flow using
 
 ## Public release evidence
 
+The [v0.4.5 source release](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.4.5)
+upgrades Phoenix, Cowboy, Cowlib and Ranch (Cowlib 2.20.0 resolves
+`CVE-2026-43971`) and corrects Public Arbitrum archive routing: thirdweb and
+Blast serve historical state, while dRPC, PublicNode, Tenderly and Nodies no
+longer claim it. Block-hash state reads now require a declared archival
+provider, and requests that no configured provider can serve fail at admission
+with a structured, non-retriable [`reason`](/api/error-codes#core-routing-exhaustion)
+instead of contacting an upstream. No configuration or journal migration is
+required; operators with local profile overrides should review their archival
+declarations against historical state reads.
+
 The [v0.4.4 source release](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.4.4)
 gives distinct physical provider instances a first pass within each health tier
 for load-balanced, replay-safe unary fallback. Alternate transports remain
@@ -63,13 +74,14 @@ It requires no configuration or journal migration. These fixes do not qualify ar
 See the [HTTP identity boundary](/api/supported-methods#reads-and-execution-safety)
 and [subscription recovery limits](/advanced/websocket-subscriptions#application-checkpoints-and-reorgs).
 
-The v0.4.4 [container verification summary](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.4/container-verification.md)
+The v0.4.5 [container verification summary](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.5/container-verification.md)
 records 19 installation and recovery checks on each native
-[AMD64](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.4/verification-amd64.json)
-and [ARM64](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.4/verification-arm64.json)
+[AMD64](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.5/verification-amd64.json)
+and [ARM64](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.5/verification-arm64.json)
 image. It covers installation, custom profiles, HTTP/WebSocket routing,
 container replacement, retained history, and optional journal recovery.
-The preceding [v0.4.3](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.3/container-verification.md)
+The preceding [v0.4.4](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.4/container-verification.md),
+[v0.4.3](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.3/container-verification.md)
 and [v0.4.2 container reports](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.2/container-verification.md)
 remain historical evidence for those earlier images.
 
