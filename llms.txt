@@ -1,0 +1,45 @@
+# Lasso documentation
+
+> Lasso Cloud is a managed EVM JSON-RPC service with provider routing, API keys,
+> custom provider pools, and per-request evidence. Lasso RPC Core is the
+> Apache-2.0 routing engine you can run with your own providers. Applications
+> keep standard JSON-RPC over HTTP or WebSocket.
+
+For an agent creating a Cloud endpoint without signup, start with the
+[Lasso agent entry point](https://lasso.sh/llms.txt). It contains the protected
+one-POST key bootstrap, a working RPC call, and links to live service discovery,
+the API schema, supported chains, and pricing. Keep returned credentials out of
+logs and chat. For a human-led Cloud setup, use the [Cloud quickstart](https://docs.lasso.sh/cloud/quickstart).
+
+## Start here
+
+- [Cloud overview](https://docs.lasso.sh/cloud/overview): Managed pools, custom profiles, and account boundaries.
+- [Cloud quickstart](https://docs.lasso.sh/cloud/quickstart): Create a key and make a JSON-RPC request.
+- [RPC Core installation](https://docs.lasso.sh/installation): Run the released container or source checkout.
+- [RPC Core quickstart](https://docs.lasso.sh/quickstart): Make HTTP and WebSocket requests and inspect routing.
+- [Route across your own providers](https://docs.lasso.sh/guides/route-across-providers): Configure a self-hosted profile, test failover, and compare request evidence.
+
+## Lasso Cloud
+
+- [Routing](https://docs.lasso.sh/cloud/routing): Strategies, provider selection, and failure boundaries.
+- [Bring your own RPC](https://docs.lasso.sh/cloud/bring-your-own-rpc): Add existing providers to a managed custom profile.
+- [Agent workflows](https://docs.lasso.sh/cloud/agent-flows): Provision and operate through HTTP APIs.
+- [Observability](https://docs.lasso.sh/cloud/observability): Read routing evidence and provider health.
+- [RPC behavior](https://docs.lasso.sh/cloud/rpc-behavior): Method and transport semantics.
+- [Support and lifecycle](https://docs.lasso.sh/support-security-lifecycle): Support and security boundaries.
+- [Versions and evidence](https://docs.lasso.sh/releases-and-availability): Current release and deployment references.
+
+## Self-hosted RPC Core
+
+- [Provider selection](https://docs.lasso.sh/concepts/provider-selection): Eligibility, measured strategy ranking, and live admission.
+- [Profiles](https://docs.lasso.sh/concepts/profiles): Isolate provider configuration by workload.
+- [Docker deployment](https://docs.lasso.sh/deployment/docker): Start, configure, and upgrade the released image.
+- [Request metadata](https://docs.lasso.sh/observability/request-metadata): Inspect candidates, completed attempts, and the executed channel.
+- [Supported methods](https://docs.lasso.sh/api/supported-methods): Read retry and method safety limits.
+
+## Reference and evidence
+
+- [Cloud API reference](https://lasso.sh/openapi.json): Current HTTP schemas.
+- [Cloud service discovery](https://lasso.sh/agent.json): Live capabilities and payment rails.
+- [Routing-overhead benchmark](https://lasso.sh/benchmarks/routing-overhead.html): Synthetic engine overhead, methodology, and raw artifacts; not hosted capacity or provider latency.
+- [Complete documentation text](https://docs.lasso.sh/llms-full.txt): Full page content when this index is too brief.

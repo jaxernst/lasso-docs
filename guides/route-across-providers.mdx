@@ -1,0 +1,109 @@
+---
+title: Route across your own RPC providers
+description: Run Lasso RPC Core in front of your Ethereum, Base, and Arbitrum providers, then inspect and test routing.
+---
+
+Lasso RPC Core is an open-source EVM JSON-RPC proxy for a provider pool you
+control. It selects eligible upstreams from live health and method-specific
+measurements. Replay-safe reads can fail over within the request deadline and
+dispatch budget. Provider quotas and method coverage still limit the pool.
+
+For a hosted pool, use [Lasso Cloud custom profiles](/cloud/bring-your-own-rpc).
+This guide runs the [released Core container](/deployment/docker) locally.
+
+## Start the container
+
+Install the selected release using the commands in [Docker deployment](/deployment/docker).
+Confirm `http://localhost:4000/api/health` responds, then make an
+upstream-backed request from the [quickstart](/quickstart). The health check
+alone does not prove that an RPC provider is reachable.
+
+## Add your providers
+
+Follow [Docker deployment: custom profiles and credentials](/deployment/docker#custom-profiles-and-credentials)
+to mount a `profiles/` directory. Keep its valid `public.yml`. Save the
+following as `profiles/my-app.yml`. Replace every environment variable with a
+credential-bearing URL from a provider or node you control. Each chain needs
+providers that actually serve that chain.
+
+```yaml
+---
+name: My App
+slug: my-app
+---
+chains:
+  ethereum:
+    chain_id: 1
+    providers:
+      - id: eth_a
+        url: ${ETH_RPC_A}
+      - id: eth_b
+        url: ${ETH_RPC_B}
+  base:
+    chain_id: 8453
+    providers:
+      - id: base_a
+        url: ${BASE_RPC_A}
+      - id: base_b
+        url: ${BASE_RPC_B}
+  arbitrum:
+    chain_id: 42161
+    providers:
+      - id: arb_a
+        url: ${ARB_RPC_A}
+      - id: arb_b
+        url: ${ARB_RPC_B}
+```
+
+Store the variables in the private `.env` file used by Compose. Do not commit
+provider credentials. Unresolved variables reject the configuration. Validate
+chain identity and the methods your app needs against each upstream; a second
+configured URL does not prove an independent failure domain. See
+[provider configuration](/configuration/providers) for declared capabilities
+and [provider selection](/concepts/provider-selection) for eligibility.
+
+After adding the mounted file or changing `.env`, recreate the container:
+
+```bash
+docker compose up -d --force-recreate --wait
+```
+
+For later YAML-only edits, use the [configuration reload](/deployment/docker#custom-profiles-and-credentials).
+Check its result before shifting application traffic.
+
+## Exercise each route
+
+Send an upstream-backed read through each chain. `fastest` uses qualified
+recent latency evidence for the requested method; the default route is
+`load-balanced`. Neither strategy promises that one provider always wins.
+
+```bash
+for chain in ethereum base arbitrum; do
+  curl --fail-with-body --silent --show-error \
+    "http://localhost:4000/rpc/profile/my-app/fastest/$chain?include_meta=body" \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+done
+```
+
+Check the response `result` and `lasso_meta` for each chain. The metadata
+identifies selection candidates, recorded attempts, and the executed channel
+when available. A candidate is not proof of a dispatch. See
+[request metadata](/observability/request-metadata) for the released field
+contract and a failover example.
+
+## Test a provider failure
+
+In a non-production trial, interrupt one upstream that you control while you
+send replay-safe reads through the profile. Compare successful responses,
+errors, p95/p99 latency, head freshness, and `attempted_channels` before and
+during the fault. Then restore it and check recovery. Lasso can try another
+eligible provider within its deadline and dispatch budget; it cannot recover
+if the remaining pool is unavailable, over quota, or does not support the
+request. Signed transactions and other unsafe work have different replay rules
+in the [method contract](/api/supported-methods).
+
+Keep the original provider route available for rollback while you compare the
+same application traffic. Before exposing the container to clients, apply the
+[network and authentication guidance](/deployment/production-checklist): Core
+does not provide inbound API-key authentication or per-client RPC quotas.
