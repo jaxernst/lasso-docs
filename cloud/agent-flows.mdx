@@ -8,8 +8,7 @@ with its existing HTTP tools. No SDK or CLI is required. The operational
 reference for agents is [`/SKILL.md`](https://lasso.sh/SKILL.md).
 
 <Note>
-The management API is in preview. Check live availability before following a
-recipe: `payments.prepaid` and `auth.claiming` in
+Check live availability before following a recipe: `payments.prepaid` and `auth.claiming` in
 [`/agent.json`](https://lasso.sh/agent.json), and operation flags in the
 [configuration schema](https://lasso.sh/api/v1/management/configuration-schema).
 [`/openapi.json`](https://lasso.sh/openapi.json) has the exact request and
@@ -173,6 +172,3 @@ rollback, and verify a real application query before moving more traffic. The
 [Base viem and ethers guide](/cloud/base-rpc-integration) shows a client
 integration. Test historical reads, transaction sending and subscriptions
 against their [workload behavior](/cloud/rpc-behavior).
-
-A preview CLI wraps these flows for agents that prefer local state management.
-It is not publicly distributed, and the HTTP API above is the supported path.
