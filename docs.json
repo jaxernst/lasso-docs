@@ -114,6 +114,7 @@
                   "support-security-lifecycle",
                   "releases-and-availability",
                   "quickstart",
+                  "guides/route-across-providers",
                   "installation"
                 ]
               },
