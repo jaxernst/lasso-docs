@@ -25,6 +25,10 @@ Lasso tracks blockchain state using HTTP polling as a reliable foundation with o
 - Resilient to WebSocket failures
 - Predictable observation delay for fair lag comparison
 
+When the WebSocket subscription is active, Core keeps HTTP polling as a
+cross-check but uses three times the configured interval. It restores the
+normal interval when the subscription becomes unavailable.
+
 **WebSocket Subscription** (Optional):
 - Sub-second block notifications when healthy
 - Degrades gracefully to HTTP on failure

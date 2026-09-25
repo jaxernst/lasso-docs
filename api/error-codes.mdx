@@ -6,7 +6,7 @@ description: Released RPC Core v0.4.5 JSON-RPC errors, routing exhaustion, and r
 This page describes **Lasso RPC Core v0.4.5**. Cloud has separate access,
 billing, and rate-limit behavior; see [Cloud RPC workload behavior](/cloud/rpc-behavior).
 Core preserves a valid, request-correlated upstream JSON-RPC error's `code`,
-`message`, and optional `data`. An error's numeric code alone does not prove
+`message`, and optional `data` when the upstream HTTP response is 2xx. An error's numeric code alone does not prove
 which provider failed or whether repeating the operation is safe.
 
 ## JSON-RPC envelope
@@ -82,10 +82,13 @@ when available. It does not promise an exhaustive provider diagnostic schema.
 
 ## Upstream errors and retry safety
 
-An upstream may return a valid JSON-RPC error with HTTP 2xx, 4xx, or 5xx.
-Core preserves a structurally valid, request-correlated provider error rather
-than replacing its code or wording with a generic Lasso message. Gateway text,
-HTML, and malformed envelopes are transport failures.
+An upstream can return a JSON-RPC error body with any HTTP status, but the
+released Core HTTP client validates and preserves that body only for a 2xx
+response. HTTP 429, 408, other 4xx, and 5xx statuses are classified as
+transport or upstream-status failures, even if their body contains a JSON-RPC
+error. A structurally valid, request-correlated error in a 2xx response keeps
+its provider code and wording. Gateway text, HTML, and malformed 2xx envelopes
+are not authoritative JSON-RPC errors.
 
 Core can fail over reviewed replay-safe reads within their dispatch budget and
 absolute deadline. Signed transaction submission receives one upstream dispatch;
