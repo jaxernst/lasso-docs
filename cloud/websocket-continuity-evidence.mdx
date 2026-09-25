@@ -1,0 +1,31 @@
+---
+title: WebSocket continuity evidence
+description: Scope and result of Lasso's controlled newHeads provider-replacement soak.
+---
+
+Lasso tested `newHeads` subscription recovery during provider replacement on
+a surviving downstream WebSocket connection. This is a controlled continuity
+test, not a guarantee across client disconnections, application-node loss, or
+exhausted recovery bounds. Applications should keep checkpoints and reconcile
+after reconnecting. See [subscription recovery limits](/advanced/websocket-subscriptions#application-checkpoints-and-reorgs).
+
+## Test and result
+
+On August 22, 2026, a pinned Lasso implementation ran a 30-minute in-process
+soak. Fifty downstream clients shared one upstream `newHeads` subscription.
+The harness forced a provider replacement every 15 seconds and skipped three
+live blocks per replacement so HTTP replay had to restore the gap. It recorded
+119 replacements, zero downstream gaps, and zero replay-created duplicates.
+The coordinator count stayed at one. Subscription state drained after the last
+client left, within the test's 95-second teardown limit.
+
+```text
+WS_SOAK_EVIDENCE {"duration_ms":1800000,"failovers":119,"clients":50,"gaps":0,"duplicates":0,"teardown_ms":89008,"final_head":9387,"warm_processes":660,"final_processes":660,"warm_memory_bytes":94445512,"final_memory_bytes":92216898,"peak_coordinators":1,"peak_backfill_owners":0,"peak_event_buffer":0,"peak_dedupe":155}
+```
+
+This is a Lasso-run gate against implementation commit
+`89ad1a09ad88a1cf86a1dbc8ac5de6feb526b5f3`. Its Cloud harness is not
+part of the public RPC Core release, so this result is reported evidence,
+not a command you can reproduce from the public repository. It measures
+bounded replacement within one profile and one running process. It does not
+measure a general hosted capacity, SLA, or exactly-once delivery guarantee.

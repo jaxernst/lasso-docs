@@ -28,6 +28,7 @@ logs and chat. For a human-led Cloud setup, use the [Cloud quickstart](https://d
 - [RPC behavior](https://docs.lasso.sh/cloud/rpc-behavior): Method and transport semantics.
 - [Support and lifecycle](https://docs.lasso.sh/support-security-lifecycle): Support and security boundaries.
 - [Versions and evidence](https://docs.lasso.sh/releases-and-availability): Current release and deployment references.
+- [WebSocket continuity evidence](https://docs.lasso.sh/cloud/websocket-continuity-evidence): Controlled provider-replacement soak, result, and limits.
 
 ## Self-hosted RPC Core
 

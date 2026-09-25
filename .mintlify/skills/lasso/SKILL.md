@@ -52,19 +52,43 @@ curl -fsSL https://lasso.sh/api/v1/agent/pricing
 Confirm `managed_key_bootstrap.enabled` in
 `/api/v1/management/configuration-schema`. You generate the management
 credential (`lasso_mk_` plus 32 random bytes, unpadded base64url) and a UUID,
-and persist both before sending:
+and persist both with the exact body before sending. Rerun this snippet after
+a lost response. It reuses saved state; use a fresh state directory for a new
+key:
 
 ```bash
-umask 077; S="${XDG_STATE_HOME:-$HOME/.local/state}/lasso"; mkdir -p "$S"
-printf 'lasso_mk_%s\n%s\n' "$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n')" "$(uuidgen)" > "$S/bootstrap"
-curl -fsS https://lasso.sh/api/v1/management/keys \
-  -H "Authorization: Bearer $(sed -n 1p "$S/bootstrap")" \
-  -H "Idempotency-Key: $(sed -n 2p "$S/bootstrap")" \
-  -H 'content-type: application/json' -d '{"name":"my-app"}' > "$S/key.json"
+set -euo pipefail
+umask 077
+S="${XDG_STATE_HOME:-$HOME/.local/state}/lasso"
+mkdir -p "$S"
+if [ ! -e "$S/bootstrap" ]; then
+  credential="lasso_mk_$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n')"
+  request_id="$(uuidgen)"
+  ( set -C; printf '%s\n%s\n' "$credential" "$request_id" > "$S/bootstrap" )
+fi
+if [ "$(wc -l < "$S/bootstrap")" -ne 2 ]; then
+  printf 'Invalid saved bootstrap state; stop before creating a key.\n' >&2
+  exit 1
+fi
+if [ ! -e "$S/key-request.json" ]; then
+  ( set -C; printf '%s\n' '{"name":"my-app"}' > "$S/key-request.json" )
+fi
+jq -e '.name == "my-app"' "$S/key-request.json" > /dev/null
+if [ ! -e "$S/key.json" ]; then
+  tmp=$(mktemp "$S/key.XXXXXX")
+  trap 'rm -f "$tmp"' EXIT
+  curl -fsS https://lasso.sh/api/v1/management/keys \
+    -H "Authorization: Bearer $(sed -n 1p "$S/bootstrap")" \
+    -H "Idempotency-Key: $(sed -n 2p "$S/bootstrap")" \
+    -H 'content-type: application/json' --data-binary @"$S/key-request.json" > "$tmp"
+  jq -er '.data.credential_delivery.strategy_url_template | strings | select(length > 0)' "$tmp" > /dev/null
+  mv -n "$tmp" "$S/key.json"
+fi
 ```
 
-Keep this state outside the repository. After a lost response, rerun the same
-`curl`; it returns `replayed: true` and the same key.
+Keep this state outside the repository. After a lost response, rerun with the
+same credential, idempotency key and body. The create API returns the same key
+with `replayed: true`.
 
 The default grant is `keys:read`, `keys:write` and `claims:create`. To buy
 credit later, send
@@ -79,7 +103,7 @@ is claimed. Neither authorizes a wallet payment.
 ## Call it and read the evidence
 
 ```bash
-URL=$(jq -r '.data.credential_delivery.strategy_url_template' "$S/key.json" \
+URL=$(jq -er '.data.credential_delivery.strategy_url_template | strings | select(length > 0)' "$S/key.json" \
   | sed 's/{strategy}/fastest/; s/{chain}/base/')
 curl -fsS "$URL?include_meta=body" -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}' | jq

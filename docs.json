@@ -78,6 +78,7 @@
               "cloud/block-continuity",
               "cloud/read-at-one-block",
               "cloud/rpc-behavior",
+              "cloud/websocket-continuity-evidence",
               "cloud/historical-workloads",
               "cloud/json-rpc-compatibility",
               "cloud/observability"
