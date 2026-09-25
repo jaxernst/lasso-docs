@@ -252,7 +252,10 @@ Location: `Lasso.Providers.ProbeCoordinator`
 
 **Fixed Tick Interval:**
 
-ProbeCoordinator uses a fixed 200ms tick interval with per-instance exponential backoff. The `probe_interval_ms` config parameter (previously per-profile) has been removed.
+ProbeCoordinator checks work on a 200 ms scheduling tick. Each upstream's
+effective probe cadence comes from the shortest `monitoring.probe_interval_ms`
+among the profiles that reference it, or the chain's block-time default when
+none applies. Failure backoff can delay a probe further.
 
 ### Exponential Backoff
 
@@ -295,7 +298,10 @@ chains:
       lag_alert_threshold_blocks: 5  # Alert if provider lags by more than N blocks
 ```
 
-Note: `probe_interval_ms` is no longer configurable per profile. ProbeCoordinator uses a fixed 200ms tick interval.
+Set `monitoring.probe_interval_ms` in a chain's profile configuration when you
+need a different probe cadence. Profiles sharing an upstream use the shortest
+configured interval. The 200 ms tick is a scheduler, not a request to probe
+every upstream five times per second.
 
 ### Dynamic vs Static Block Time
 

@@ -148,4 +148,4 @@ each viewer.
 | `402` | Anonymous balance or a session payment is exhausted. |
 | `403` | The key is not authorized for the requested profile. |
 | `429` | A Lasso or upstream limit was reached. |
-| `503` | No eligible provider attempt served the request. |
+| `503` | An ingress or service admission failure prevented ordinary routing. A routed JSON-RPC exhaustion error can instead arrive with HTTP 200; inspect the body. |

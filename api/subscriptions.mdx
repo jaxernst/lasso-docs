@@ -199,7 +199,7 @@ Here's a complete subscription flow using `wscat`:
 
 ```bash
 # Connect to WebSocket endpoint
-wscat -c 'ws://localhost:4000/ws/rpc/ethereum?key=lasso_abc123'
+wscat -c 'ws://localhost:4000/ws/rpc/ethereum'
 
 # Subscribe to new blocks
 > {"jsonrpc":"2.0","method":"eth_subscribe","params":["newHeads"],"id":1}

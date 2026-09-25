@@ -9,7 +9,7 @@ Clustering is optional. A single node works standalone. Clustering enables:
 - Per-region drill-down for provider performance comparison
 - Cluster health monitoring (node status, region discovery)
 
-Clustering does **not** affect routing. Each node makes independent routing decisions based on local latency measurements. There is no cross-node coordination in the request hot path.
+Each node makes its own provider-selection decision from local measurements; there is no cross-node coordination in the request hot path. Peers can still supply recovery hints for local block protection, and optional global block publication has a separate shared-storage contract. See [block continuity](/deployment/block-continuity) before treating a multi-node deployment as one continuity domain.
 
 ### Requirements
 
