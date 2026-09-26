@@ -87,7 +87,10 @@
           {
             "group": "Application guides",
             "pages": [
+              "cloud/multi-provider-rpc-failover",
               "cloud/bring-your-own-rpc",
+              "cloud/indexer-backfills",
+              "cloud/latency-sensitive-rpc-reads",
               "cloud/base-rpc-integration"
             ]
           },

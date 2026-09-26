@@ -1,0 +1,48 @@
+---
+title: Route latency-sensitive EVM RPC reads
+description: Compare Lasso Cloud routing strategies for latency-sensitive reads using your own methods, regions, provider health, and request evidence.
+canonical: https://docs.lasso.sh/cloud/latency-sensitive-rpc-reads
+"og:title": Route latency-sensitive EVM RPC reads
+---
+
+**Lasso Cloud · For teams with latency-sensitive reads.** Keep your standard
+EVM JSON-RPC client and choose a routing strategy for the request path you are
+measuring. Provider capability and health are checked before strategy ranking.
+
+## Choose an explicit strategy
+
+| Strategy | First-attempt behavior | Tradeoff to measure |
+| --- | --- | --- |
+| `load-balanced` | Statistically shares first attempts inside the current eligible live tier. | Shares are not exact and health can narrow the tier. |
+| `latency-weighted` | Biases ordering toward providers with qualified recent successful latency. | Relative weights do not promise a fixed exploration share or exact distribution. |
+| `fastest` | Selects the lowest qualified recent mean successful-attempt latency for each routing decision. | Traffic can concentrate; weak evidence can fall back to availability-first ordering. |
+
+The runtime default is `load-balanced`. Name the strategy explicitly during a
+trial so your results describe the route you actually tested. The
+[routing guide](/cloud/routing) covers eligibility, health tiers, and the
+request deadline.
+
+## Measure the application path
+
+Choose one read method and a representative request mix. Compare direct
+provider and Lasso routes from the same client regions. Record successful
+responses, p50/p95/p99 end-to-end latency, error categories, provider choice,
+head freshness, and upstream request volume. Repeat during a controlled
+provider failure or throttle event. A low mean upstream latency alone does not
+show that the app's tail latency improved.
+
+Use the [dashboard](https://lasso.sh/dashboard) for live provider state and
+[opt-in request metadata](/cloud/observability#opt-in-metadata) for available
+per-request timing and executing-channel fields. Keep missing fields unknown;
+candidate order alone does not prove which provider answered.
+
+The [routing-overhead benchmark](https://lasso.sh/benchmarks/routing-overhead.html)
+measured 0.70–1.08 ms added p95 latency in five short, isolated synthetic HTTP
+trials at 10,000 requests per second on a four-CPU Lasso profile. That is
+routing-engine overhead, not hosted capacity or Internet/provider latency.
+Your workload trial supplies the application result.
+
+If several reads must observe one state, use [one block hash](/cloud/read-at-one-block)
+across those calls. If successive `latest` results must avoid a backwards
+block number, evaluate [block regression protection](/cloud/block-continuity)
+separately. Neither strategy selection nor block policy guarantees finality.

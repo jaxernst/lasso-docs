@@ -23,6 +23,9 @@ logs and chat. For a human-led Cloud setup, use the [Cloud quickstart](https://d
 
 - [Routing](https://docs.lasso.sh/cloud/routing): Strategies, provider selection, and failure boundaries.
 - [Bring your own RPC](https://docs.lasso.sh/cloud/bring-your-own-rpc): Add existing providers to a managed custom profile.
+- [Multi-provider RPC failover](https://docs.lasso.sh/cloud/multi-provider-rpc-failover): Replay-safe read failover, signed-transaction handling, and bounded WebSocket replacement.
+- [Indexer backfills](https://docs.lasso.sh/cloud/indexer-backfills): Qualify historical state, receipts, and log ranges through the exact route.
+- [Latency-sensitive reads](https://docs.lasso.sh/cloud/latency-sensitive-rpc-reads): Compare explicit strategies and client-observed latency.
 - [Agent workflows](https://docs.lasso.sh/cloud/agent-flows): Provision and operate through HTTP APIs.
 - [Observability](https://docs.lasso.sh/cloud/observability): Read routing evidence and provider health.
 - [RPC behavior](https://docs.lasso.sh/cloud/rpc-behavior): Method and transport semantics.
