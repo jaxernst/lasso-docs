@@ -75,7 +75,8 @@ or buffer limits terminates the affected downstream connection explicitly; it
 does not promise unbounded or lossless delivery through arbitrary outages.
 
 In Core v0.4.5, `subscribe_new_heads` controls automatic block monitoring **and**
-client `newHeads` eligibility. Set it to `true` on intended providers. New profiles
+client `newHeads` eligibility. Providers inherit the chain setting, which
+defaults to `true`; override it per provider when needed. New profiles
 can reuse an already-connected upstream after a successful configuration reload.
 See [Configuration](/configuration/overview) and [Deployment](/deployment/docker).
 

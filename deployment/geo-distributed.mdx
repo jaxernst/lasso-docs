@@ -9,7 +9,7 @@ For optimal performance, deploy one Lasso node per region and route application 
 
 Each node independently:
 - Measures latency to upstream providers from its region
-- Routes requests to the fastest provider for that region
+- Selects providers using its configured strategy and local observations
 - Maintains independent circuit breaker state
 
 The dashboard aggregates data across all nodes for unified observability with regional drill-down.
