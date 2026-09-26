@@ -49,7 +49,7 @@ Explicitly specify the routing strategy for provider selection.
 POST /rpc/fastest/:chain
 ```
 
-Routes all requests to the single fastest provider based on measured latency.
+Orders eligible providers by recent, reliability-qualified latency. Other eligible providers remain available for bounded fallback.
 
 ```bash
 curl -X POST http://localhost:4000/rpc/fastest/ethereum \
@@ -144,68 +144,14 @@ curl -X POST http://localhost:4000/rpc/profile/testnet/fastest/base \
 Without an explicit profile in the URL, requests automatically use the `"public"` profile. Ensure `config/profiles/public.yml` exists at startup.
 </Note>
 
-## Supported Methods
+## Method and transport policy
 
-Lasso supports read-only Ethereum JSON-RPC methods:
-
-### Block Methods
-
-- `eth_blockNumber` - Latest block number
-- `eth_getBlockByNumber` - Block data by number
-- `eth_getBlockByHash` - Block data by hash
-
-### Account Methods
-
-- `eth_getBalance` - Account balance
-- `eth_getTransactionCount` - Account nonce
-- `eth_getCode` - Contract bytecode
-
-### Transaction Methods
-
-- `eth_getTransactionByHash` - Transaction details
-- `eth_getTransactionReceipt` - Transaction receipt
-
-### Call Methods
-
-- `eth_call` - Read-only contract call
-- `eth_estimateGas` - Gas estimation
-
-### State Methods
-
-- `eth_getLogs` - Historical log queries
-- `eth_getStorageAt` - Storage slot value
-
-### Gas & Fee Methods
-
-- `eth_gasPrice` - Current gas price
-- `eth_maxPriorityFeePerGas` - EIP-1559 priority fee
-- `eth_feeHistory` - Historical fee data
-
-### Metadata Methods
-
-- `eth_chainId` - Chain ID (served locally, no upstream call)
-
-## Unsupported Methods
-
-### Subscription Methods
-
-Subscription methods (`eth_subscribe`, `eth_unsubscribe`) are rejected over HTTP with a WebSocket URL hint:
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "error": {
-    "code": -32601,
-    "message": "Method not supported over HTTP. Use WebSocket connection for subscriptions.",
-    "data": {"websocket_url": "/ws/rpc/ethereum"}
-  }
-}
-```
-
-### Write Methods
-
-`eth_sendRawTransaction` is routed with one upstream dispatch. `eth_sendTransaction` and the node-local methods listed in [Supported methods](/api/supported-methods) are rejected.
+Core forwards supported reads and can send `eth_sendRawTransaction` to one
+upstream. It rejects `eth_subscribe` and `eth_unsubscribe` over HTTP and
+provides a WebSocket route hint. Unknown methods and provider-local filter
+methods have separate dispatch and affinity limits. See the released
+[supported-methods contract](/api/supported-methods) for the complete method
+and execution-safety boundary.
 
 ## Request Headers
 
@@ -219,8 +165,6 @@ Subscription methods (`eth_subscribe`, `eth_unsubscribe`) are rejected over HTTP
 
 | Header | Example | Description |
 |--------|---------|-------------|
-| `X-Lasso-Api-Key` | `lasso_abc123` | API key authentication |
-| `Authorization` | `Bearer lasso_abc123` | Bearer token authentication |
 | `X-Lasso-Provider` | `alchemy` | Override provider selection |
 | `X-Lasso-Transport` | `http` or `ws` | Force transport selection |
 | `X-Lasso-Include-Meta` | `headers` or `body` | Request observability metadata |
@@ -240,19 +184,14 @@ curl -X POST http://localhost:4000/rpc/ethereum \
 
 | Parameter | Values | Description |
 |-----------|--------|-------------|
-| `key` | `lasso_...` | API key for authentication |
 | `include_meta` | `headers`, `body` | Return routing metadata |
 | `transport` | `http`, `ws` | Force transport selection |
-| `provider` | provider ID | Override provider selection |
-| `strategy` | `fastest`, `load_balanced`, `latency_weighted` | Override routing strategy |
+| `provider_override` or `provider_id` | provider ID | Override provider selection |
 
-### Strategy Query Parameter
-
-```bash
-curl -X POST 'http://localhost:4000/rpc/ethereum?strategy=fastest' \
-  -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
-```
+Choose a strategy with its URL path, such as `/rpc/fastest/ethereum`.
+The default route does not use `?strategy=` to override its strategy.
+Core does not authenticate client requests; protect the endpoint at your
+[network or reverse proxy boundary](/api/authentication).
 
 ## Response Format
 
@@ -282,7 +221,7 @@ curl -X POST 'http://localhost:4000/rpc/ethereum?strategy=fastest' \
 ### Error Codes
 
 | Code | Meaning |
-|------|---------||
+|------|---------|
 | `-32700` | Parse error (malformed JSON) |
 | `-32600` | Invalid Request (missing fields, batch too large) |
 | `-32601` | Method not found or not supported on this transport |
@@ -317,6 +256,5 @@ All origins are allowed (`*`). Allowed headers:
 - `X-Requested-With`
 - `X-Lasso-Provider`
 - `X-Lasso-Transport`
-- `X-Lasso-Api-Key`
 
 Preflight responses are cached for 24 hours.

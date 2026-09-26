@@ -29,8 +29,9 @@ segment explicitly so the integration does not depend on an implicit default.
 | Strategy | Behavior | Use it when |
 | --- | --- | --- |
 | `load-balanced` | Randomizes providers within the same health tier. | Comparable providers should share first attempts and quota. |
-| `latency-weighted` | Samples probabilistically using latency, success, confidence, and exploration weight. | You want a performance bias without always selecting one provider. |
+| `latency-weighted` | Samples a weighted order from recent successful latency after reliability qualification. | You want a performance bias without always selecting one provider. |
 | `fastest` | Ranks measured latency by provider, method, and transport. | Latency matters enough to accept traffic concentration. |
+| `priority` | Uses configured provider order within the same health tier. | You want an explicit first preference. |
 
 “Load-balanced” does not guarantee an even split across all configured
 providers. If only one provider is in the healthiest tier, it can receive nearly
@@ -40,7 +41,9 @@ one method while choosing another provider for a different method or transport.
 ## Failover
 
 Lasso advances to the next eligible provider for failures classified as safe to
-retry. It returns `503` when no eligible attempt can serve the request. The
+retry. A routed JSON-RPC exhaustion error can be returned in an HTTP 200
+response; authentication and admission failures can use distinct HTTP statuses.
+Inspect both the HTTP status and the JSON-RPC `error` object. The
 number of providers in a profile is therefore not itself a guarantee: providers
 must overlap on the requested capability and remain in usable health states.
 

@@ -12,8 +12,9 @@ Use [WebSocket endpoints](/api/websocket-endpoints) for connection examples and
 ## Configure the provider pool
 
 Configure both HTTP and WebSocket endpoints for providers that support your
-chain and workload. Set `subscribe_new_heads: true` on providers intended to
-serve `newHeads`; a WebSocket URL alone does not enable this opt-in. See
+chain and workload. Providers inherit the chain's `subscribe_new_heads` setting,
+which defaults to `true`; set a provider override to `false` if it must not
+serve `newHeads`. A usable WebSocket connection is still required. See
 [Provider configuration](/configuration/providers).
 
 Identical subscriptions can share upstream work. Different log filters can

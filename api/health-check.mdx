@@ -70,7 +70,7 @@ Returns a JSON object containing instance health information:
   "status": "healthy",
   "timestamp": "2026-03-03T21:45:30.123456Z",
   "uptime_seconds": 86400,
-  "version": "0.1.0",
+  "version": "0.4.5",
   "cluster": {
     "enabled": true,
     "nodes_connected": 3,
@@ -142,6 +142,6 @@ fi
 ## Notes
 
 - This endpoint responds immediately and does not perform heavy computation
-- Response time is typically under 10ms, making it suitable for frequent polling
-- The endpoint is always accessible, even when other parts of the system may be degraded
+- It does not make a live upstream RPC call; pair it with provider and routing monitoring
+- A healthy response confirms application availability, not that every upstream is usable
 - For single-instance deployments, `cluster.enabled` will be `false` and `cluster.status` will be `standalone`

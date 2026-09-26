@@ -10,10 +10,13 @@ Lasso uses WebSocket ping/pong frames to detect disconnected clients. Keep your 
 Use a standard WebSocket client:
 
 ```bash
-wscat -c 'ws://localhost:4000/ws/rpc/ethereum?key=lasso_abc123'
+wscat -c 'ws://localhost:4000/ws/rpc/ethereum'
 ```
 
-The connection can close when you disconnect, fail to answer heartbeats, lose profile access, encounter a network interruption, or the server restarts. Subscription continuity exhaustion or delivery backpressure can also close the connection.
+The connection can close when you disconnect, fail to answer heartbeats,
+encounter a network interruption, or the server restarts. Subscription
+continuity exhaustion can also close the connection. Core does not authenticate
+the incoming client; protect this endpoint at your deployment boundary.
 
 ## Heartbeats
 
@@ -54,11 +57,12 @@ These application-level closure cases have explicit meanings:
 | --- | --- | --- |
 | Two missed heartbeat replies | 1002 | `Heartbeat timeout - no pong responses` |
 | Subscription continuity exhausted | 1011 | `Lasso subscription continuity exhausted` |
-| Subscription client too slow | 1013 | `Lasso subscription client too slow` |
 
 A JSON-RPC rate-limit error can be returned on an open connection. It does not inherently mean the socket closes with code 1008. Deployments, access changes, proxies, and network failures can produce other close events; handle closure regardless of code.
 
-Code 1013 indicates retryable delivery backpressure or resource exhaustion. Slow client processing, subscription volume, or server-wide delivery limits can trigger it; the close reason alone does not identify the cause. Reconnect with capped backoff, reconcile missed events, and check whether your client can keep up with its subscriptions.
+The released Core socket does not promise a dedicated slow-client close code.
+Bound your own processing and subscription volume, reconnect with capped
+backoff, and reconcile missed events after any closure.
 
 ## Reconnection
 
@@ -132,4 +136,4 @@ Use `eth_unsubscribe` when you no longer need an individual subscription. Closin
 - Treat a long gap in notifications separately from a failed connection. A healthy stream may have no matching events.
 - Track reconnect frequency, subscription errors, and the last processed block.
 - Expect reconnects during deployments and network changes.
-- If access is revoked, resolve the account or profile issue before repeatedly retrying.
+- If a profile or provider configuration changes, inspect the active routes before repeatedly retrying.

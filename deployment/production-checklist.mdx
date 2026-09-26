@@ -46,9 +46,12 @@ export ALCHEMY_API_KEY="your-key-here"
 
 ### Health Check
 
-Lasso exposes `GET /api/health` for liveness/readiness probes. Configure your orchestrator or load balancer to poll this endpoint.
+Core v0.4.5 exposes `GET /api/health` for application liveness. Configure your
+orchestrator or load balancer to poll this endpoint for process availability.
 
-The health endpoint confirms that the application is running and reports cluster topology. It does not make live upstream RPC requests, so pair it with your normal provider and routing monitoring.
+The health endpoint confirms that the application is running and reports cluster
+topology. It does not make live upstream RPC requests or prove route readiness;
+pair it with provider and routing monitoring and an upstream-backed RPC check.
 
 ### HTTPS
 
@@ -67,7 +70,7 @@ Lasso serves HTTP. Terminate TLS at your reverse proxy or load balancer. Set `PH
 - [ ] Profile YAML validated (startup crashes on unresolved `${ENV_VAR}`)
 - [ ] Client request limits enforced at the reverse proxy; profile rate settings only configure the dashboard tester
 - [ ] TLS terminated at reverse proxy / load balancer
-- [ ] Structured JSON log drain configured
+- [ ] Console log drain configured; add a JSON formatter at deployment level if your collector requires JSON
 - [ ] RPC and dashboard protected by reverse-proxy authentication or a private network boundary (Lasso OSS has no built-in client authentication)
 - [ ] If clustering: named nodes, shared cookie, DNS discovery, and private distribution connectivity configured; peers visible in `Node.list()`
 

@@ -75,8 +75,8 @@ GET /api/metrics/:chain
       95th percentile latency in milliseconds
     </ResponseField>
     
-    <ResponseField name="failovers_last_minute" type="integer">
-      Number of failover events in the last minute
+    <ResponseField name="failovers_last_minute" type="null">
+      Reserved field; the released endpoint returns `null`
     </ResponseField>
     
     <ResponseField name="connected_providers" type="integer">
@@ -87,12 +87,12 @@ GET /api/metrics/:chain
       Total number of configured providers for this chain
     </ResponseField>
     
-    <ResponseField name="recent_activity" type="integer">
-      Number of recent RPC calls in the activity buffer
+    <ResponseField name="recent_activity" type="null">
+      Reserved field; the released endpoint returns `null`
     </ResponseField>
     
-    <ResponseField name="rpc_calls_per_second" type="number">
-      Current RPC request rate
+    <ResponseField name="rpc_calls_per_second" type="null">
+      Reserved field; the released endpoint returns `null`
     </ResponseField>
     
     <ResponseField name="error_rate_percent" type="number">
@@ -231,11 +231,11 @@ GET /api/metrics/:chain
     "success_rate": 99.2,
     "p50_latency": 125.5,
     "p95_latency": 342.1,
-    "failovers_last_minute": 2,
+    "failovers_last_minute": null,
     "connected_providers": 3,
     "total_providers": 3,
-    "recent_activity": 45,
-    "rpc_calls_per_second": 12.5,
+    "recent_activity": null,
+    "rpc_calls_per_second": null,
     "error_rate_percent": 0.8
   },
   "providers": [
