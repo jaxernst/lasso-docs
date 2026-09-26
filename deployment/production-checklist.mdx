@@ -46,9 +46,12 @@ export ALCHEMY_API_KEY="your-key-here"
 
 ### Health Check
 
-Lasso exposes `GET /api/health` for liveness/readiness probes. Configure your orchestrator or load balancer to poll this endpoint.
+Core v0.4.5 exposes `GET /api/health` for application liveness. Configure your
+orchestrator or load balancer to poll this endpoint for process availability.
 
-The health endpoint confirms that the application is running and reports cluster topology. It does not make live upstream RPC requests, so pair it with your normal provider and routing monitoring.
+The health endpoint confirms that the application is running and reports cluster
+topology. It does not make live upstream RPC requests or prove route readiness;
+pair it with provider and routing monitoring and an upstream-backed RPC check.
 
 ### HTTPS
 
