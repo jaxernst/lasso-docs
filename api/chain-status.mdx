@@ -1,6 +1,6 @@
 ---
 title: 'Chain Status'
-description: 'Query configured blockchain chains and their availability'
+description: 'List chains configured in RPC Core'
 ---
 
 ## Overview
@@ -70,7 +70,8 @@ Returns a JSON object containing an array of configured chains:
 
 ### Discover Available Chains
 
-Query which chains are configured and ready to use:
+Query which chains are configured. This list does not check whether an upstream
+is currently usable:
 
 ```bash
 curl http://localhost:4000/api/chains
