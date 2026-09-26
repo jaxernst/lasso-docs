@@ -1,0 +1,52 @@
+---
+title: RPC routing for indexers and historical backfills
+description: Test historical state and eth_getLogs through your actual EVM RPC route before moving an indexer or backfill behind Lasso Cloud.
+canonical: https://docs.lasso.sh/cloud/indexer-backfills
+"og:title": RPC routing for indexers and historical backfills
+---
+
+**Lasso Cloud · For indexer operators.** Route historical EVM reads through a
+profile of configured providers, then qualify the exact blocks and methods your
+indexer needs. A provider serving an old block header may still lack old state
+or logs at that block.
+
+## Match the provider to the query
+
+Lasso considers declared and probed history evidence when admitting a request.
+Selected depths do not prove unlimited archive coverage. Historical state,
+receipts, and logs have different coverage; `eth_getLogs` also faces
+provider-specific block-range and result-size limits. See
+[RPC workload behavior](/cloud/rpc-behavior#historical-state-and-logs) for the
+method boundary.
+
+Build a small set of known positive queries from your own contracts and chain
+history. Keep the expected block hash, nonempty log or receipt identity, and
+expected state value. Run each query against the direct provider and the exact
+Lasso endpoint and credential your indexer will use. An empty response is not
+proof that the provider covered the requested history.
+
+| Indexer task | Trial query | Check |
+| --- | --- | --- |
+| Rebuild state | `eth_call` or a state method at a known old block | Expected value and block selector support |
+| Scan events | `eth_getLogs` over a representative range | Complete known logs, range limits, and result size |
+| Reconcile transactions | `eth_getTransactionReceipt` for known hashes | Receipt identity and expected block |
+
+Split large log ranges to fit the upstreams you use. Keep a durable checkpoint
+and a reorg overlap in your indexer, then deduplicate by log identity. Test the
+same path from your deployment regions and under representative request volume.
+
+## Inspect routing during a backfill
+
+The [dashboard](https://lasso.sh/dashboard) shows current provider health and
+recent routing activity. Opt-in [`lasso_meta`](/cloud/observability#opt-in-metadata)
+can identify the executing upstream when that field is available. Preserve the
+request ID and the query's block selector alongside your result. For HTTP
+batches, items route independently; a batch is neither pinned to one provider
+nor an atomic snapshot. Use [one block hash for related state reads](/cloud/read-at-one-block)
+when you need them to refer to the same block.
+
+Lasso's [dated historical qualification](/cloud/historical-workloads) shows
+positive samples and gaps across selected chains, depths, and methods. It is a
+model for testing, not a coverage promise for your contracts or a later
+deployment. Retain your previous endpoint until the Lasso route passes your
+own correctness, latency, and failure trials.
