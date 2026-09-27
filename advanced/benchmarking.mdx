@@ -60,12 +60,14 @@ latency or successful service.
 
 ## Retention and overhead
 
-BenchmarkStore uses bounded retention and cleanup; it is not a durable complete
-request journal. Its implementation details and APIs are in the released
-[BenchmarkStore source](https://github.com/jaxernst/lasso-rpc/blob/v0.4.5/lib/lasso/core/benchmarking/benchmark_store.ex).
-Measure process/ETS memory and request overhead for your configured workload.
-This page does not assign a fixed per-call overhead or memory footprint to every
-deployment.
+In v0.4.5, BenchmarkStore periodically trims raw per-chain samples. A burst can
+exceed that threshold before the next trim, and aggregated provider/method score
+entries have no fixed cardinality cap in this release. It is not a durable
+complete request journal. Monitor process and ETS memory for your configured
+profile, method, and provider mix. The released
+[BenchmarkStore source](https://github.com/jaxernst/lasso-rpc/blob/v0.4.5/lib/lasso/core/benchmarking/benchmark_store.ex)
+defines the exact behavior; this page does not assign a fixed per-call overhead
+or memory footprint to every deployment.
 
 The historical [routing-overhead report](https://lasso.sh/benchmarks/routing-overhead.html)
 is a dated engine benchmark. Preserve its source and environment attribution;
