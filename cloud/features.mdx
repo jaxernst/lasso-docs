@@ -22,7 +22,8 @@ unification contract and claim boundaries.
 ## Routing and resilience
 
 - Capability-aware filtering before provider selection.
-- Per-provider, method, transport, and regional latency evidence.
+- Recent routing latency evidence by provider, transport, and bounded method
+  family. Regional metrics are available separately.
 - Circuit and rate-limit state influence the attempt order.
 - Sequential attempts on failures that are safe to retry.
 - Conservative single-dispatch handling for signed transactions, unknown
