@@ -1,11 +1,14 @@
 ---
 title: 'Metrics API'
-description: 'Retrieve detailed performance metrics for blockchain chains'
+description: 'Retrieve default-profile performance metrics from RPC Core v0.4.5'
 ---
 
 ## Overview
 
-The metrics API provides comprehensive performance data for a specific blockchain chain, including provider statistics, RPC method performance, and system resource usage.
+In Lasso RPC Core v0.4.5, the metrics API reports a chain in the default
+`public` profile, including provider statistics, RPC method performance, and
+VM resource usage. It does not accept a profile parameter or report a chain
+configured only in a custom profile.
 
 ## Endpoint
 
@@ -16,7 +19,7 @@ GET /api/metrics/:chain
 ### Path Parameters
 
 <ParamField path="chain" type="string" required>
-  The chain identifier (e.g., `ethereum`, `polygon`, `arbitrum`)
+  A chain identifier in `public` (e.g., `ethereum`, `polygon`, `arbitrum`)
 </ParamField>
 
 ## Response
@@ -328,6 +331,10 @@ GET /api/metrics/:chain
 ```
 
 **HTTP Status**: `404 Not Found`
+
+This includes chains configured only in another profile. The response's
+`available_chains` lists canonical chain names in `public`; see the released
+[metrics controller](https://github.com/jaxernst/lasso-rpc/blob/v0.4.5/lib/lasso_web/controllers/metrics_controller.ex).
 
 ## Use Cases
 
