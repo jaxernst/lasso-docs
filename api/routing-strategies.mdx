@@ -14,6 +14,7 @@ describes the managed service.
 | --- | --- |
 | `/rpc/:chain` | Application default; shipped as `load_balanced` |
 | `/rpc/load-balanced/:chain` | Randomized order with distinct-instance first pass for replay-safe calls |
+| `/rpc/round-robin/:chain` | Alias for `load-balanced`; it does not provide deterministic round-robin rotation |
 | `/rpc/fastest/:chain` | Recent reliability-qualified latency order |
 | `/rpc/latency-weighted/:chain` | Relative-latency weighted permutation |
 | `/rpc/provider/:provider_id/:chain` | Explicit configured provider |
