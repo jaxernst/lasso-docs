@@ -18,13 +18,13 @@ MIX_ENV=prod mix release
 
 Or build a Docker image using the included `Dockerfile`.
 
-### Required Environment Variables
+### Production environment variables
 
 | Variable | Description |
 |----------|-------------|
 | `SECRET_KEY_BASE` | Phoenix signing/encryption secret. Generate with `mix phx.gen.secret` (64+ bytes) |
-| `PHX_HOST` | Public hostname for URL generation (e.g., `rpc.example.com`) |
-| `PHX_SERVER` | Set to `true` to start the HTTP server (required for releases) |
+| `PHX_HOST` | Set your public hostname for URL generation (e.g., `rpc.example.com`); defaults to `localhost` |
+| `PHX_SERVER` | Optional. Production already starts the HTTP server; the release `bin/server` wrapper sets this explicitly |
 | `LASSO_NODE_ID` | Unique, stable identifier for this node. Required in production. Convention: use region names (e.g., `us-east-1`) for geo-distributed deployments |
 | `PORT` | HTTP listener port (default: `4000`) |
 
@@ -63,7 +63,7 @@ Lasso serves HTTP. Terminate TLS at your reverse proxy or load balancer. Set `PH
 
 - [ ] `SECRET_KEY_BASE` set (64+ bytes)
 - [ ] `PHX_HOST` set to public hostname
-- [ ] `PHX_SERVER=true` set
+- [ ] HTTP server responds to `GET /api/health`
 - [ ] `LASSO_NODE_ID` set to a unique, stable value
 - [ ] Provider credentials set when referenced by profile configuration
 - [ ] Health check (`GET /api/health`) monitored by orchestrator
