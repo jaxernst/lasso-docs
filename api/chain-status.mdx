@@ -1,11 +1,13 @@
 ---
-title: 'Chain Status'
-description: 'List chains configured in RPC Core'
+title: 'Configured chains'
+description: 'List chains in the default public profile of RPC Core v0.4.5'
 ---
 
 ## Overview
 
-The chain status endpoint provides information about all blockchain chains configured in your Lasso RPC instance.
+In Lasso RPC Core v0.4.5, this endpoint lists chains in the default `public`
+profile. A chain configured only in another file profile does not appear.
+The list does not test whether an upstream can currently serve the chain.
 
 ## Endpoint
 
@@ -15,7 +17,7 @@ GET /api/chains
 
 ## Response
 
-Returns a JSON object containing an array of configured chains:
+Returns a JSON object containing the default profile's configured chains:
 
 <ResponseField name="chains" type="array" required>
   Array of chain configuration objects
@@ -34,7 +36,7 @@ Returns a JSON object containing an array of configured chains:
     </ResponseField>
     
     <ResponseField name="supported" type="boolean" required>
-      Whether this chain is currently supported (always `true` for configured chains)
+      Always `true` for a listed chain; this does not indicate upstream readiness
     </ResponseField>
   </Expandable>
 </ResponseField>
@@ -70,8 +72,7 @@ Returns a JSON object containing an array of configured chains:
 
 ### Discover Available Chains
 
-Query which chains are configured. This list does not check whether an upstream
-is currently usable:
+Query which chains the default `public` profile configures:
 
 ```bash
 curl http://localhost:4000/api/chains
@@ -79,7 +80,7 @@ curl http://localhost:4000/api/chains
 
 ### Validate Chain Configuration
 
-Check if a specific chain is configured before making RPC requests:
+Check if a specific chain is configured in `public` before making a default-profile RPC request:
 
 ```bash
 # Check if Ethereum is configured
@@ -93,7 +94,8 @@ fi
 
 ### Dynamic Client Configuration
 
-Use this endpoint to dynamically configure multi-chain applications:
+Use this endpoint to build default-profile RPC URLs. It does not discover chains
+that exist only in custom profiles:
 
 ```javascript
 const response = await fetch('http://localhost:4000/api/chains');
@@ -136,7 +138,7 @@ curl -X POST http://localhost:4000/rpc/ethereum \
 
 ## Notes
 
-- The list of chains is determined by your configuration file
-- All returned chains have `supported: true` as unsupported chains are not included in the response
+- The list comes from `public.yml`, not the union of all file profiles. See the released [chain controller](https://github.com/jaxernst/lasso-rpc/blob/v0.4.5/lib/lasso_web/controllers/chain_controller.ex) and [configuration store](https://github.com/jaxernst/lasso-rpc/blob/v0.4.5/lib/lasso/config/config_store.ex).
+- All returned chains have `supported: true` because they are configured; this is not a live capability or availability check.
 - Validated profile YAML can be reloaded without restarting the instance; each node reads its own files. See [Profiles and reload](/concepts/profiles).
-- This endpoint is useful for service discovery in multi-chain applications
+- Use this endpoint for default-profile chain discovery; inspect a custom profile's configuration separately.
