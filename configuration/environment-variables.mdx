@@ -10,9 +10,9 @@ description: Runtime variables for RPC Core containers and source deployments.
 | Variable | Required | Description | Default |
 |----------|----------|-------------|---------|
 | `SECRET_KEY_BASE` | Prod | Phoenix signing secret (64+ bytes) | - |
-| `PHX_HOST` | Prod | Public hostname | `localhost` |
+| `PHX_HOST` | Recommended in prod | Public hostname for generated URLs | `localhost` |
 | `PHX_SCHEME` | No | External URL scheme | `https` in production |
-| `PHX_SERVER` | Prod | Set to `true` to start HTTP server | - |
+| `PHX_SERVER` | No | Set to `true` to enable the HTTP server when the endpoint configuration does not already enable it; production enables it by default | - |
 | `PORT` | No | HTTP listener port | `4000` |
 | `LASSO_NODE_ID` | Prod | Unique node identifier | `"local"` in dev |
 | `LASSO_DATA_DIR` | No | Base directory for profiles and snapshots | `/data` in Docker; unset outside Docker |
