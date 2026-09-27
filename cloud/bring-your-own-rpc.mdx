@@ -38,8 +38,10 @@ if a provider needs header authentication or a distinct WebSocket endpoint.
 
 Dashboard capability probes and management API probes have different scopes.
 The management probe, when advertised by the live API, checks chain identity and
-head with at most two calls. It does not establish archive, WebSocket or method
-coverage. Test those requirements separately.
+head within the call budget in its
+[live configuration schema](https://lasso.sh/api/v1/management/configuration-schema).
+It does not establish archive, WebSocket or method coverage. Test those
+requirements separately.
 
 ## Choose behavior for your workload
 
