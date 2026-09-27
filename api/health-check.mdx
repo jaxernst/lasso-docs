@@ -5,7 +5,8 @@ description: 'Monitor Lasso RPC instance health and cluster status'
 
 ## Overview
 
-The health check endpoint provides real-time information about your Lasso RPC instance's operational status, uptime, and cluster connectivity.
+In Lasso RPC Core v0.4.5, this endpoint reports application liveness, uptime,
+and cluster connectivity. It does not test whether an upstream can serve a request.
 
 ## Endpoint
 
@@ -18,7 +19,7 @@ GET /api/health
 Returns a JSON object containing instance health information:
 
 <ResponseField name="status" type="string" required>
-  Overall health status of the instance (always "healthy" when responding)
+  Application liveness status ("healthy" when this endpoint responds)
 </ResponseField>
 
 <ResponseField name="timestamp" type="string" required>
@@ -58,7 +59,7 @@ Returns a JSON object containing instance health information:
     </ResponseField>
     
     <ResponseField name="status" type="string" required>
-      Cluster health status: `standalone`, `healthy`, `degraded`, or `critical`
+      Status derived from responding versus connected nodes: `standalone`, `healthy`, `degraded`, or `critical`
     </ResponseField>
   </Expandable>
 </ResponseField>
@@ -91,16 +92,22 @@ The `cluster.status` field indicates the overall health of your cluster deployme
 </ResponseField>
 
 <ResponseField name="healthy">
-  All expected cluster nodes are connected and responding.
+  Every connected node is responding. This does not establish that every expected node is connected.
 </ResponseField>
 
 <ResponseField name="degraded">
-  At least half of the cluster nodes are responding, but some are unavailable.
+  Fewer nodes are responding than connected, but the responding count is at least `floor(nodes_connected / 2)`.
 </ResponseField>
 
 <ResponseField name="critical">
-  Less than half of the expected cluster nodes are responding.
+  The responding count is below `floor(nodes_connected / 2)`.
 </ResponseField>
+
+The status calculation uses `nodes_connected`, not `nodes_total`. Monitor both
+counts to detect missing expected nodes; `cluster.status` alone does not prove
+full cluster coverage. This is the behavior of the released
+[health controller](https://github.com/jaxernst/lasso-rpc/blob/v0.4.5/lib/lasso_web/controllers/health_controller.ex)
+and [topology status function](https://github.com/jaxernst/lasso-rpc/blob/v0.4.5/lib/lasso/cluster/health_topology.ex).
 
 ## Use Cases
 
@@ -144,4 +151,4 @@ fi
 - This endpoint responds immediately and does not perform heavy computation
 - It does not make a live upstream RPC call; pair it with provider and routing monitoring
 - A healthy response confirms application availability, not that every upstream is usable
-- For single-instance deployments, `cluster.enabled` will be `false` and `cluster.status` will be `standalone`
+- When clustering is disabled, `cluster.enabled` is `false` and `cluster.status` is `standalone`
