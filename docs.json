@@ -195,7 +195,7 @@
                 ]
               },
               {
-                "group": "Management API",
+                "group": "Status and metrics",
                 "pages": [
                   "api/health-check",
                   "api/chain-status",
