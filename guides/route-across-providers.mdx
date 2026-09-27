@@ -4,8 +4,8 @@ description: Run Lasso RPC Core in front of your Ethereum, Base, and Arbitrum pr
 ---
 
 Lasso RPC Core is an open-source EVM JSON-RPC proxy for a provider pool you
-control. It selects eligible upstreams from live health and method-specific
-measurements. Replay-safe reads can fail over within the request deadline and
+control. It selects eligible upstreams from live health and recent request
+evidence. Replay-safe reads can fail over within the request deadline and
 dispatch budget. Provider quotas and method coverage still limit the pool.
 
 For a hosted pool, use [Lasso Cloud custom profiles](/cloud/bring-your-own-rpc).
@@ -73,8 +73,9 @@ Check its result before shifting application traffic.
 
 ## Exercise each route
 
-Send an upstream-backed read through each chain. `fastest` uses qualified
-recent latency evidence for the requested method; the default route is
+Send an upstream-backed read through each chain. In the released Core version,
+`fastest` uses qualified recent latency evidence from client requests across
+methods for each provider and transport; the default route is
 `load-balanced`. Neither strategy promises that one provider always wins.
 
 ```bash
