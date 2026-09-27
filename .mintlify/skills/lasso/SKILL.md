@@ -132,7 +132,7 @@ One key can use a different strategy per call site.
 |---|---|---|---|
 | `load-balanced` (default) | Random within the healthiest tier | Background reads, indexers | 1x |
 | `latency-weighted` | Favors recent latency and success, keeps exploring | General user traffic | 1.5x |
-| `fastest` | Lowest recent latency per provider, method and transport; concentrates traffic | Latency-critical paths | 2x |
+| `fastest` | Lowest qualified recent latency for the request's bounded method family and provider transport; concentrates traffic | Latency-critical paths | 2x |
 | `priority` | Configured order within the healthy tier | Custom profiles with a preferred primary | 1x |
 
 ## Install into the app
