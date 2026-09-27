@@ -207,13 +207,15 @@ Core does not authenticate client requests; protect the endpoint at your
 
 ### Error Response
 
+For a request to `/rpc/not-a-chain` in the default `public` profile:
+
 ```json
 {
   "jsonrpc": "2.0",
-  "id": 1,
+  "id": null,
   "error": {
     "code": -32602,
-    "message": "Invalid params: unsupported chain"
+    "message": "Unsupported chain: Unknown chain 'not-a-chain' in profile 'public'"
   }
 }
 ```

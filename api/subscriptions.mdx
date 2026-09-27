@@ -10,7 +10,7 @@ Lasso supports Ethereum JSON-RPC subscriptions over WebSocket for real-time bloc
 Lasso supports the following subscription types:
 
 | Type | Description |
-|------|-------------||
+|------|-------------|
 | `newHeads` | New block headers as they arrive |
 | `logs` | Log events matching a filter |
 
@@ -126,7 +126,7 @@ As matching logs are emitted, the server pushes events:
 The `logs` subscription accepts a filter object with:
 
 | Field | Type | Description |
-|-------|------|-------------||
+|-------|------|-------------|
 | `address` | string or array | Contract address(es) to filter. Omit for all contracts. |
 | `topics` | array | Event signature and indexed parameters. Use `null` for wildcards. |
 
@@ -255,31 +255,14 @@ Each subscription receives a unique subscription ID and events are tagged with t
   "id":1,
   "error":{
     "code":-32602,
-    "message":"Invalid params: unsupported subscription type"
+    "message":"Invalid subscription parameters"
   }
 }
 ```
 
-### Invalid Filter Format
-
-**Request:**
-
-```json
-{"jsonrpc":"2.0","method":"eth_subscribe","params":["logs",{"invalid":"field"}],"id":2}
-```
-
-**Response:**
-
-```json
-{
-  "jsonrpc":"2.0",
-  "id":2,
-  "error":{
-    "code":-32602,
-    "message":"Invalid params: malformed filter"
-  }
-}
-```
+For `logs`, Core accepts a filter object and forwards it to the selected
+upstream. An unsupported field is not rejected locally with a fixed “malformed
+filter” response; upstream validation and error details can vary.
 
 ### Unsubscribe Non-Existent Subscription
 
