@@ -114,15 +114,15 @@ GET /api/metrics/:chain
     </ResponseField>
     
     <ResponseField name="score" type="number">
-      Provider performance score (0-100)
+      Relative provider ranking score; not a percentage or fixed 0-100 range
     </ResponseField>
     
     <ResponseField name="success_rate" type="number">
-      Success rate percentage for this provider
+      Success fraction for this provider (0-1), rounded to two decimals
     </ResponseField>
     
     <ResponseField name="total_calls" type="integer">
-      Total calls routed to this provider
+      Upstream attempts recorded for this provider
     </ResponseField>
     
     <ResponseField name="avg_latency_ms" type="number">
@@ -242,8 +242,8 @@ GET /api/metrics/:chain
     {
       "id": "alchemy-eth-mainnet",
       "name": "Alchemy",
-      "score": 95.6,
-      "success_rate": 99.8,
+      "score": 3.51,
+      "success_rate": 1.0,
       "total_calls": 8432,
       "avg_latency_ms": 115.3,
       "calls_last_minute": 28
@@ -251,8 +251,8 @@ GET /api/metrics/:chain
     {
       "id": "infura-eth-mainnet",
       "name": "Infura",
-      "score": 92.1,
-      "success_rate": 99.1,
+      "score": 3.16,
+      "success_rate": 0.99,
       "total_calls": 4521,
       "avg_latency_ms": 145.8,
       "calls_last_minute": 12
@@ -260,8 +260,8 @@ GET /api/metrics/:chain
     {
       "id": "quicknode-eth-mainnet",
       "name": "QuickNode",
-      "score": 94.3,
-      "success_rate": 99.5,
+      "score": 2.96,
+      "success_rate": 0.99,
       "total_calls": 2281,
       "avg_latency_ms": 128.2,
       "calls_last_minute": 5
@@ -374,7 +374,8 @@ fi
 
 ### Performance Dashboards
 
-Integrate with monitoring tools like Grafana, Datadog, or Prometheus:
+Transform the JSON values for your monitoring backend. Core v0.4.5 does not
+provide a native Prometheus scrape endpoint:
 
 ```javascript
 // Fetch metrics periodically
@@ -399,8 +400,8 @@ reserved fields that return `null` in v0.4.5. Derive a rate from successive
 
 ## Notes
 
-- Metrics are updated in real-time based on actual RPC traffic
+- Available values reflect retained in-process upstream-attempt observations.
 - Performance percentiles (p50, p95, etc.) are calculated over a sliding window
-- Provider scores are calculated based on a combination of latency, success rate, and reliability
+- Provider scores combine the success fraction, average latency, and observation count. They rank providers within the retained data; they are not percentages.
 - The `rpc_performance_by_provider` and `rpc_performance_by_method` fields provide the same data organized differently for convenience
 - System metrics reflect the Erlang VM's resource usage, not the underlying host system
