@@ -329,18 +329,6 @@ GET /api/metrics/:chain
 
 **HTTP Status**: `404 Not Found`
 
-### Missing Chain Parameter
-
-```json
-{
-  "error": "Chain parameter required",
-  "usage": "/api/metrics/{chain_name}",
-  "available_chains": ["ethereum", "polygon", "arbitrum"]
-}
-```
-
-**HTTP Status**: `400 Bad Request`
-
 ## Use Cases
 
 ### Monitor Chain Performance
@@ -398,12 +386,16 @@ setInterval(async () => {
   await sendToDatadog({
     'lasso.chain.success_rate': metrics.chain_performance.success_rate,
     'lasso.chain.p95_latency': metrics.chain_performance.p95_latency,
-    'lasso.chain.rps': metrics.chain_performance.rpc_calls_per_second,
+    'lasso.chain.total_calls': metrics.chain_performance.total_calls,
     'lasso.system.memory_mb': metrics.system_metrics.memory_mb,
     'lasso.system.cpu_percent': metrics.system_metrics.cpu_percent
   });
 }, 30000); // Every 30 seconds
 ```
+
+`rpc_calls_per_second`, `failovers_last_minute`, and `recent_activity` are
+reserved fields that return `null` in v0.4.5. Derive a rate from successive
+`total_calls` samples if your monitoring system needs one.
 
 ## Notes
 
