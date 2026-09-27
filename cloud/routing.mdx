@@ -30,13 +30,13 @@ segment explicitly so the integration does not depend on an implicit default.
 | --- | --- | --- |
 | `load-balanced` | Randomizes providers within the same health tier. | Comparable providers should share first attempts and quota. |
 | `latency-weighted` | Samples a weighted order from recent successful latency after reliability qualification. | You want a performance bias without always selecting one provider. |
-| `fastest` | Ranks measured latency by provider, method, and transport. | Latency matters enough to accept traffic concentration. |
+| `fastest` | Ranks reliability-qualified providers by recent successful latency within a bounded request family and transport. | Latency matters enough to accept traffic concentration. |
 | `priority` | Uses configured provider order within the same health tier. | You want an explicit first preference. |
 
 “Load-balanced” does not guarantee an even split across all configured
 providers. If only one provider is in the healthiest tier, it can receive nearly
 all first attempts. Likewise, `fastest` can converge heavily on one provider for
-one method while choosing another provider for a different method or transport.
+one request family while choosing another provider for a different family or transport.
 
 ## Failover
 
