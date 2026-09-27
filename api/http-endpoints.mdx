@@ -64,12 +64,12 @@ POST /rpc/load-balanced/:chain
 POST /rpc/round-robin/:chain
 ```
 
-Randomly distributes requests across healthy providers.
+Starts from randomized order and gives distinct physical instances a first pass for replay-safe requests.
 
 ```bash
 curl -X POST http://localhost:4000/rpc/load-balanced/ethereum \
   -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0x123...","latest"],"id":1}'
+  -d '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0x0000000000000000000000000000000000000000","latest"],"id":1}'
 ```
 
 ### Latency Weighted
@@ -83,7 +83,7 @@ Probabilistically routes requests with bias toward lower-latency providers.
 ```bash
 curl -X POST http://localhost:4000/rpc/latency-weighted/ethereum \
   -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","method":"eth_call","params":[{"to":"0x...","data":"0x..."},"latest"],"id":1}'
+  -d '{"jsonrpc":"2.0","method":"eth_call","params":[{"to":"0x0000000000000000000000000000000000000000","data":"0x"},"latest"],"id":1}'
 ```
 
 ## Provider Override Endpoints
@@ -118,14 +118,16 @@ curl -X POST http://localhost:4000/rpc/ethereum/alchemy \
 
 ## Profile-Scoped Endpoints
 
-All routes above are available under a profile namespace for multi-tenancy.
+All routes above are available under a profile namespace for per-profile routing.
 
 ```
 POST /rpc/profile/:profile/:chain
 POST /rpc/profile/:profile/fastest/:chain
 POST /rpc/profile/:profile/load-balanced/:chain
+POST /rpc/profile/:profile/round-robin/:chain
 POST /rpc/profile/:profile/latency-weighted/:chain
 POST /rpc/profile/:profile/provider/:provider_id/:chain
+POST /rpc/profile/:profile/:chain/:provider_id
 ```
 
 ### Parameters
@@ -143,6 +145,8 @@ curl -X POST http://localhost:4000/rpc/profile/testnet/fastest/base \
 <Note>
 Without an explicit profile in the URL, requests automatically use the `"public"` profile. Ensure `config/profiles/public.yml` exists at startup.
 </Note>
+
+A profile selects configuration; it does not authenticate clients or isolate tenant traffic.
 
 ## Method and transport policy
 
