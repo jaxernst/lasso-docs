@@ -46,12 +46,15 @@ export ALCHEMY_API_KEY="your-key-here"
 
 ### Health Check
 
-Core v0.4.5 exposes `GET /api/health` for application liveness. Configure your
-orchestrator or load balancer to poll this endpoint for process availability.
+Core v0.5.0 exposes `GET /api/health` for application liveness and
+`GET /api/ready` for route readiness. Configure your orchestrator to use
+health for process availability. Scope readiness with `profile` and `chain`
+when a load balancer needs to assess one application route.
 
 The health endpoint confirms that the application is running and reports cluster
-topology. It does not make live upstream RPC requests or prove route readiness;
-pair it with provider and routing monitoring and an upstream-backed RPC check.
+topology. Readiness uses local eligible HTTP routes and fresh head observations;
+it does not make a live upstream request. Pair both endpoints with an
+upstream-backed RPC check for your actual method and provider pool.
 
 ### HTTPS
 
@@ -64,13 +67,15 @@ Lasso serves HTTP. Terminate TLS at your reverse proxy or load balancer. Set `PH
 - [ ] `SECRET_KEY_BASE` set (64+ bytes)
 - [ ] `PHX_HOST` set to public hostname
 - [ ] HTTP server responds to `GET /api/health`
+- [ ] Intended profile and chain respond to `GET /api/ready?profile=...&chain=...` after head observation warms
 - [ ] `LASSO_NODE_ID` set to a unique, stable value
 - [ ] Provider credentials set when referenced by profile configuration
 - [ ] Health check (`GET /api/health`) monitored by orchestrator
-- [ ] Profile YAML validated (startup crashes on unresolved `${ENV_VAR}`)
+- [ ] Profile YAML validated with `bin/lasso check-config` before `bin/lasso reload`; unresolved `${ENV_VAR}` prevents readiness at cold start
 - [ ] Client request limits enforced at the reverse proxy; profile rate settings only configure the dashboard tester
 - [ ] TLS terminated at reverse proxy / load balancer
-- [ ] Console log drain configured; add a JSON formatter at deployment level if your collector requires JSON
+- [ ] Console log drain configured; set `LOG_FORMAT=json` if your collector requires JSON
+- [ ] Each node's `GET /metrics` scrape restricted to the collector and labeled by instance
 - [ ] RPC and dashboard protected by reverse-proxy authentication or a private network boundary (Lasso OSS has no built-in client authentication)
 - [ ] If clustering: named nodes, shared cookie, DNS discovery, and private distribution connectivity configured; peers visible in `Node.list()`
 

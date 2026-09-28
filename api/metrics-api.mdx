@@ -1,11 +1,11 @@
 ---
 title: 'Metrics API'
-description: 'Retrieve default-profile performance metrics from RPC Core v0.4.5'
+description: 'Retrieve default-profile performance metrics from RPC Core v0.5.0'
 ---
 
 ## Overview
 
-In Lasso RPC Core v0.4.5, the metrics API reports a chain in the default
+In Lasso RPC Core v0.5.0, the metrics API reports a chain in the default
 `public` profile, including provider statistics, RPC method performance, and
 VM resource usage. It does not accept a profile parameter or report a chain
 configured only in a custom profile.
@@ -334,7 +334,7 @@ GET /api/metrics/:chain
 
 This includes chains configured only in another profile. The response's
 `available_chains` lists canonical chain names in `public`; see the released
-[metrics controller](https://github.com/jaxernst/lasso-rpc/blob/v0.4.5/lib/lasso_web/controllers/metrics_controller.ex).
+[metrics controller](https://github.com/jaxernst/lasso-rpc/blob/v0.5.0/lib/lasso_web/controllers/metrics_controller.ex).
 
 ## Use Cases
 
@@ -381,8 +381,9 @@ fi
 
 ### Performance Dashboards
 
-Transform the JSON values for your monitoring backend. Core v0.4.5 does not
-provide a native Prometheus scrape endpoint:
+Transform the JSON values for your monitoring backend. For native Prometheus
+text, scrape `GET /metrics` on each node; see [metrics](/observability/metrics).
+The JSON endpoint remains useful when you need the chain and provider fields:
 
 ```javascript
 // Fetch metrics periodically
@@ -402,7 +403,7 @@ setInterval(async () => {
 ```
 
 `rpc_calls_per_second`, `failovers_last_minute`, and `recent_activity` are
-reserved fields that return `null` in v0.4.5. Derive a rate from successive
+reserved fields that return `null` in v0.5.0. Derive a rate from successive
 `total_calls` samples if your monitoring system needs one.
 
 ## Notes

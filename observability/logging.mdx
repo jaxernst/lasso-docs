@@ -3,7 +3,9 @@ title: Operational logging
 description: Core's request telemetry, event logs, and log-format configuration.
 ---
 
-RPC Core emits operational logs for failover, provider exhaustion, slow requests, and circuit breaker transitions. Production enables `Lasso.TelemetryLogger`; its event categories can be enabled or disabled through application configuration. The standard Logger level and formatter determine the output. The released production configuration uses a chain-prefixed console formatter, not JSON logs.
+RPC Core emits operational logs for failover, provider exhaustion, slow requests, and circuit breaker transitions. Production enables `Lasso.TelemetryLogger`; its event categories can be enabled or disabled through application configuration. Text remains the default console format. Set `LOG_LEVEL=debug|info|warning|error` to control the level and `LOG_FORMAT=json` for one JSON object per line.
+
+JSON entries include UTC time, severity, message, and an allowlist of route and request identifiers. The formatter masks embedded upstream URL paths and queries and common labeled credential assignments. Do not put secrets in arbitrary freeform messages or provider identifiers. Protect the log drain at your deployment boundary.
 
 ```elixir
 config :lasso, Lasso.TelemetryLogger,
@@ -17,4 +19,4 @@ Core does not emit a JSON `rpc.request.completed` log for every request, and it 
 
 For client correlation, opt into [response metadata](/observability/request-metadata). Provider identifiers can appear in logs and metadata, so do not put secrets in them. Protect logs using your deployment's normal access controls.
 
-See the [released observability reference](https://github.com/jaxernst/lasso-rpc/blob/v0.4.5/docs/OBSERVABILITY.md) for the event contract and [TelemetryLogger source](https://github.com/jaxernst/lasso-rpc/blob/v0.4.5/lib/lasso/observability/telemetry_logger.ex) for its handlers.
+See the [released observability reference](https://github.com/jaxernst/lasso-rpc/blob/v0.5.0/docs/OBSERVABILITY.md) for the event contract and [TelemetryLogger source](https://github.com/jaxernst/lasso-rpc/blob/v0.5.0/lib/lasso/observability/telemetry_logger.ex) for its handlers.

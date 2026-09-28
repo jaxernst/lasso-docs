@@ -1,9 +1,9 @@
 ---
 title: Error codes
-description: Released RPC Core v0.4.5 JSON-RPC errors, routing exhaustion, and retry boundaries.
+description: Released RPC Core v0.5.0 JSON-RPC errors, routing exhaustion, and retry boundaries.
 ---
 
-This page describes **Lasso RPC Core v0.4.5**. Cloud has separate access,
+This page describes **Lasso RPC Core v0.5.0**. Cloud has separate access,
 billing, and rate-limit behavior; see [Cloud RPC workload behavior](/cloud/rpc-behavior).
 Core preserves a valid, request-correlated upstream JSON-RPC error's `code`,
 `message`, and optional `data` when the upstream HTTP response is 2xx. An error's numeric code alone does not prove
@@ -41,7 +41,7 @@ permits, with one dispatch and no cross-request affinity. Cloud rejects its
 
 ## Core routing exhaustion
 
-When no eligible attempt can serve a request, Core v0.4.5 returns a JSON-RPC
+When no eligible attempt can serve a request, Core v0.5.0 returns a JSON-RPC
 `-32000` error over **HTTP 200**, preserving the request ID. `data` has
 `reason`, `retry_after_ms`, and `upstream_attempts`. `retry_after_ms` can be
 non-null only for `no_eligible_providers`.
@@ -75,8 +75,8 @@ on current circuit state:
 ```
 
 The shape comes from the released
-[controller regression](https://github.com/jaxernst/lasso-rpc/blob/v0.4.5/test/lasso_web/controllers/rpc_controller_test.exs)
-and [request pipeline](https://github.com/jaxernst/lasso-rpc/blob/v0.4.5/lib/lasso/core/request/request_pipeline.ex).
+[controller regression](https://github.com/jaxernst/lasso-rpc/blob/v0.5.0/test/lasso_web/controllers/rpc_controller_test.exs)
+and [request pipeline](https://github.com/jaxernst/lasso-rpc/blob/v0.5.0/lib/lasso/core/request/request_pipeline.ex).
 Request [metadata](/observability/request-metadata) can show recorded attempts
 when available. It does not promise an exhaustive provider diagnostic schema.
 

@@ -1,9 +1,9 @@
 ---
 title: Error classification
-description: How released RPC Core v0.4.5 decides failover and circuit penalties.
+description: How released RPC Core v0.5.0 decides failover and circuit penalties.
 ---
 
-**Lasso RPC Core v0.4.5** classifies upstream responses and transport failures
+**Lasso RPC Core v0.5.0** classifies upstream responses and transport failures
 to decide whether another provider may be tried and whether a transport's
 circuit breaker should be penalized. Classification is internal routing
 behavior. A valid, request-correlated upstream JSON-RPC error retains its
@@ -11,7 +11,7 @@ original `code`, `message`, and optional `data` in the caller response.
 
 ## Decision order
 
-The released [classifier](https://github.com/jaxernst/lasso-rpc/blob/v0.4.5/lib/lasso/core/support/error_classification.ex)
+The released [classifier](https://github.com/jaxernst/lasso-rpc/blob/v0.5.0/lib/lasso/core/support/error_classification.ex)
 checks structural revert evidence and definitive codes before message patterns.
 For ambiguous codes, it uses bounded message evidence for execution errors,
 provider limits, authentication, and capabilities, then falls back to the code.

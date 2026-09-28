@@ -5,7 +5,7 @@ description: 'Monitor Lasso RPC instance health and cluster status'
 
 ## Overview
 
-In Lasso RPC Core v0.4.5, this endpoint reports application liveness, uptime,
+In Lasso RPC Core v0.5.0, this endpoint reports application liveness, uptime,
 and cluster connectivity. It does not test whether an upstream can serve a request.
 
 ## Endpoint
@@ -71,7 +71,7 @@ Returns a JSON object containing instance health information:
   "status": "healthy",
   "timestamp": "2026-03-03T21:45:30.123456Z",
   "uptime_seconds": 86400,
-  "version": "0.4.5",
+  "version": "0.5.0",
   "cluster": {
     "enabled": true,
     "nodes_connected": 3,
@@ -106,8 +106,28 @@ The `cluster.status` field indicates the overall health of your cluster deployme
 The status calculation uses `nodes_connected`, not `nodes_total`. Monitor both
 counts to detect missing expected nodes; `cluster.status` alone does not prove
 full cluster coverage. This is the behavior of the released
-[health controller](https://github.com/jaxernst/lasso-rpc/blob/v0.4.5/lib/lasso_web/controllers/health_controller.ex)
-and [topology status function](https://github.com/jaxernst/lasso-rpc/blob/v0.4.5/lib/lasso/cluster/health_topology.ex).
+[health controller](https://github.com/jaxernst/lasso-rpc/blob/v0.5.0/lib/lasso_web/controllers/health_controller.ex)
+and [topology status function](https://github.com/jaxernst/lasso-rpc/blob/v0.5.0/lib/lasso/cluster/health_topology.ex).
+
+## Route readiness
+
+`GET /api/ready` checks whether the selected file profile has an eligible HTTP
+route and a fresh head observation for each selected chain. It defaults to the
+`public` profile and all its configured chains. Add `profile` and `chain` query
+parameters to check one route:
+
+```bash
+curl 'http://localhost:4000/api/ready?profile=public&chain=ethereum'
+```
+
+The endpoint returns HTTP `200` with `status: "ready"` when every selected
+chain is ready. It returns HTTP `503` with `status: "not_ready"` otherwise.
+Each item in `checks` includes `chain_id`, `status`, and a `reason`: either
+`no_eligible_upstream`, `stale_or_missing_head`, or `null` when ready. An unknown
+profile or chain returns `reason: "profile_or_chain_not_configured"`.
+
+Readiness uses local state. It does not call an upstream or prove a particular
+RPC method will succeed. Monitor an upstream-backed request separately.
 
 ## Use Cases
 
