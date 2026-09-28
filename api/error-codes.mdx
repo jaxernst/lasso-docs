@@ -80,6 +80,32 @@ and [request pipeline](https://github.com/jaxernst/lasso-rpc/blob/v0.5.0/lib/las
 Request [metadata](/observability/request-metadata) can show recorded attempts
 when available. It does not promise an exhaustive provider diagnostic schema.
 
+## Large `eth_getLogs` queries
+
+Core v0.5.0 turns a recognized provider block-range or result-size limit, or
+its own bounded response-size rejection, into one JSON-RPC error:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "client-request-42",
+  "error": {
+    "code": -32005,
+    "message": "eth_getLogs result exceeds a range or size limit; reduce the block range",
+    "data": {
+      "reason": "log_range_too_large",
+      "action": "reduce_block_range"
+    }
+  }
+}
+```
+
+Retry with a smaller `fromBlock`–`toBlock` span and collect the ranges in your
+application. Lasso does not automatically split the query or try another
+provider for this deterministic limit. A timeout without a recognized limit
+does not imply that reducing the range is the only remedy. Other malformed
+filter arguments retain their original error rather than this action.
+
 ## Upstream errors and retry safety
 
 An upstream can return a JSON-RPC error body with any HTTP status, but the
