@@ -108,7 +108,9 @@ their remaining credit to the account, and ends anonymous management. The owner 
 management or funding separately in **Agent access**.
 
 A claimed app can move to an active custom profile with
-`PUT /api/v1/management/keys/<key_id>/binding`, keeping its secret and URL.
+`PATCH /api/v1/management/keys/<key_id>` and
+`{"profile":"<slug>"}`, keeping its secret and URL. Use an owner-approved
+management credential with access to that profile.
 
 ## Manage existing providers
 
