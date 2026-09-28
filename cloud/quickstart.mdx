@@ -6,7 +6,7 @@ description: Create a key, make a harmless RPC call, and stage the first endpoin
 # First endpoint quickstart
 
 This flow evaluates Lasso with a standard JSON-RPC call. Agents should operate
-within the user’s existing resource and spending authority. For a recoverable
+within the user’s existing resource and spending authority. For a managed
 endpoint with USDC top-ups and owner handoff, follow
 [Operate RPC with an agent](/cloud/agent-flows).
 
@@ -15,6 +15,7 @@ endpoint with USDC top-ups and owner handoff, follow
 ```bash
 curl -sS https://lasso.sh/api/v1/agent/chains
 curl -sS https://lasso.sh/api/v1/agent/pricing
+curl -sS https://lasso.sh/agent.json
 ```
 
 Choose a chain and an explicit strategy. The runtime default is
@@ -22,12 +23,16 @@ Choose a chain and an explicit strategy. The runtime default is
 
 ## 2. Create and save a key
 
+Check `auth.keys.creation_enabled` in the manifest, then create a key:
+
 ```bash
-curl -sS -X POST https://lasso.sh/api/v1/agent/keys
+curl -sS -X POST https://lasso.sh/api/v1/management/keys \
+  -H 'content-type: application/json' -d '{"name":"my-app"}'
 ```
 
-The response includes a full `key` and a ready-to-use endpoint. The full key is
-shown once. Put it in the project's existing secret store; do not print it into
+The response includes `key`, `rpc_url`, and `management_token`. Put the RPC key
+in the project's existing secret store and the management token in the agent's
+private store. Do not print either into
 chat, logs, shell history, screenshots, or source control.
 
 Load the key from the project's secret manager. For a one-off interactive shell,
@@ -81,17 +86,19 @@ or subscription workloads.
 ## 5. Link management when useful
 
 An anonymous key can be linked to a dashboard account without changing its RPC
-URL:
+URL. Use the returned key `id` and management token:
 
 ```bash
 curl -sS -X POST \
-  "https://lasso.sh/api/v1/agent/keys/$LASSO_KEY/claim-link"
+  -H "Authorization: Bearer $LASSO_MANAGEMENT_TOKEN" \
+  "https://lasso.sh/api/v1/management/keys/$LASSO_KEY_ID/claim-link"
 ```
 
-Give the short-lived `claim_url` to the user. Claiming keeps the RPC endpoint and premium scope, moves purchased credit to the
+Give the short-lived `claim_url` to the user. Claiming keeps each key created
+by that token and its RPC URL, moves remaining purchased credit to the
 account’s shared balance, and ends anonymous management. Grant later agent
 management and funding access separately; claiming does not broaden the app key.
 
-For exact key, funding, claim, and session-payment payloads, use
+For exact key, credit purchase, Custom access, and claim payloads, use
 [`/openapi.json`](https://lasso.sh/openapi.json) and
 [`/SKILL.md`](https://lasso.sh/SKILL.md).

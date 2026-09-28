@@ -5,7 +5,11 @@ description: Read Core's node-local metrics and distinguish request events from 
 
 RPC Core's dashboard shows provider connectivity, circuit state, block freshness, upstream attempt rates, success rates, and latency distributions. These observations belong to a node and its available observation window. An unavailable value is not a measured zero.
 
-`GET /api/metrics/:chain` returns JSON metrics for the node-local `public` profile. Its provider and method measurements describe upstream attempts; a client request can make several attempts during failover. The endpoint does not expose a Prometheus scrape format. See the [metrics API](/api/metrics-api) for its fields, units, and nullable values.
+`GET /api/metrics/:chain` returns JSON metrics for the node-local `public` profile. Its provider and method measurements describe upstream attempts; a client request can make several attempts during failover. See the [metrics API](/api/metrics-api) for its fields, units, and nullable values.
+
+`GET /metrics` exposes Prometheus text for node-local routed request counts by chain, provider, method, and outcome. It also reports local circuit state and fresh provider head lag. Request labels occupy at most 4,096 series slots; unknown methods use `other`, and dropped observations increment `lasso_rpc_request_observations_dropped_total`. Circuit and lag samples scan at most 2,048 configured routes per scrape. Missing lag is unknown, not zero.
+
+Scrape each Core node separately and retain an instance label in Prometheus when you aggregate nodes. Restrict `/metrics` to your collector at the proxy or private network boundary: Core does not authenticate that endpoint, and labels can include configured provider identifiers. You can import the [versioned Grafana dashboard](https://github.com/jaxernst/lasso-rpc/blob/v0.5.0/docs/grafana/lasso-core-v1.json) to inspect these series.
 
 The dashboard request tester generates real upstream traffic. Its success, error, and latency counters describe that browser's test run. Open WebSocket connection counts do not establish that every subscription succeeded; the activity feed records confirmations and errors separately.
 
@@ -13,4 +17,4 @@ The request pipeline also emits `[:lasso, :rpc, :request, :stop]` with a millise
 
 VM/system metrics are disabled by default. Set `LASSO_VM_METRICS_ENABLED=true` to collect and display them. Protect metrics and dashboard routes at your ingress when deployed publicly.
 
-See the [released observability reference](https://github.com/jaxernst/lasso-rpc/blob/v0.4.5/docs/OBSERVABILITY.md) for the event schema and [metrics API](/api/metrics-api) for response examples.
+See the [released observability reference](https://github.com/jaxernst/lasso-rpc/blob/v0.5.0/docs/OBSERVABILITY.md) for the event schema and [metrics API](/api/metrics-api) for response examples.

@@ -1,9 +1,9 @@
 ---
 title: 'Provider selection'
-description: 'Eligibility, ranking and live admission in Core v0.4.5'
+description: 'Eligibility, ranking and live admission in Core v0.5.0'
 ---
 
-**Lasso RPC Core v0.4.5** selects upstream channels from the requested file profile
+**Lasso RPC Core v0.5.0** selects upstream channels from the requested file profile
 and chain. A configured provider and an executing channel are different: one
 provider can offer HTTP and WebSocket transports, and multiple configuration
 entries can refer to the same physical upstream.
@@ -61,8 +61,8 @@ chains:
 
 `selection` belongs under the chain. The profile body accepts only the `chains`
 mapping. A `routing.method_overrides` block is not supported. See the released
-[file schema](https://github.com/jaxernst/lasso-rpc/blob/v0.4.5/lib/lasso/config/file_schema.ex)
-and [configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.4.5/docs/CONFIGURATION.md#provider-capabilities).
+[file schema](https://github.com/jaxernst/lasso-rpc/blob/v0.5.0/lib/lasso/config/file_schema.ex)
+and [configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.5.0/docs/CONFIGURATION.md#provider-capabilities).
 
 ## Strategy ranking
 

@@ -145,7 +145,7 @@ each viewer.
 | Signal | Meaning |
 | --- | --- |
 | `401` | API key is missing or invalid. |
-| `402` | Anonymous balance or a session payment is exhausted. |
+| `402` | Anonymous balance is exhausted or a credit or Custom-access purchase requires payment. |
 | `403` | The key is not authorized for the requested profile. |
 | `429` | A Lasso or upstream limit was reached. |
 | `503` | An ingress or service admission failure prevented ordinary routing. A routed JSON-RPC exhaustion error can instead arrive with HTTP 200; inspect the body. |

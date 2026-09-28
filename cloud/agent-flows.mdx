@@ -1,6 +1,6 @@
 ---
 title: Operate RPC with an agent
-description: Create a recoverable endpoint, top it up with prepaid credit, hand it to its owner, and manage custom profiles over HTTP.
+description: Create an endpoint, buy prepaid credit, hand it to its owner, and manage custom profiles over HTTP.
 ---
 
 An agent can run the full endpoint lifecycle over Lasso's HTTP management API
@@ -16,105 +16,95 @@ response schemas.
 </Note>
 
 Three credentials stay separate: the **RPC key** goes in the application's
-secret store, the **management credential** stays with the agent, and **wallet
-authority** stays with the user's signer. None substitutes for another.
+secret store, the **management token or delegated credential** stays with the
+agent, and **wallet authority** stays with the user's signer. None substitutes
+for another.
 
-Before every mutation, persist its `Idempotency-Key` UUID, exact body and
-credential. After a timeout or lost response, replay the same request. A new
-UUID or credential starts new work instead of recovering the original.
+Key creation delivers its secret once. If the response is lost, create another
+key; the first secret cannot be recovered. Delegated profile configuration
+changes require a UUID `Idempotency-Key`: persist it with the exact method,
+path, body and credential, then replay the same request after a lost response.
+For a credit or Custom-access purchase, retry only the same signed payment and
+check its returned `status_url` if settlement is pending.
 
 ## Create a managed endpoint
 
-Generate and persist a management credential (`lasso_mk_` followed by 32 random
-bytes as unpadded base64url) and a UUID, then create the app:
+Check `auth.keys.creation_enabled` in `/agent.json`, then create a key without
+signup or a credential:
 
 ```http
 POST /api/v1/management/keys
-Authorization: Bearer <management credential>
-Idempotency-Key: <UUID>
 Content-Type: application/json
 
 {"name":"trading-bot"}
 ```
 
-The default grant is `keys:read`, `keys:write` and `claims:create`. If the app
-will buy credit, request funding up front:
-
-```json
-{
-  "name": "funded-bot",
-  "permissions": ["keys:read", "keys:write", "claims:create", "funding:read", "funding:write"]
-}
-```
-
-Save `data.key_id` and `data.credential_delivery.secret`. Build the RPC URL from
-`credential_delivery.rpc_url_template` by replacing `{chain}`:
+Save the returned `id`, `key`, `rpc_url` and `management_token` privately.
+The token manages every key it creates until the owner claims them. It does
+not authorize a payment. Append a chain to the returned RPC URL:
 
 ```text
-https://lasso.sh/rpc/k/<secret>/load-balanced/{chain}
+https://lasso.sh/rpc/k/<secret>/load-balanced/base
 ```
 
-`strategy_url_template` also exposes `{strategy}`; valid values are in
-`route_parameters`. The `endpoint` field is only a base URL and returns `422
-rpc_route_required` if called directly.
-
-`GET /api/v1/management/keys/<key_id>` inspects the key without returning its
-secret.
+`GET /api/v1/management/keys/<id>` with the management token as Bearer inspects
+balance and recent usage without returning the RPC secret.
 
 ## Top up with prepaid credit
 
 Prepaid credit buys premium RPC usage on the same key and URL. Rails are USDC.e
-on Tempo (`mpp`) and USDC on Base (`x402`), each capped per quote at the
-`maximum_quote_usd` in `/agent.json`. Use the user's approved budget and a
-separately authorized wallet.
+on Tempo (`mpp`) and USDC on Base (`x402`). Use only a rail with
+`enabled: true` in `/agent.json`, and check its live `minimum_usd` and
+`maximum_usd`. Anyone can pay for a key;
+Lasso credentials are not wallet authority. Stay within the user's approved
+budget.
 
 <Steps>
-  <Step title="Quote">
+  <Step title="Request a payment challenge">
     ```http
-    POST /api/v1/management/keys/<key_id>/funding-operations
-    Authorization: Bearer <management credential>
-    Idempotency-Key: <UUID>
+    POST /api/v1/management/keys/<key_id>/credit
     Content-Type: application/json
 
-    {"rail":"x402","amount_usd":"1","max_usd":"1","payer":"<wallet address>"}
+    {"usd":"1"}
     ```
 
-    Save `data.id`. Check the network, asset, recipient, amount and credited CU.
-    A quote does not move money.
+    The first response is HTTP `402`. Read `PAYMENT-REQUIRED` for x402 or
+    `WWW-Authenticate` for MPP. Check the amount, network, asset, and recipient
+    before asking the wallet to sign. The challenge does not move money.
   </Step>
   <Step title="Pay">
-    `POST /api/v1/management/funding-operations/<id>/pay` returns 402 with the
-    payment challenge. The wallet signs it, then repeat `/pay` with the signed
-    credential:
+    Repeat the same `/credit` request and body with one signed payment:
 
-    | Rail | Management auth | Wallet credential |
-    | --- | --- | --- |
-    | `x402` | `Authorization: Bearer ...` | `PAYMENT-SIGNATURE` |
-    | `mpp` | `X-Lasso-Management-Key` | `Authorization: Payment ...` |
+    | Rail | Wallet credential |
+    | --- | --- |
+    | `x402` | `PAYMENT-SIGNATURE` |
+    | `mpp` | `Authorization: Payment ...` |
 
-    Never send Bearer auth and `X-Lasso-Management-Key` together.
+    A standard x402 or MPP client can handle the challenge and retry. Do not
+    send the management token as the wallet credential.
   </Step>
   <Step title="Confirm">
-    `200` with `data.state=credited` is the durable receipt. x402 credit posts
-    once Lasso verifies the successful Base receipt, without waiting for
-    finality. `202` means the transfer is unresolved: honor `Retry-After`, then
-    call `POST /api/v1/management/funding-operations/<id>/reconcile` on the same
-    ID. Never sign or submit a second payment while one is pending.
+    HTTP `200` returns credited balance and a receipt. HTTP `202` means the
+    transfer is still settling; use the returned `status_url` to check the same
+    purchase. Never sign a second payment while one is pending. Repeating the
+    same signed payment returns its result without crediting twice.
   </Step>
 </Steps>
 
-`GET /api/v1/management/keys/<key_id>/balance` shows the current balance.
+For account-owned Custom access, use the same exchange at
+`POST /api/v1/management/keys/<key_id>/custom-access` with `{"days":7}`.
+The key must be claimed first. See the live daily price in `/agent.json`.
 
 ## Hand the app to its owner
 
 ```http
 POST /api/v1/management/keys/<key_id>/claim-link
-Authorization: Bearer <management credential>
+Authorization: Bearer <management token>
 ```
 
 Give the owner the returned `claim_url` privately; it expires in 10 minutes.
-Claiming keeps the key, URL and premium scope, moves remaining purchased credit
-to the account, and ends anonymous management. The owner grants later
+Claiming keeps the key and URL, moves every key created by the same token and
+their remaining credit to the account, and ends anonymous management. The owner grants later
 management or funding separately in **Agent access**.
 
 A claimed app can move to an active custom profile with

@@ -3,7 +3,7 @@ title: Block height monitoring
 description: How RPC Core observes upstream heads and uses them in routing.
 ---
 
-RPC Core v0.4.5 observes provider block heights so routing can account for lag.
+RPC Core v0.5.0 observes provider block heights so routing can account for lag.
 It polls each configured upstream over HTTP and, when enabled and connected,
 also receives `newHeads` over WebSocket. These observations help select a route;
 they do not establish chain consensus or guarantee that a provider can serve
@@ -72,8 +72,8 @@ for the remaining admission checks.
 - Verify a representative upstream-backed request; a healthy application
   endpoint does not prove that every provider is usable.
 
-The released [block-sync worker](https://github.com/jaxernst/lasso-rpc/blob/v0.4.5/lib/lasso/core/block_sync/worker.ex),
-[registry](https://github.com/jaxernst/lasso-rpc/blob/v0.4.5/lib/lasso/core/block_sync/registry.ex),
-[lag calculation](https://github.com/jaxernst/lasso-rpc/blob/v0.4.5/lib/lasso/providers/lag_calculation.ex),
-and [probe coordinator](https://github.com/jaxernst/lasso-rpc/blob/v0.4.5/lib/lasso/providers/probe_coordinator.ex)
-are the implementation references for v0.4.5.
+The released [block-sync worker](https://github.com/jaxernst/lasso-rpc/blob/v0.5.0/lib/lasso/core/block_sync/worker.ex),
+[registry](https://github.com/jaxernst/lasso-rpc/blob/v0.5.0/lib/lasso/core/block_sync/registry.ex),
+[lag calculation](https://github.com/jaxernst/lasso-rpc/blob/v0.5.0/lib/lasso/providers/lag_calculation.ex),
+and [probe coordinator](https://github.com/jaxernst/lasso-rpc/blob/v0.5.0/lib/lasso/providers/probe_coordinator.ex)
+are the implementation references for v0.5.0.
