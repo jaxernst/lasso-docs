@@ -146,8 +146,13 @@ Content-Type: application/json
   {"name":"backup","url":"<existing backup RPC URL>"}]}}}
 ```
 
-The dry run checks new or changed providers without storing the document or
-requiring Custom access. Repeat the `PUT` without `dry_run` to save it. A
+Start with the URLs and omit optional provider `limits` unless the owner has a
+known policy to enforce. Test historical reads through the saved Lasso route
+and inspect the selected provider before adding an explicit override.
+
+A dry run checks chain identity and reachability for new or changed providers.
+It does not store the document, require Custom access, or prove archive
+coverage. Repeat the `PUT` without `dry_run` to save it. A
 wrong-chain provider rejects the whole document; an unreachable provider can
 remain `verifying` until a later check succeeds. Send `If-Match: <revision>`
 when changing a profile you already read. Omitted providers are removed;
