@@ -107,8 +107,10 @@ One key can use a different strategy per call site.
 | `fastest` | Lowest recent latency per provider, method and transport; concentrates traffic | Latency-critical paths | 2x |
 | `priority` | Configured order within the healthy tier | Custom profiles with a preferred primary | 1x |
 
-These are nominal CU factors; integer CU charges round down per method. Check
-`agent.json` for the exact USD charge of the method and strategy you use.
+For anonymous prepaid keys, these are nominal CU factors; integer CU charges
+round down per method. `agent.json` lists their exact method and strategy USD
+prices. Claimed account keys use account CU metering, so use the account's plan
+and usage rather than this table to assess their cost.
 
 ## Install into the app
 
