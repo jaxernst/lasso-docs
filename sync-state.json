@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "cloud": {
+    "observedDeployedSha": "345ee1e915edbf20f20108aab95dbbcb3915480d"
+  },
+  "core": {
+    "release": "v0.5.0",
+    "sourceSha": "e98587736dfd2ebcf4cd155518f2b7f37059b4dc"
+  },
+  "lastFullAuditAt": "2026-09-28T23:57:25Z"
+}
