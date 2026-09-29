@@ -92,7 +92,8 @@ The chain is a name or decimal ID from the catalog.
 Report the result, serving provider, latency and request ID. For balance and
 the last 24 hours of usage, `GET /api/v1/management/keys/<id>` with the
 management token as Bearer, or `GET /api/v1/management/keys/current` with the
-RPC key as Bearer.
+RPC key as Bearer. The response's `recent_errors` groups failures by code,
+category and last reached provider, with counts and `next_action` guidance.
 
 ## Choose a strategy
 
@@ -105,6 +106,9 @@ One key can use a different strategy per call site.
 | `latency-weighted` | Favors recent latency and success, keeps exploring | General user traffic | 1.5x |
 | `fastest` | Lowest recent latency per provider, method and transport; concentrates traffic | Latency-critical paths | 2x |
 | `priority` | Configured order within the healthy tier | Custom profiles with a preferred primary | 1x |
+
+These are nominal CU factors; integer CU charges round down per method. Check
+`agent.json` for the exact USD charge of the method and strategy you use.
 
 ## Install into the app
 
@@ -267,5 +271,4 @@ HTTP batch uses one rate-limit token per entry; see `x-lasso-rate-limit-*`.
 - Public dashboard: https://lasso.sh/dashboard/public
 - Open-source routing core (Apache-2.0): https://github.com/jaxernst/lasso-rpc
 
-Lasso Cloud is the proprietary managed service on lasso.sh; the routing core is
-open source.
+Lasso Cloud is the managed service on lasso.sh; the routing core is open source.
