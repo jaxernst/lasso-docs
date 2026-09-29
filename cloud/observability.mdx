@@ -29,10 +29,9 @@ The credential and service determine what a compute unit (CU) means:
 
 | Usage path | Unit and evidence |
 | --- | --- |
-| Anonymous key | Method-based cost, adjusted by routing strategy. Read the live [method pricing catalog](https://lasso.sh/api/v1/agent/pricing) and applicable response headers. |
+| Anonymous key | Method-based cost, adjusted by routing strategy. Read `pricing` in the live [service manifest](https://lasso.sh/agent.json) and applicable response headers. |
 | Account key | Request and response byte-based accounting with method multipliers. Account usage is recorded by the service; the anonymous method catalog and per-request USD headers do not describe this balance. |
 | Custom profile | Usage observations and the account's billable balance are separate. Your upstream provider can also charge for traffic. |
-| Paid session | Deployment-dependent method pricing. Production currently disables this path; check [service discovery](https://lasso.sh/agent.json). |
 
 Do not sum CU from different models or infer an account charge by multiplying
 anonymous-key prices by request count. Retain the credential class, profile,
