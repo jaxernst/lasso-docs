@@ -57,7 +57,7 @@ The current Lasso Cloud editor accepts provider URLs. Use the endpoint URL suppl
 
 The editor does not currently expose custom authentication headers or independent HTTP and WebSocket endpoint pairing. A provider that requires header-only authentication, or different HTTP and WebSocket hosts or paths, cannot be fully configured through this editor. Do not assume that changing `https` to `wss` creates a valid WebSocket endpoint, or move a header credential into a URL unless your provider explicitly supports that authentication method.
 
-The management API advertises connection fields in its live configuration schema, including independent HTTP and WebSocket URLs when supported. Check that deployment contract separately from the editor. Neither path promises support for arbitrary provider authentication.
+The management API advertises connection fields in its live configuration schema, including independent HTTP and WebSocket URLs when supported, and a `headers` map that sets secret request headers shared by that provider's HTTP and WebSocket endpoints. A `PUT /api/v1/management/profiles/<slug>` document can set, replace, or clear a provider's `headers`; omitting the field keeps the stored headers. Header names and values are validated with Lasso RPC Core's provider-header rules (a bounded count, no hop-by-hop or WebSocket handshake headers, no control characters). Reads and dry runs never return header values: `GET` reports sorted `header_names`, and dry runs report a `headers_change` of `unchanged`, `set`, `replace`, or `clear`. This header support is API-only; the dashboard editor still has no header input.
 
 Lasso RPC Core supports more transport configuration options when self-hosted; those options are separate from the current Cloud editor.
 
