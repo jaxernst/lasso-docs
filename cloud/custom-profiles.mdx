@@ -11,6 +11,10 @@ credentials, billing lifecycle, and route identity separate.
 
 Start with the [two-provider evaluation](/cloud/bring-your-own-rpc), or use the
 [agent management workflow](/cloud/agent-flows) when available on your deployment.
+The agent API uses a whole-document `PUT /api/v1/management/profiles/<slug>`;
+read the [configuration schema](https://lasso.sh/api/v1/management/configuration-schema)
+and dry-run a change before storing it. Its document operation differs from
+the dashboard editing steps below.
 
 ## Operator journey
 

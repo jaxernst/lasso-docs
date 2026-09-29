@@ -21,11 +21,11 @@ agent, and **wallet authority** stays with the user's signer. None substitutes
 for another.
 
 Key creation delivers its secret once. If the response is lost, create another
-key; the first secret cannot be recovered. Delegated profile configuration
-changes require a UUID `Idempotency-Key`: persist it with the exact method,
-path, body and credential, then replay the same request after a lost response.
-For a credit or Custom-access purchase, retry only the same signed payment and
-check its returned `status_url` if settlement is pending.
+key; the first secret cannot be recovered. A Custom profile `PUT` is the whole
+desired document, so repeat it with the same body after a lost response. Use
+`If-Match` with the revision you read to protect concurrent edits. For a credit
+or Custom-access purchase, retry only the same signed payment and check its
+returned `status_url` if settlement is pending.
 
 ## Create a managed endpoint
 
@@ -114,48 +114,46 @@ management credential with access to that profile.
 
 ## Manage existing providers
 
-An account owner connects an agent in one of two ways. They can create a
-credential in **Agent access**, or approve the agent's request from
-`POST /api/v1/management/access-requests` via the `approval_url` it returns.
-Either way, the agent uses that credential as Bearer auth:
-
-| Request | Purpose |
-| --- | --- |
-| `GET /api/v1/management/me` | Inspect delegated authority and expiry |
-| `GET /api/v1/management/profiles` | List delegated profiles |
-| `POST /api/v1/management/profiles` | Create a draft |
-| `GET /api/v1/management/profiles/<id>/configuration` | Read configuration and its revision, without provider secrets |
-| `POST /api/v1/management/profiles/<id>/plan` | Validate a proposed configuration |
-| `PUT /api/v1/management/profiles/<id>/configuration` | Apply it |
-| `POST /api/v1/management/profiles/<id>/activate` | Activate a configured draft |
-
-A plan request for a single-chain draft:
+An agent asks the owner to connect it to the account:
 
 ```http
-POST /api/v1/management/profiles/<id>/plan
-Authorization: Bearer <owner-delegated management credential>
+POST /api/v1/management/connections
 Content-Type: application/json
 
-{
-  "expected_revision": 0,
-  "configuration": {
-    "chains": [{
-      "chain_id": 8453,
-      "head_policy": "off",
-      "providers": [
-        {"id":"primary","url":"<existing primary RPC URL>"},
-        {"id":"secondary","url":"<existing secondary RPC URL>"}
-      ]
-    }]
-  }
-}
+{"name":"Set up RPC for my app"}
 ```
 
-Apply the same body with `PUT .../configuration` and a UUID. Chain and provider
-lists are complete: omitted entries are removed. Omitting a retained provider's
-URL keeps its stored secret. A provider probe is a bounded chain/head check that
-consumes provider quota. It does not test archival or WebSocket support.
-Suspension is permanent owner removal, not a pause.
+Store the one-time `token` privately and send the owner only `approval_url`.
+Poll `GET /api/v1/management/connections/<id>` with that token as Bearer auth
+no faster than every five seconds. The owner has 15 minutes to approve. Once
+approved, the same token manages ordinary RPC resources across the account;
+`GET /api/v1/management/me` shows its authority. Approval does not authorize
+wallet payment. The owner may narrow the credential through the signed-in
+owner API or revoke it in **Agent access**.
+
+Check `auth.profiles.documents_enabled` in `/agent.json` and fetch
+`GET /api/v1/management/configuration-schema` for the accepted document and
+recipes. Read a profile with `GET /api/v1/management/profiles/<slug>`; provider
+URLs are never returned. Create or replace it with a whole-document `PUT`:
+
+```http
+PUT /api/v1/management/profiles/my-app?dry_run=true
+Authorization: Bearer <approved management token>
+Content-Type: application/json
+
+{"chains":{"base":{"providers":[
+  {"name":"primary","url":"<existing primary RPC URL>"},
+  {"name":"backup","url":"<existing backup RPC URL>"}]}}}
+```
+
+The dry run checks new or changed providers without storing the document or
+requiring Custom access. Repeat the `PUT` without `dry_run` to save it. A
+wrong-chain provider rejects the whole document; an unreachable provider can
+remain `verifying` until a later check succeeds. Send `If-Match: <revision>`
+when changing a profile you already read. Omitted providers are removed;
+omitting a retained provider's `url` keeps its stored secret. Saving a profile
+requires Custom access, which the owner can subscribe to or purchase for a
+claimed key through the separate 402 exchange.
 
 ## Integrate and evaluate
 

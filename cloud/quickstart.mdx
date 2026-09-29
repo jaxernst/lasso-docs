@@ -13,12 +13,12 @@ endpoint with USDC top-ups and owner handoff, follow
 ## 1. Check live support
 
 ```bash
-curl -sS https://lasso.sh/api/v1/agent/chains
-curl -sS https://lasso.sh/api/v1/agent/pricing
 curl -sS https://lasso.sh/agent.json
+curl -sS https://lasso.sh/openapi.json
 ```
 
-Choose a chain and an explicit strategy. The runtime default is
+Choose a chain from `chains` in the manifest and an explicit strategy. Read
+`pricing` and `payments` there before any purchase. The runtime default is
 `load-balanced`, but an explicit URL makes the evaluation reproducible.
 
 ## 2. Create and save a key

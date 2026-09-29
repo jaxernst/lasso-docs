@@ -64,9 +64,11 @@ not instantaneous; a successful local reconciliation does not prove every region
 has observed the change.
 
 For agent-managed changes, follow the [management workflow](/cloud/agent-flows).
-Read the current revision, preview the complete desired configuration, and retain
-one request UUID for an apply and its retries. Omitting a provider from the desired
-list removes it; omitting an existing provider's secret preserves that secret.
+Read the current revision, dry-run the complete desired profile document, then
+apply the same document with `If-Match: <revision>`. Repeating the same `PUT`
+after a lost response is safe; re-read before changing an already updated
+profile. Omitting a provider removes it; omitting an existing provider's URL
+preserves that secret.
 
 If a provider performs poorly, remove or correct it while other eligible providers
 remain available. Keep an application rollback for the evaluation. Provider outages,
