@@ -4,7 +4,7 @@ description: 'How released Core v0.5.0 ranks eligible upstream channels'
 ---
 
 This page describes **Lasso RPC Core v0.5.0**. See [versions and evidence](/releases-and-availability)
-for release identity and [Cloud RPC behavior](/cloud/rpc-behavior) for the managed service.
+for release identity and [Cloud routing](/cloud/routing) for the managed service.
 
 ## Strategy selection
 
@@ -16,7 +16,12 @@ Select a strategy in the request URL:
 | `/rpc/load-balanced/:chain` | Randomized order with distinct-instance first pass for replay-safe calls |
 | `/rpc/fastest/:chain` | Recent reliability-qualified latency |
 | `/rpc/latency-weighted/:chain` | Weighted random order |
+| `/rpc/round-robin/:chain` | Alias for `load-balanced`; not deterministic round-robin rotation |
 | `/rpc/profile/:profile/fastest/:chain` | Explicit file profile and strategy |
+| `/rpc/provider/:provider_id/:chain` | One configured provider; see [provider override](#provider-override) |
+
+The chain must be configured in the profile. WebSocket routes take the same
+segments under `/ws/rpc`.
 
 The application default can be set to `:priority` in an Elixir configuration:
 
@@ -107,20 +112,11 @@ chains:
         priority: 2
 ```
 
-## Health-based tiering
+## Health comes first
 
-Health tier order takes precedence over strategy rank:
-
-1. Closed circuit, not rate-limited.
-2. Half-open circuit, not rate-limited.
-3. Closed circuit, rate-limited.
-4. Half-open circuit, rate-limited.
-
-Open circuits are excluded. Each strategy defines its within-tier order;
-load balanced applies the bounded distinct-instance first pass described above.
-For example, a half-open channel without a rate limit precedes a closed channel
-already marked rate-limited. Live admission can still reject a candidate whose
-state changes after selection.
+Health tiers take precedence over strategy rank, and open circuits are
+excluded. Each strategy orders channels within a tier. The tiers and live
+admission are defined in [provider selection](/concepts/provider-selection#health-tiering).
 
 ## Per-method routing
 
@@ -143,17 +139,10 @@ diagnosis; it is not proof that normal routing would choose that provider.
 
 ## Execution and failover
 
-Replay-safe reads have a three-dispatch limit, bounded candidate admission and an
-absolute deadline. A retriable failure can move to another eligible channel
-within those limits. Raw transaction submission, upstream signing, stateful
-filters and unknown methods have separate single-dispatch rules; a failure does
-not grant permission to replay them on another provider.
-
-Terminal routing exhaustion returns a JSON-RPC error over HTTP 200, not a blanket
-HTTP 503. Request validation and admission failures have their own responses.
-Use [supported methods](/api/supported-methods) for execution-safety boundaries
-and [request metadata](/observability/request-metadata) to distinguish candidates
-from actual recorded attempts.
+A strategy only orders candidates. Dispatch limits, deadlines and which methods
+may fail over are defined in
+[provider selection](/concepts/provider-selection#execution-and-failover) and
+the [method contract](/api/supported-methods).
 
 This contract is grounded in the released [routing guide](https://github.com/jaxernst/lasso-rpc/blob/v0.5.0/docs/ROUTING.md),
 [Fastest](https://github.com/jaxernst/lasso-rpc/blob/v0.5.0/lib/lasso/core/selection/strategies/fastest.ex),

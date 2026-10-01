@@ -36,11 +36,11 @@ distribution or availability guarantees.
 
 ## Block heights and consistent state reads
 
-- [Block regression protection](/cloud/block-continuity) prevents sequential
+- [Block regression protection](/advanced/block-continuity) prevents sequential
   latest-block requests from returning lower heights on the same running Lasso
   server. Turn it On in a custom profile; fleet sharing is automatic and recovery
   after a server switch or restart is best effort.
-- [Read at one block](/cloud/read-at-one-block) uses a standard block-hash selector
+- [Read at one block](/advanced/read-at-one-block) uses a standard block-hash selector
   when several balances or contract reads must refer to the same block. It works
   with protection Off. Ordinary `latest` state calls remain unpinned.
 

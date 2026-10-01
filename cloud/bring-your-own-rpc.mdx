@@ -52,8 +52,8 @@ requirements separately.
 | Several values from one state | Select a block hash and reuse it for all reads | Upstream support for the block-hash selector |
 | Real-time logs | Account-backed WebSocket endpoint | Reconnect, duplicate handling and bounded replay recovery |
 
-[Block regression protection](/cloud/block-continuity) does not make independent
-`latest` contract calls a snapshot. Use [Read at one block](/cloud/read-at-one-block)
+[Block regression protection](/advanced/block-continuity) does not make independent
+`latest` contract calls a snapshot. Use [Read at one block](/advanced/read-at-one-block)
 for related balances, nonces or contract values. Neither feature guarantees finality.
 
 ## Update without changing the app endpoint

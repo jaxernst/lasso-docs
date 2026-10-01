@@ -5,38 +5,29 @@ description: Understand provider eligibility, strategies, health tiers, attempts
 
 # Routing and failure semantics
 
-For each request, Lasso builds an eligible provider set and attempts providers
-in a health-aware order:
-
-1. **Capability filter:** remove providers that cannot serve the chain, method,
-   transport, coarse archival requirement, or configured request limits. The
-   current archive model does not express arbitrary provider history depth.
-2. **Strategy ranking:** order or sample the remaining providers according to
-   the requested strategy.
-3. **Health tiering:** prefer closed, non-rate-limited providers over degraded
-   tiers. Open circuits are excluded.
-4. **Execution:** try providers sequentially until one returns an acceptable
-   response or the candidates are exhausted.
-
-This order matters. A strategy chooses within the eligible, similarly healthy
-set; it does not force traffic to an unhealthy or incapable provider.
+For each request, Lasso finds the providers in the profile that can serve it,
+orders them by health and by the strategy in your URL, and tries them in turn
+until one returns an acceptable response. A strategy chooses within the
+eligible, similarly healthy set; it doesn't force traffic to an unhealthy or
+incapable provider. The routing engine's selection, health tiers and circuit
+breakers are defined once, in [provider selection](/concepts/provider-selection)
+and [circuit breakers](/concepts/circuit-breakers).
 
 ## Strategies
 
-The runtime default is `load-balanced`. During an evaluation, include a strategy
+The default is `load-balanced`. During an evaluation, include a strategy
 segment explicitly so the integration does not depend on an implicit default.
 
-| Strategy | Behavior | Use it when |
-| --- | --- | --- |
-| `load-balanced` | Randomizes providers within the same health tier. | Comparable providers should share first attempts and quota. |
-| `latency-weighted` | Samples a weighted order from recent successful latency after reliability qualification. | You want a performance bias without always selecting one provider. |
-| `fastest` | Ranks reliability-qualified providers by recent successful latency within a bounded request family and transport. | Latency matters enough to accept traffic concentration. |
-| `priority` | Uses configured provider order within the same health tier. | You want an explicit first preference. |
+| Strategy | Use it when |
+| --- | --- |
+| `load-balanced` | Comparable providers should share first attempts and quota. |
+| `latency-weighted` | You want a performance bias without always selecting one provider. |
+| `fastest` | Latency matters enough to accept traffic concentration. |
+| `priority` | You want your Custom profile's provider order as the first preference. |
 
-“Load-balanced” does not guarantee an even split across all configured
-providers. If only one provider is in the healthiest tier, it can receive nearly
-all first attempts. Likewise, `fastest` can converge heavily on one provider for
-one request family while choosing another provider for a different family or transport.
+[Routing strategies](/concepts/routing-strategies) defines each strategy
+precisely. `load-balanced` doesn't guarantee an even split, and `fastest` can
+concentrate traffic on one provider for one kind of request.
 
 ## Failover
 

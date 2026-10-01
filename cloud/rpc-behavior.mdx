@@ -66,17 +66,13 @@ historical scans and WebSocket subscriptions for real-time delivery.
 
 ## WebSocket subscriptions
 
-Lasso multiplexes compatible upstream subscriptions and can fail over within a
-profile. On provider changes it can gap-fill `newHeads` and log subscriptions
-with bounded HTTP backfill and duplicate suppression. The launch subset accepts
-only `newHeads` and `logs`; pending-transaction subscriptions are not included.
+Lasso accepts `newHeads` and `logs` subscriptions, not pending transactions,
+and can move them to another provider within the profile, backfilling the gap
+over HTTP. Recovery is bounded; when it can't complete, the client's
+connection closes explicitly. How recovery works, and what your application
+must still checkpoint, is defined once, in
+[WebSocket subscriptions](/advanced/websocket-subscriptions).
 
-Recovery that exceeds its time, replay, buffer, or ancestry bounds closes the
-affected client explicitly. Lasso does not continue after a silent partial
-backfill.
-
-Within-profile subscription failover should not be confused with system-profile
-HTTP fallback. Cross-profile subscription fallback is not part of the current
-guarantee. Clients must reconnect after network interruption, handle duplicate
-or delayed events, and keep their own durable checkpoint for indexer-grade
-processing.
+Subscriptions don't fall back across profiles. Clients must reconnect after a
+network interruption, handle duplicate or delayed events, and keep their own
+durable checkpoint for indexer-grade processing.
