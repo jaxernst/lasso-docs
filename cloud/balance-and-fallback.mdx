@@ -24,7 +24,7 @@ For a request on `premium`, Lasso takes the first source that applies:
 |---|---|---|
 | Included usage from a subscription remains this month | Premium providers | From included usage |
 | The balance covers the request | Premium providers | From the balance |
-| The money ran out, and the account paid within the last 30 days | Public providers, `x-lasso-fallback: payment` | No |
+| The money ran out less than 30 days ago (the window restarts whenever the account pays), and the account has paid before | Public providers, `x-lasso-fallback: payment` | No |
 | A person sponsors the account, and its free allowance remains this month | Public providers, `x-lasso-fallback: free` | No; counts against the allowance |
 | None of the above | Not served: 402 `balance_exhausted`, naming the credit URL | No |
 

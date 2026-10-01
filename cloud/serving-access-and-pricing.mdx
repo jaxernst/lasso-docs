@@ -39,7 +39,7 @@ served:
 | The URL names | Served as |
 |---|---|
 | `premium`, or no profile with a `premium` default | `premium` while included usage or balance covers it; otherwise `public`, marked with `x-lasso-fallback` (see [balance and payment fallback](/cloud/balance-and-fallback)) |
-| `public` | `public`, always on public providers |
+| `public` | `public`, always on public providers and uncharged, while the account's balance or included usage, grace window or free allowance would serve it; otherwise 402 `balance_exhausted`. It counts against the free allowance only when free access is what serves it |
 | A Custom profile | `custom` while your account has Custom access; otherwise `premium`, marked `x-lasso-fallback: profile` |
 
 Choose `public` explicitly for traffic that doesn't need premium providers:
@@ -48,7 +48,7 @@ segment:
 
 ```ts
 const premium = `${process.env.LASSO_RPC_URL}/fastest/base`;
-const free = `${process.env.LASSO_RPC_URL}/profile/public/base`;
+const background = `${process.env.LASSO_RPC_URL}/profile/public/base`;
 ```
 
 ## What a premium request costs

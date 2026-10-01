@@ -113,6 +113,8 @@ Management errors use one envelope:
 | `not_found` | Check the ID; resources outside your account look absent |
 | `invalid_field`, `unknown_field` | Correct the named field |
 | `key_limit` | Revoke an unused key |
+| `key_revoked` | Use the current key |
+| `account_closed` | The provisional account closed; create a new key |
 | `profile_limit` | Delete a Custom profile |
 | `custom_access_required` | Buy access (`POST /api/v1/accounts/{id}/custom-access`) or subscribe |
 | `invalid_config` | Fix the field paths listed in `details` |
