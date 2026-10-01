@@ -1,59 +1,87 @@
 ---
-title: Routing and failure semantics
-description: Understand provider eligibility, strategies, health tiers, attempts, and fallback
+title: Routing
+description: How Lasso Cloud picks a provider for each request, what each strategy does, and when it fails over
 ---
 
-# Routing and failure semantics
+# Routing
 
-For each request, Lasso finds the providers in the profile that can serve it,
-orders them by health and by the strategy in your URL, and tries them in turn
-until one returns an acceptable response. A strategy chooses within the
-eligible, similarly healthy set; it doesn't force traffic to an unhealthy or
-incapable provider. The routing engine's selection, health tiers and circuit
-breakers are defined once, in [provider selection](/concepts/provider-selection)
-and [circuit breakers](/concepts/circuit-breakers).
+For every request, Lasso finds the providers in the profile that can serve it,
+orders them by your strategy, and fails over to the next one when an error is
+safe to retry. You choose the strategy per call site in the URL. This page
+covers what that means on Lasso Cloud; the routing engine's full behavior is
+documented once, in the RPC Core concepts linked below.
 
-## Strategies
+```bash
+curl -sS "$LASSO_RPC_URL/fastest/base?include_meta=body" \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}' \
+  | jq '.lasso_meta | {strategy, candidate_providers, selected_provider, retries}'
+```
 
-The default is `load-balanced`. During an evaluation, include a strategy
-segment explicitly so the integration does not depend on an implicit default.
+## How a provider is chosen
 
-| Strategy | Use it when |
-| --- | --- |
-| `load-balanced` | Comparable providers should share first attempts and quota. |
-| `latency-weighted` | You want a performance bias without always selecting one provider. |
-| `fastest` | Latency matters enough to accept traffic concentration. |
-| `priority` | You want your Custom profile's provider order as the first preference. |
+1. **Find candidates.** Providers in the profile that serve the chain and
+   transport. Known method gaps, history limits and range limits steer the
+   request away from providers that can't serve it; a provider is still tried
+   when its support is unknown or every provider is impaired.
+2. **Order by health.** Providers with an open circuit are skipped. Healthy
+   providers come before rate-limited or recovering ones.
+3. **Order by strategy.** Within each health group, your strategy sets the
+   order.
+4. **Send, and fail over.** A read that fails in a way that's safe to retry
+   moves to the next provider, within one request deadline.
 
-[Routing strategies](/concepts/routing-strategies) defines each strategy
-precisely. `load-balanced` doesn't guarantee an even split, and `fastest` can
-concentrate traffic on one provider for one kind of request.
+[Provider selection](/concepts/provider-selection) and
+[circuit breakers](/concepts/circuit-breakers) describe each step in detail.
 
-## Failover
+## Choose a strategy
 
-Lasso advances to the next eligible provider for failures classified as safe to
-retry. A routed JSON-RPC exhaustion error can be returned in an HTTP 200
-response; authentication and admission failures can use distinct HTTP statuses.
-Inspect both the HTTP status and the JSON-RPC `error` object. The
-number of providers in a profile is therefore not itself a guarantee: providers
-must overlap on the requested capability and remain in usable health states.
+| Strategy | What it does | Use it for |
+|---|---|---|
+| `load-balanced` (default) | Spreads requests in random order across healthy providers | Backends, indexers, quota spreading |
+| `latency-weighted` | Random order weighted toward providers with lower recent latency | User-facing reads |
+| `fastest` | Tries the provider with the lowest recent latency for this kind of request first | Trading and latency-critical paths |
+| `priority` | Follows your Custom profile's provider order | A preferred primary with backups |
 
-System profiles can have ordered fallback phases. Premium is designed to fall
-back to public after premium-provider exhaustion so an eligible request has the
-greatest chance to succeed. The request retains its authorized service-profile
-identity even when an internal fallback phase serves it. Custom profiles do not
-implicitly borrow a different account's providers.
+Latency is measured on the machine serving you, per provider, transport and
+kind of request (a family of related methods). The
+[routing strategies](/concepts/routing-strategies) concept page defines each
+strategy precisely.
 
-Provider-override routes are diagnostic: they select one explicit provider and
-do not use cross-profile fallback.
+On `public`, and on any request served by payment fallback or free access,
+every strategy is served as `load-balanced`. Premium and Custom serve all four.
+Strategies price differently on premium; see
+[serving access and pricing](/cloud/serving-access-and-pricing).
 
-## What failover does not imply
+## Failover on Lasso Cloud
 
-Failover does not make provider-local state portable. A filter ID created by one
-provider, an application-managed transaction sequence, or a provider-specific
-extension can require affinity or application recovery. Read
-[RPC workload behavior](/cloud/rpc-behavior) before treating those workloads like
-stateless reads.
+| Situation | What happens |
+|---|---|
+| A provider times out or errors on a read | The next provider in the order is tried, within the request deadline |
+| Every premium provider fails | The request is retried on Lasso's public providers and marked `x-lasso-fallback: availability` |
+| Every provider in a Custom profile fails | The request fails with the JSON-RPC error. Custom profiles never borrow providers from other profiles or accounts |
+| A signed transaction's response is lost | Lasso doesn't resend it. Look up the transaction hash before you do |
+| A provider keeps failing | Its circuit opens. After a cooldown, a trial request decides whether it returns |
 
-For implementation-level algorithms and tuning, see RPC Core's
-[provider selection](/concepts/provider-selection).
+Pin one provider with `<base>/provider/<name>/<chain>` to debug it. A pin has
+no failover.
+
+## Limits
+
+- Routing exhaustion arrives as a JSON-RPC error inside an HTTP 200 response.
+  Check the body's `error`, not only the status.
+- `load-balanced` doesn't promise an even split. If only one provider is
+  healthy, it gets nearly every first attempt.
+- `fastest` can concentrate traffic on one provider for one kind of request.
+- Each region chooses providers from its own measurements.
+- Failover helps only when providers overlap on the method, history and chain
+  you need. Two URLs on the same provider account can fail together.
+
+## Next
+
+- [RPC method behavior](/cloud/rpc-behavior): reads, history, transactions,
+  filters and subscriptions.
+- [Routing evidence](/cloud/observability): see which provider served a
+  request and why.
+- [Multi-provider failover](/cloud/multi-provider-rpc-failover): test the
+  failure you need to survive.

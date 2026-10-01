@@ -1,0 +1,57 @@
+---
+title: Routing overhead benchmark
+description: Measured latency Lasso's routing engine adds at 10,000 requests per second, and what the result does and doesn't show
+---
+
+# Routing overhead benchmark
+
+Lasso measured how much latency its routing engine adds in front of an
+upstream: under 1.1 ms at p95, at 10,000 requests per second, across five
+isolated trials. Use this result to bound Lasso's own cost on a request path;
+your provider's latency and your network dominate the rest.
+
+| Result | Value |
+|---|---|
+| Median added p95 across trials | 0.95 ms |
+| Added p95, all five trials | 0.70 to 1.08 ms |
+| Routed requests successful | 750,000 of 750,000 |
+
+The full report, raw results and harness revision are on
+[lasso.sh/benchmarks/routing-overhead.html](https://lasso.sh/benchmarks/routing-overhead.html).
+
+## How it was measured
+
+| Trial | Direct p95 | Routed p95 | Added p95 |
+|---|---|---|---|
+| 1 | 5.69 ms | 6.64 ms | 0.95 ms |
+| 2 | 5.74 ms | 6.44 ms | 0.70 ms |
+| 3 | 5.61 ms | 6.69 ms | 1.08 ms |
+| 4 | 5.73 ms | 6.53 ms | 0.81 ms |
+| 5 | 5.73 ms | 6.70 ms | 0.97 ms |
+
+- Each trial sent 150,000 `eth_getBalance` requests over HTTP in 15 seconds,
+  at fixed arrivals of 10,000 per second, after a 5-second warmup, through the
+  `fastest` strategy to a synthetic upstream that answers in 1 ms.
+- "Added p95" is routed p95 minus the paired direct-to-upstream p95, measured
+  from each request's intended arrival time.
+- Lasso ran on four BEAM schedulers pinned to four CPUs in a fresh container
+  per trial, on a Linux/arm64 Docker host. Load generators and upstreams had
+  their own CPUs.
+- A separate 60-second instrumented run completed 600,000 of 600,000 requests
+  with 2.29 ms added p95.
+
+## Limits
+
+- This is routing-engine overhead, not a hosted-capacity promise. It excludes
+  internet ingress, authentication, metering, multiple regions, WebSocket
+  subscriptions and real providers.
+- One method against one controlled upstream. Other methods, payload sizes,
+  retries and deployment shapes can differ.
+- A difference of two p95 values is a paired distribution comparison, not a
+  per-request overhead.
+
+## Next
+
+- [Route latency-sensitive reads](/cloud/latency-sensitive-rpc-reads): measure
+  your own path.
+- [Routing](/cloud/routing): what the engine does with that time.

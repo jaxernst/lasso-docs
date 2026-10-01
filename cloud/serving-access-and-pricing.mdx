@@ -1,0 +1,125 @@
+---
+title: Serving access and pricing
+description: What serves each request (premium, public or Custom), what it costs in USD, and how compute units measure included usage
+---
+
+# Serving access and pricing
+
+Every request Lasso serves has one **serving access**: `premium`, `public` or
+`custom`. It decides which providers answer, what the request costs, which
+strategies apply and which rate limit counts it, and every response tells you
+which one served it. Read this page to choose a pool and predict your bill;
+read [balance and payment fallback](/cloud/balance-and-fallback) for what
+happens when money runs out.
+
+```bash
+curl -sS -D - -o /dev/null "$LASSO_RPC_URL/fastest/base" \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}' \
+  | grep -iE '^x-lasso-(access|usd|cu|fallback)'
+```
+
+```http
+x-lasso-access: premium
+x-lasso-cu: 2
+x-lasso-usd: 0.000010
+```
+
+## The three kinds of serving access
+
+| Serving access | Providers | Strategies | Price | Rate limit |
+|---|---|---|---|---|
+| `premium` | Lasso's premium pool | All four | Charged per request | 100 RPS |
+| `public` | Lasso's public pool | `load-balanced` only | Uncharged | 30 RPS |
+| `custom` | Your Custom profile's providers | All four | Uncharged; your Custom subscription covers it | 1,000 RPS per profile |
+
+Your URL names the profile, and your account's payment state decides how it is
+served:
+
+| The URL names | Served as |
+|---|---|
+| `premium`, or no profile with a `premium` default | `premium` while included usage or balance covers it; otherwise `public`, marked with `x-lasso-fallback` (see [balance and payment fallback](/cloud/balance-and-fallback)) |
+| `public` | `public`, always on public providers and uncharged, while the account's balance or included usage, grace window or free allowance would serve it; otherwise 402 `balance_exhausted`. It counts against the free allowance only when free access is what serves it |
+| A Custom profile | `custom` while your account has Custom access; otherwise `premium`, marked `x-lasso-fallback: profile` |
+
+Choose `public` explicitly for traffic that doesn't need premium providers:
+background jobs, development, or a browser app. Same key, different path
+segment:
+
+```ts
+const premium = `${process.env.LASSO_RPC_URL}/fastest/base`;
+const background = `${process.env.LASSO_RPC_URL}/profile/public/base`;
+```
+
+## What a premium request costs
+
+A request's size in **compute units (CU)** is its **method weight** times its
+**strategy factor**. Its price is that CU at a published USD rate. A cheap read
+like `eth_blockNumber` weighs less than `eth_getLogs`, and a trace weighs
+more. The strategy factor is the trade you make between latency and cost:
+
+| Strategy | Factor |
+|---|---|
+| `load-balanced` | 1x |
+| `latency-weighted` | 1.5x |
+| `fastest` | 2x |
+| `priority` | 1x |
+
+Every method's weight and price is in
+[chains and prices](/cloud/reference/chains-and-prices), generated from the
+live [`agent.json`](https://lasso.sh/agent.json). Every response states its
+size in `x-lasso-cu` and its charge in `x-lasso-usd`, so nothing is a surprise.
+A batch is priced per item, a WebSocket request costs the same as over HTTP,
+and each subscription notification is priced as an `eth_subscription` entry.
+
+Money is always in USD: prices, balances, purchases and charges. Included
+usage, from free access or a subscription, is counted in CU per month.
+
+## Subscriptions and free access
+
+| | What it gives your account | How you get it |
+|---|---|---|
+| **Free access** | A monthly CU allowance served on public providers, uncharged | A person on the account sponsors it; each person sponsors up to three accounts |
+| **Pro** | A monthly CU allowance on premium providers; beyond it, requests draw on the balance | Subscribe in the dashboard |
+| **Custom** | Routing over your own providers on up to five Custom profiles, unmetered | Subscribe in the dashboard, or buy days with a wallet, even before anyone signs up |
+
+Free access belongs to accounts that a person has joined. When you sign in
+and create or claim your first account, you sponsor it, and you can sponsor
+two more. A provisional account an agent created has no free access until a
+person claims it.
+
+Current subscription prices and allowances are on
+[lasso.sh/pricing](https://lasso.sh/pricing) and in `agent.json`.
+
+## Rate limits
+
+Limits apply per account, not per key, and per place requests are served:
+
+- One **managed bucket** holds every `premium` and `public` request from all
+  of the account's keys.
+- Each Custom profile has its own bucket while it serves `custom`.
+
+Every response carries the IETF `RateLimit-Policy` and `RateLimit` headers,
+named after the bucket (`managed` or the Custom profile's slug). Over the
+limit, Lasso answers 429 `rate_limited` with `Retry-After`. Need more? Ask
+Lasso support for an account override.
+
+## Limits
+
+- `public` serves `load-balanced` only. A request for another strategy is
+  served as `load-balanced`, and `lasso_meta.strategy` reports what was used.
+  The same holds for any request served by payment fallback or free access.
+- Public providers' method coverage and historical depth can be narrower than
+  the premium pool's.
+- Rate limits are enforced on each serving machine.
+- Custom traffic has no request price, but your upstream providers may charge
+  you for it.
+
+## Next
+
+- [Balance and payment fallback](/cloud/balance-and-fallback): where the money
+  comes from and what happens at zero.
+- [Keys, URLs and profiles](/cloud/keys-and-profiles): default profiles and
+  scoped keys.
+- [Chains and prices](/cloud/reference/chains-and-prices): the live price
+  table.

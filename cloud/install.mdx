@@ -1,0 +1,132 @@
+---
+title: Install Lasso in your app
+description: Point viem, ethers, Foundry, Hardhat or an indexer at Lasso by changing one URL, then roll out one request path at a time
+---
+
+# Install Lasso in your app
+
+Lasso is standard EVM JSON-RPC, so installing it means changing one URL. Keep
+your client library, your contract calls and your secret store. This page shows
+the URL in each common client, how to handle browser apps, and how to move
+traffic safely.
+
+```bash
+# .env
+LASSO_RPC_URL=https://lasso.sh/rpc/k/lasso_…
+LASSO_WS_URL=wss://lasso.sh/ws/rpc/k/lasso_…
+```
+
+Get these values from the [quickstart](/cloud/quickstart). Every URL below is
+built from them as `<base>[/profile/<profile>][/<strategy>]/<chain>`; see
+[keys, URLs and profiles](/cloud/keys-and-profiles).
+
+## viem
+
+```ts
+import { createPublicClient, http, webSocket } from "viem";
+import { base } from "viem/chains";
+
+const client = createPublicClient({
+  chain: base,
+  transport: http(`${process.env.LASSO_RPC_URL}/latency-weighted/base`),
+});
+
+const subscriber = createPublicClient({
+  chain: base,
+  transport: webSocket(`${process.env.LASSO_WS_URL}/base`),
+});
+```
+
+## ethers v6
+
+```ts
+import { JsonRpcProvider, WebSocketProvider } from "ethers";
+
+const provider = new JsonRpcProvider(
+  `${process.env.LASSO_RPC_URL}/latency-weighted/base`,
+  8453,
+  { staticNetwork: true, polling: true },
+);
+
+const subscriber = new WebSocketProvider(`${process.env.LASSO_WS_URL}/base`, 8453);
+```
+
+`polling: true` makes `provider.on(...)` poll with `eth_getLogs` instead of
+HTTP filters, which Lasso doesn't serve. For push delivery, use the WebSocket
+provider.
+
+## Foundry, Hardhat and indexers
+
+```bash
+cast block-number --rpc-url "$LASSO_RPC_URL/base"
+forge script Deploy --rpc-url "$LASSO_RPC_URL/fastest/base" --broadcast
+```
+
+```ts
+// hardhat.config.ts
+networks: {
+  base: { url: `${process.env.LASSO_RPC_URL}/fastest/base` },
+},
+```
+
+Indexers take the same URL wherever they take an RPC endpoint. Use
+`load-balanced` for backfills; see
+[indexer backfills](/cloud/indexer-backfills).
+
+## Choose the URL per call site
+
+| Call site | URL |
+|---|---|
+| User-facing reads | `$LASSO_RPC_URL/latency-weighted/<chain>` |
+| Trading, quoting, liquidations | `$LASSO_RPC_URL/fastest/<chain>` |
+| Backfills and batch jobs | `$LASSO_RPC_URL/load-balanced/<chain>` |
+| Development, tests and work that doesn't need premium | `$LASSO_RPC_URL/profile/public/<chain>` |
+| Your own providers | `$LASSO_RPC_URL/profile/<slug>/<strategy>/<chain>` |
+| Subscriptions | `$LASSO_WS_URL/<chain>` |
+
+## Browser and mobile apps
+
+A URL that ships to a browser or a phone is public. Give that app its own key,
+scoped to the profiles it needs, and keep unscoped keys on servers:
+
+```bash
+curl -sS https://lasso.sh/api/v1/keys \
+  -H "authorization: Bearer $LASSO_MANAGEMENT_TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"name":"web","default_profile":"public","allowed_profiles":["public"]}'
+```
+
+A visitor who copies that key can only send public traffic. It shares your
+account's rate limit and, on an account with no balance, its free monthly
+allowance, but it never spends your balance.
+
+## Roll out one path at a time
+
+1. Pick one stateless read path your app already measures, such as a balance
+   or `eth_blockNumber` poller.
+2. Point it at Lasso with an explicit strategy, and keep the previous URL as a
+   rollback.
+3. Compare correctness, error rate, latency and head freshness against the old
+   endpoint, and check [routing evidence](/cloud/observability) to see which
+   provider served each request.
+4. Move historical reads, transaction sending and subscriptions as separate
+   steps; each has its own behavior in
+   [RPC method behavior](/cloud/rpc-behavior).
+5. Expand traffic once your own evidence supports it.
+
+## Limits
+
+- Lasso rejects HTTP filter methods (`eth_newFilter` and friends). Use
+  `eth_getLogs` or WebSocket subscriptions.
+- A signed transaction is sent to one provider and not retried after dispatch.
+  If the response is lost, look up the transaction hash before resending.
+- JSON-RPC batches are routed per item; a batch is not pinned to one provider
+  or one block.
+
+## Next
+
+- [Keys, URLs and profiles](/cloud/keys-and-profiles): defaults, scoping and
+  rotation.
+- [Routing](/cloud/routing): what each strategy does.
+- [Multi-provider failover](/cloud/multi-provider-rpc-failover): test the
+  failure you need to survive.

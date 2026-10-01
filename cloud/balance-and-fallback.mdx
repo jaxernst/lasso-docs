@@ -1,0 +1,107 @@
+---
+title: Balance and payment fallback
+description: One USD balance per account, how to top it up, and why your app keeps serving when it runs out
+---
+
+# Balance and payment fallback
+
+Each account has one USD balance that every key draws on. Anyone can top it up
+with USDC through a standard 402 exchange, with no Lasso credential. If your
+account has paid before and the money runs out, your app keeps serving on
+public providers for 30 days while you top up.
+
+```bash
+curl -sS https://lasso.sh/api/v1/accounts/current \
+  -H "authorization: Bearer $LASSO_MANAGEMENT_TOKEN" \
+  | jq '{balance_usd, managed_access, fallback, included_usage}'
+```
+
+## Where premium requests are paid from
+
+For a request on `premium`, Lasso takes the first source that applies:
+
+| Your account | Served from | Charged |
+|---|---|---|
+| Included usage from a subscription remains this month | Premium providers | From included usage |
+| The balance covers the request | Premium providers | From the balance |
+| The money ran out less than 30 days ago (the window restarts whenever the account pays), and the account has paid before | Public providers, `x-lasso-fallback: payment` | No |
+| A person sponsors the account, and its free allowance remains this month | Public providers, `x-lasso-fallback: free` | No; counts against the allowance |
+| None of the above | Not served: 402 `balance_exhausted`, naming the credit URL | No |
+
+A provisional account that has never paid has only its starting grant: once
+it's spent, requests return `balance_exhausted` until someone tops it up.
+
+## Your app keeps serving when the balance runs out
+
+Say your trading bot's balance hits zero at 3 a.m. The next response looks like
+this, and nothing fails:
+
+```http
+HTTP/1.1 200 OK
+x-lasso-access: public
+x-lasso-fallback: payment
+x-lasso-usd: 0
+```
+
+The account view shows when the grace window ends in `fallback.until`. Open
+WebSocket subscriptions keep streaming from the upstreams they're on. Top up,
+and the next request is served by premium providers again, with no reconnect
+and no redeploy.
+
+## Top up
+
+Credit the account. Lasso answers 402 with a challenge for every enabled rail:
+x402 in `PAYMENT-REQUIRED`, MPP in `WWW-Authenticate: Payment`.
+
+```http
+POST https://lasso.sh/api/v1/accounts/{account_id}/credit
+Content-Type: application/json
+
+{"usd":"20"}
+```
+
+1. Sign one challenge with a standard x402 or MPP client and the payer's
+   wallet.
+2. Repeat the same request with `PAYMENT-SIGNATURE` (x402) or
+   `Authorization: Payment` (MPP).
+3. `200` returns `credited_usd`, `balance_usd` and a receipt. `202` means
+   settlement is pending: poll its `status_url`, and never sign a second
+   payment for the same top-up.
+
+Resubmitting the same signed payment returns that payment's result and never
+credits twice. Rails, networks, assets and the per-purchase range are in
+[`agent.json`](https://lasso.sh/agent.json). People can also subscribe in the
+dashboard.
+
+## Watching spend
+
+| Signal | What it tells you |
+|---|---|
+| `x-lasso-usd` | This request's charge; `0` when included usage, free access, Custom access or payment fallback covered it |
+| `x-lasso-balance-usd` | The balance as the serving machine knows it after this charge |
+| `x-lasso-access` | `premium`, `public` or `custom` |
+| `x-lasso-fallback` | Why a request was served somewhere other than the profile it named |
+| `GET /api/v1/accounts/{id}` | The authoritative balance, subscriptions, included usage, access and grace window |
+
+## Limits
+
+- The grace window lasts 30 days from when paid spending power runs out, and
+  restarts every time the account pays.
+- Payment fallback serves public providers at the public rate limit
+  (30 RPS) with `load-balanced` only.
+- Serving machines reconcile usage every 10 seconds, so concurrent responses
+  can report slightly different balances, and a balance can dip below zero by
+  about one interval of spend. Balances show negative values truthfully, and
+  the next top-up repays them first.
+- When an account finally stops being served, each region closes its open
+  WebSocket connections with `balance_exhausted` and the credit URL.
+- The management token can't pay. Every purchase needs a wallet signature.
+
+## Next
+
+- [Serving access and pricing](/cloud/serving-access-and-pricing): what each
+  request costs.
+- [Accounts, people and agents](/cloud/accounts-and-agents): who owns the
+  balance and who can top it up.
+- [Set up production RPC with an agent](/cloud/guides/production-rpc-with-an-agent):
+  fund once, then hand off.

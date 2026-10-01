@@ -5,7 +5,7 @@ description: Measured historical-state samples, known gaps, and a practical arch
 
 Test the exact historical methods, blocks and selectors your application needs.
 A successful old header or log query does not prove that an upstream can serve
-state at that block—or that customer routing will reach it.
+state at that block, or that customer routing will reach it.
 
 ## What we measured
 
@@ -85,4 +85,4 @@ method is unsupported. No sustained-load or availability guarantee follows.
    and effective profile; preserve failures separately.
 3. Repeat from your deployment regions under representative load and an isolated
    test upstream failure. Measure correctness, latency, request volume and quota use.
-   Keep the previous endpoint available during a [staged rollout](/cloud/adoption).
+   Keep the previous endpoint available during a [staged rollout](/cloud/install#roll-out-one-path-at-a-time).

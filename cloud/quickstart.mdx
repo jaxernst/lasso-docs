@@ -1,104 +1,172 @@
 ---
-title: First endpoint quickstart
-description: Create a key, make a harmless RPC call, and stage the first endpoint change
+title: Quickstart
+description: Create a Lasso endpoint in one request, call it, and install it in your app
 ---
 
-# First endpoint quickstart
+# Quickstart
 
-This flow evaluates Lasso with a standard JSON-RPC call. Agents should operate
-within the user’s existing resource and spending authority. For a managed
-endpoint with USDC top-ups and owner handoff, follow
-[Operate RPC with an agent](/cloud/agent-flows).
+Create a working Lasso endpoint, call it, and put it in your app. Agents can do
+all of it over HTTP with no signup; people can do the same in the dashboard.
+Both paths end in the same place: an account with one key whose URL your app
+keeps in `.env`.
 
-## 1. Check live support
+## With an agent, through the API
+
+### 1. Create an endpoint
 
 ```bash
-curl -sS https://lasso.sh/agent.json
-curl -sS https://lasso.sh/openapi.json
+curl -sS https://lasso.sh/api/v1/keys \
+  -H 'content-type: application/json' -d '{"name":"prod"}'
 ```
 
-Choose a chain from `chains` in the manifest and an explicit strategy. Read
-`pricing` and `payments` there before any purchase. The runtime default is
-`load-balanced`, but an explicit URL makes the evaluation reproducible.
-
-## 2. Create and save a key
-
-Check `auth.keys.creation_enabled` in the manifest, then create a key:
-
-```bash
-curl -sS -X POST https://lasso.sh/api/v1/management/keys \
-  -H 'content-type: application/json' -d '{"name":"my-app"}'
+```json
+{
+  "id": "…",
+  "key": "lasso_…",
+  "rpc_url": "https://lasso.sh/rpc/k/lasso_…",
+  "ws_url": "wss://lasso.sh/ws/rpc/k/lasso_…",
+  "account_id": "…",
+  "management_token": "lasso_mk_…"
+}
 ```
 
-The response includes `key`, `rpc_url`, and `management_token`. Put the RPC key
-in the project's existing secret store and the management token in the agent's
-private store. Do not print either into
-chat, logs, shell history, screenshots, or source control.
+That one request creates a provisional account with a small starting balance,
+makes you its agent, and issues your first key. Keep the secrets apart:
 
-Load the key from the project's secret manager. For a one-off interactive shell,
-read it without echoing it or placing the value in shell history:
+| Value | Where it goes |
+|---|---|
+| `key`, `rpc_url`, `ws_url` | The app's secret store or `.env` |
+| `management_token` | Your own private store, never the app or the repository |
+| `account_id` | Anywhere; it identifies the account for top-ups and support |
+
+Never print a key or token into chat, logs or source control. A repeated
+create makes a second, separate account, so reuse the token for more keys.
+
+### 2. Call it
+
+Append a chain, and optionally a strategy, to `rpc_url`:
 
 ```bash
-read -rsp "Lasso key: " LASSO_KEY && export LASSO_KEY && printf '\n'
-```
-
-## 3. Make a harmless call
-
-```bash
-curl -sS -D /tmp/lasso-headers.txt \
+curl -sS "$LASSO_RPC_URL/fastest/base?include_meta=body" \
   -H 'content-type: application/json' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' \
-  "https://lasso.sh/rpc/k/$LASSO_KEY/load-balanced/ethereum?include_meta=headers"
+  -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
 ```
 
-The body remains standard JSON-RPC. `include_meta=headers` adds a request ID and
-encoded routing metadata without changing the body shape. Anonymous keys can
-also receive per-request CU and USD headers. See
-[Routing and usage evidence](observability) before building automation around a
-header.
+```json
+{
+  "jsonrpc": "2.0", "id": 1, "result": "0x3157d37",
+  "lasso_meta": {
+    "strategy": "fastest", "chain_id": 8453, "access": "premium",
+    "selected_provider": { "id": "premium_base_2", "protocol": "http" },
+    "upstream_latency_ms": 9.4, "lasso_overhead_ms": 1.9, "retries": 0
+  }
+}
+```
 
-## 4. Install the URL
+Every response also carries `x-lasso-request-id`, `x-lasso-access` (what
+served it), `x-lasso-usd` (what it cost) and `x-lasso-balance-usd`. Use
+`eth_blockNumber` rather than `eth_chainId` to see routing, since the chain ID
+can be answered without an upstream.
 
-Lasso replaces the upstream URL; the client remains standard EVM JSON-RPC.
+### 3. Pick a pool and a strategy per call site
+
+The same key reaches every profile of its account. With no profile segment,
+the key's default profile (`premium` unless you change it) serves the request.
+Change one path segment to switch pools:
+
+| URL | Served by |
+|---|---|
+| `$LASSO_RPC_URL/fastest/base` | The key's default profile, `premium` |
+| `$LASSO_RPC_URL/profile/public/base` | Lasso's public providers, uncharged, `load-balanced` |
+| `$LASSO_RPC_URL/profile/prod-base/fastest/base` | Your `prod-base` Custom profile |
+
+| Strategy | What it does | Use it for |
+|---|---|---|
+| `load-balanced` (default) | Spreads requests across healthy providers | Backends, indexers |
+| `latency-weighted` | Spreads requests, weighted toward recently fast providers | User-facing reads |
+| `fastest` | Sends each request to the recently fastest provider for its kind of request | Trading and other latency-critical paths |
+| `priority` | Follows your configured provider order | Custom profiles with a preferred primary |
+
+Strategies price differently on premium; the live table is in
+[chains and prices](/cloud/reference/chains-and-prices).
+
+### 4. Install it
+
+Save the key once in `.env` and build every URL from it:
 
 ```bash
-export RPC_URL="https://lasso.sh/rpc/k/$LASSO_KEY/load-balanced/ethereum"
+# .env
+LASSO_RPC_URL=https://lasso.sh/rpc/k/lasso_…
+LASSO_WS_URL=wss://lasso.sh/ws/rpc/k/lasso_…
 ```
 
-For viem:
-
-```javascript
+```ts
 import { createPublicClient, http } from "viem";
-import { mainnet } from "viem/chains";
+import { base } from "viem/chains";
 
 const client = createPublicClient({
-  chain: mainnet,
-  transport: http(
-    `https://lasso.sh/rpc/k/${process.env.LASSO_KEY}/load-balanced/ethereum`,
-  ),
+  chain: base,
+  transport: http(`${process.env.LASSO_RPC_URL}/latency-weighted/base`),
 });
 ```
 
-Begin with a non-critical stateless read path. Compare results, latency, and
-routing evidence before expanding traffic or adding historical, write, filter,
-or subscription workloads.
+The same URL works in ethers, Foundry (`--rpc-url`), Hardhat and indexers. For
+subscriptions, use `${LASSO_WS_URL}/base` with a WebSocket transport. Run your
+app's real methods and block ranges through the new URL before moving traffic.
+[Install Lasso in your app](/cloud/install) covers each client and browser
+apps.
 
-## 5. Link management when useful
+### 5. Fund it and hand it off
 
-An anonymous key can be linked to a dashboard account without changing its RPC
-URL. Use the returned key `id` and management token:
+When the starting balance isn't enough, credit the account within the budget
+your user approved. The request answers 402 with a standard x402 or MPP
+challenge that a stock client signs with the user's wallet:
 
-```bash
-curl -sS -X POST \
-  -H "Authorization: Bearer $LASSO_MANAGEMENT_TOKEN" \
-  "https://lasso.sh/api/v1/management/keys/$LASSO_KEY_ID/claim-link"
+```http
+POST https://lasso.sh/api/v1/accounts/{account_id}/credit
+Content-Type: application/json
+
+{"usd":"5"}
 ```
 
-Give the short-lived `claim_url` to the user. Claiming keeps each key created
-by that token and its RPC URL, moves remaining purchased credit to the
-account’s shared balance, and ends anonymous management. Grant later agent
-management and funding access separately; claiming does not broaden the app key.
+To hand the setup to its owner, request a claim link and give them the URL
+privately. It's valid for 24 hours and works once:
 
-For exact key, credit purchase, Custom access, and claim payloads, use
-[`/openapi.json`](https://lasso.sh/openapi.json) and
-[`/SKILL.md`](https://lasso.sh/SKILL.md).
+```http
+POST https://lasso.sh/api/v1/accounts/current/claim-link
+Authorization: Bearer <management token>
+```
+
+When they claim it, every key and URL keeps working, and you keep your access
+as the account's agent. See
+[accounts, people and agents](/cloud/accounts-and-agents).
+
+## With the dashboard
+
+1. Sign in at [lasso.sh](https://lasso.sh).
+2. Create an endpoint. Your first endpoint creates your account, and you're
+   its admin.
+3. Copy its RPC URL into your app's `.env`. Requests are served on public
+   providers under your free monthly allowance, and the dashboard says so.
+4. Add balance, or subscribe to Pro, and the next request is served by premium
+   providers. Subscribe to Custom to route over your own providers.
+
+## Limits
+
+- Creating accounts without credentials is limited per client IP (currently 10
+  per hour). Each provisional account gets its starting balance once.
+- A provisional account that never pays and sees no activity for 90 days
+  closes. Accounts that have paid, or that a person has joined, never expire.
+- The management token can't spend money. Paying always needs a wallet
+  signature.
+- `public` serves `load-balanced` only. A different strategy in a `public` URL
+  is served as `load-balanced`, and `lasso_meta.strategy` says so.
+
+## Next
+
+- [Set up production RPC with an agent](/cloud/guides/production-rpc-with-an-agent):
+  separate keys per environment, one balance, a clean handoff.
+- [Keys, URLs and profiles](/cloud/keys-and-profiles): default profiles,
+  scoped keys and rotation.
+- [Serving access and pricing](/cloud/serving-access-and-pricing): what serves
+  each request and what it costs.

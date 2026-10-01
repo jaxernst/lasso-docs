@@ -1,84 +1,107 @@
 ---
-title: Lasso Cloud overview
-description: Managed EVM RPC routing, provider pools, failover, and operational evidence
+title: What Lasso is and when it fits
+description: The unified interface for blockchain RPC. One edge-routed endpoint in front of your nodes and providers, for EVM apps and the agents that build them
 ---
 
-# Lasso Cloud
+# The unified interface for blockchain RPC
 
-Lasso is a control layer for EVM RPC. Applications keep standard JSON-RPC
-clients while Lasso decides which upstream can serve each request, routes it,
-fails over when appropriate, and exposes evidence about the result.
+Lasso wrangles your nodes and providers into one high-performance, edge-routed
+JSON-RPC endpoint. Its routing engine learns how each upstream performs by kind
+of request and transport, orders upstreams for every request by the strategy
+you choose, and fails over in-flight. You keep deep control over your
+infrastructure, node failures stay away from your users, and your app keeps
+speaking standard JSON-RPC.
 
-Use these docs to decide where Lasso belongs in an existing RPC stack and how
-to operate it. For exact request and response shapes, use the deployed
-[`/openapi.json`](https://lasso.sh/openapi.json). Fetch the live
-[`/agent.json`](https://lasso.sh/agent.json) for live chains, strategy names,
-pricing, and enabled payment rails rather than copying values into an
-integration.
+An agent can create a working endpoint with one HTTP request and no signup.
+Start with the [quickstart](/cloud/quickstart), or read on to decide whether
+Lasso fits your app.
 
-## Choose a path
+```bash
+curl -sS https://lasso.sh/api/v1/keys \
+  -H 'content-type: application/json' -d '{"name":"prod"}'
+```
 
-- **Evaluate managed routing:** start with a Lasso-managed profile and one
-  endpoint swap. This is the shortest way to test routing and failover without
-  moving provider credentials.
-- **Bring your existing providers:** build a custom profile from Alchemy,
-  QuickNode, Infura, self-hosted nodes, or other EVM endpoints. Lasso keeps the
-  credentials server-side and routes across the pool.
-- **Operate a mixed RPC stack:** combine providers to increase quota headroom,
-  regional reach, method or history coverage, and failure independence. Use
-  request evidence and provider health to refine the pool over time.
+## How a request flows
 
-Read in this order:
+```text
+your app ──▶ https://lasso.sh/rpc/k/<key>/fastest/base
+               │
+               ├─ finds providers in the profile that serve the chain and method
+               ├─ orders them by your strategy
+               ├─ sends the request, failing over on errors that are safe to retry
+               └─ returns standard JSON-RPC, plus routing evidence on request
+```
 
-1. [Choose an adoption path](/cloud/adoption) — choose managed pools, custom providers, or a
-   staged combination.
-2. [First endpoint quickstart](/cloud/quickstart) — make the first request and install the
-   endpoint safely.
-3. [Routing and failure semantics](/cloud/routing) — understand selection, health tiers, attempts,
-   strategies, and fallback.
-4. [Custom profiles and provider probes](/cloud/custom-profiles) — build a provider pool and
-   interpret probe evidence.
-5. [RPC workload behavior](/cloud/rpc-behavior) — understand reads, historical data,
-   logs, writes, filters, and WebSocket boundaries.
-6. [Ethereum JSON-RPC compatibility](/cloud/json-rpc-compatibility) — see the
-   standards, unification behavior, and exact claim boundary.
-7. [Routing and usage evidence](/cloud/observability) — correlate a request with routing
-   evidence and dashboard state.
-8. [Human and agent workflows](/cloud/agent-flows) — collaborate with an agent without
-   handing it unnecessary authority.
+It's drop-in: viem, ethers, Foundry, Hardhat and indexers keep speaking
+JSON-RPC to a new URL. You choose three things in that URL, and nothing else in
+your app changes:
 
-[Features and boundaries](/cloud/features) is the compact capability and boundary reference.
-[Multi-provider failover](/cloud/multi-provider-rpc-failover),
-[indexer backfills](/cloud/indexer-backfills), and
-[latency-sensitive reads](/cloud/latency-sensitive-rpc-reads) show how to test
-three common workloads against their own failure and performance requirements.
-[Versions, availability, and evidence](/releases-and-availability) separates released
-Core behavior, observed Cloud availability, and workload qualification.
-[Support, security, incidents, and lifecycle](/support-security-lifecycle) explains
-the public help path, current best-effort terms, and repository boundaries.
+- **Your routing strategy**, per call site: `load-balanced`,
+  `latency-weighted`, `fastest` or `priority`.
+- **Your provider pool**: Lasso's `premium` pool, its `public` pool, or a
+  Custom profile over your own nodes and provider accounts. One key reaches
+  all of them; `/profile/<name>` picks one.
+- **Your chain**: any EVM chain Lasso serves, or any EVM chain your own
+  providers serve.
 
-## Product boundary
+## When Lasso fits
 
-Lasso owns provider eligibility, selection, health-aware attempts, and the
-managed control plane around profiles, keys, and usage. It does not turn every
-JSON-RPC operation into an interchangeable stateless read. Transaction nonce
-management, transaction deduplication, receipt tracking, stateful filter
-affinity, and workload-specific correctness remain application concerns where
-documented.
+| Your situation | What Lasso gives you |
+|---|---|
+| A provider's outages or rate limits show up as errors in your app | Failover across a pool of providers behind one URL |
+| Latency matters: trading, wallets, bots | `fastest` and `latency-weighted` routing, measured from the region serving you |
+| Backends and indexers exhaust one provider's quota | Load spread across providers with `load-balanced` |
+| You already pay for provider accounts or run your own nodes | A Custom profile routes over them, reachable with the key you already have |
+| Subscriptions must survive a provider outage | WebSocket failover that backfills the gap |
+| An agent is setting up your infrastructure | One-request provisioning, pay-as-you-go in USDC, and a handoff to your team |
 
-Lasso RPC Core is the open routing engine. Lasso Cloud adds identity, keys,
-billing, entitlements, account-owned profiles, the managed dashboard, and
-agent-facing setup surfaces.
+## What stays with your app
 
-## Documentation surfaces
+- **Transactions.** Signing, nonces, replacement, receipts and finality stay
+  with your app. Lasso sends a signed transaction to one provider and doesn't
+  retry it after dispatch. If the response is lost, look up the transaction
+  hash before resending.
+- **HTTP filters.** Filter IDs belong to one provider, so use `eth_getLogs` or
+  subscriptions instead.
+- **Provider limits.** Historical depth and `eth_getLogs` range limits follow
+  the providers in your pool.
 
-- **Human product docs:** this site contains concepts, tradeoffs, workflows,
-  and operational boundaries for Lasso Cloud and RPC Core.
-- **[`/SKILL.md`](https://lasso.sh/SKILL.md):** concise instructions an agent can
-  execute after it understands the user's workload and receives approval for
-  external changes.
-- **[`/llms.txt`](https://lasso.sh/llms.txt):** a short map to the right product
-  and API resource.
-- **[`/openapi.json`](https://lasso.sh/openapi.json):** exact machine-readable
-  HTTP contracts.
-- **[`/agent.json`](https://lasso.sh/agent.json):** service discovery metadata.
+## How you pay
+
+Requests on Lasso's premium providers have a price in USD, set by the method
+and your strategy. Your account pays from its included usage first, then from
+its balance. If your account has paid before and the balance runs out, your
+app keeps serving on public providers for 30 days while you top up. An
+account a person has joined gets a monthly allowance on public providers at no
+charge, and each person sponsors up to three accounts. See
+[serving access and pricing](/cloud/serving-access-and-pricing) and
+[balance and payment fallback](/cloud/balance-and-fallback).
+
+## Two ways in, one account
+
+| | Agents, through the API | People, through the dashboard |
+|---|---|---|
+| Start | `POST /api/v1/keys`, no signup | Sign in at [lasso.sh](https://lasso.sh) and create an endpoint |
+| Fund | Pay a 402 challenge with a USDC wallet | Add balance, or subscribe to Pro or Custom |
+| Manage | A management token | The dashboard |
+
+Both work on the same account. A person can claim what an agent built without
+changing a single URL. See [accounts, people and agents](/cloud/accounts-and-agents).
+
+## Limits
+
+- EVM chains only. The live chain list is in
+  [chains and prices](/cloud/reference/chains-and-prices) and
+  [`agent.json`](https://lasso.sh/agent.json).
+- Routing evidence shows which provider answered, not that the answer is
+  correct.
+- Latency is measured per kind of request (a family of related methods), per
+  region.
+
+## Next
+
+- [Quickstart](/cloud/quickstart): a working endpoint in one request.
+- [Set up production RPC with an agent](/cloud/guides/production-rpc-with-an-agent):
+  keys per environment, one balance, a handoff.
+- [Routing](/cloud/routing): how selection and failover work.
+- [Lasso RPC Core](/introduction): run the routing engine yourself.

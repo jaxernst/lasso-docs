@@ -1,0 +1,156 @@
+---
+title: Keys, URLs and profiles
+description: One key in .env reaches every profile of its account; the URL picks the profile, strategy and chain
+---
+
+# Keys, URLs and profiles
+
+One RPC key, saved once in `.env`, reaches every profile its account has:
+Lasso's `premium` and `public` pools and each of your Custom profiles. The URL
+picks the profile, the strategy and the chain. Use this page to build URLs,
+move an app between pools without a redeploy, scope keys you have to expose,
+and rotate secrets with no downtime.
+
+```bash
+# .env: one key for every pool
+LASSO_RPC_URL=https://lasso.sh/rpc/k/lasso_…
+```
+
+```ts
+const url = process.env.LASSO_RPC_URL;
+const reads  = `${url}/latency-weighted/base`;           // the key's default profile
+const jobs   = `${url}/profile/public/base`;             // public providers, uncharged
+const trades = `${url}/profile/prod-base/fastest/base`;  // your own providers
+```
+
+## URL grammar
+
+```text
+<base>[/profile/<profile>][/<strategy>]/<chain>
+```
+
+| Base | Form |
+|---|---|
+| `https://lasso.sh/rpc/k/<key>` | HTTP, key in the path (`rpc_url`) |
+| `wss://lasso.sh/ws/rpc/k/<key>` | WebSocket, key in the path (`ws_url`) |
+| `https://lasso.sh/rpc` | HTTP, key in `Authorization: Bearer <key>` or `x-lasso-api-key` |
+| `wss://lasso.sh/ws/rpc` | WebSocket, key in `Authorization: Bearer <key>` or `x-lasso-api-key` |
+
+- `<chain>` is a chain name or decimal chain ID from
+  [chains and prices](/cloud/reference/chains-and-prices).
+- `<strategy>` is optional; `load-balanced` is the default. See
+  [routing](/cloud/routing).
+- `<profile>` is `premium`, `public` or one of your Custom profile slugs.
+  Without it, the key's default profile serves the request.
+- `<base>[/profile/<profile>]/provider/<name>/<chain>` pins one provider for
+  debugging. Managed providers use their public aliases.
+
+Creating or rotating a key returns `rpc_url` and `ws_url` ready to use, with
+nothing to fill in.
+
+## Default and allowed profiles
+
+| Field | What it does | Default |
+|---|---|---|
+| `default_profile` | The profile a URL with no profile segment uses | `premium` |
+| `allowed_profiles` | The profiles the key may name in its URL | `all`: every current and future profile of the account |
+
+Change a key's default, and every URL without a profile segment moves with it
+as each region applies the change, usually within a second, with no redeploy:
+
+```http
+PATCH https://lasso.sh/api/v1/keys/{id}
+Authorization: Bearer <management token>
+Content-Type: application/json
+
+{"default_profile": "prod-base"}
+```
+
+Making a Custom profile the default needs Custom access. Open WebSocket
+connections that used the old default close with `default_profile_changed`,
+and your client's reconnect follows the new default.
+
+## Scope keys you expose
+
+A key in a browser bundle or mobile app is public. Scope it to `public`, so a
+visitor who copies it can't spend your balance. A key scoped to a Custom
+profile isn't safe to expose: if Custom access lapses or the profile is
+deleted, its requests are served and charged as `premium`.
+
+```http
+POST https://lasso.sh/api/v1/keys
+Authorization: Bearer <management token>
+Content-Type: application/json
+
+{"name": "web", "default_profile": "public", "allowed_profiles": ["public"]}
+```
+
+Keep unscoped keys on servers. A scoped key that names another profile gets
+`forbidden`, listing what it may use.
+
+## How a profile segment resolves
+
+| The URL names | Result |
+|---|---|
+| Nothing | The key's default profile |
+| A profile the key is allowed | That profile |
+| A profile outside a scoped key's allowed set | 403 `forbidden`, naming the allowed profiles |
+| A slug the account has never had | 404 `unknown_profile`, listing the account's profiles |
+| A Custom profile that was deleted, or whose Custom access lapsed | Served as `premium`, with `x-lasso-fallback: profile` |
+
+Whether `premium` is served by premium providers depends on the account's
+payment state, not the URL. See
+[serving access and pricing](/cloud/serving-access-and-pricing).
+
+## Rotate with no downtime
+
+Rotate with an overlap, and both secrets work until `previous_valid_until`, so
+your deploys can catch up:
+
+```http
+POST https://lasso.sh/api/v1/keys/{id}/rotate
+Authorization: Bearer <management token>
+Content-Type: application/json
+
+{"grace_seconds": 3600}
+```
+
+The response carries the new `key`, `rpc_url` and `ws_url`. Ship them, then
+let the old secret expire. See
+[rotate a key with no downtime](/cloud/guides/rotate-a-key) for the full
+sequence.
+
+## Existing URLs keep working
+
+Every URL Lasso has issued keeps serving. `/rpc/k/<key>/…`,
+`/rpc/profile/<slug>/…`, header-auth URLs and provider pins already follow the
+grammar above. Three older forms serve until 30 days pass with no traffic on
+them:
+
+| Older form | Served as |
+|---|---|
+| `round-robin` strategy segment | `load-balanced` |
+| `/rpc/<chain>/<provider>` | The provider pin |
+| `?key=` query parameter | The key |
+
+See [Agent API v2 compatibility](/cloud/reference/v2-compatibility).
+
+## Limits
+
+- The API returns a key's secret only on create and rotate. If you lose it,
+  rotate the key or create another; admins can view active keys' URLs in the
+  dashboard.
+- `grace_seconds` defaults to 0, so the old secret stops as each region
+  applies the rotation, and can be at most 86,400.
+- An account holds at most 100 active keys.
+- `premium` and `public` are reserved; Custom profile slugs can't use them.
+- Key changes reach every region within about a second, and a region that
+  misses one catches up within about 75 seconds.
+
+## Next
+
+- [Custom profiles](/cloud/custom-profiles): put your own providers behind a
+  profile slug.
+- [Serving access and pricing](/cloud/serving-access-and-pricing): what each
+  profile costs.
+- [Install Lasso in your app](/cloud/install): client examples.
