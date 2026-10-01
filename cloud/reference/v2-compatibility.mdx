@@ -1,0 +1,81 @@
+---
+title: Agent API v2 compatibility
+description: Everything built on Agent API v2 keeps working; how each v2 route, header and URL maps to the account API, and when it retires
+---
+
+# Agent API v2 compatibility
+
+Nothing you deployed against Agent API v2 stops working. Every RPC URL and key
+secret keeps serving, v2 management routes keep answering, and v2 tokens keep
+authenticating as agents. Use this page to move an existing integration to the
+`/api/v1` account API at your own pace.
+
+```bash
+curl -sS -D - -o /dev/null https://lasso.sh/api/v1/management/me \
+  -H "authorization: Bearer $LASSO_MANAGEMENT_TOKEN" \
+  | grep -iE '^(deprecation|sunset):'
+```
+
+## What keeps working
+
+| v2 surface | After the account model |
+|---|---|
+| RPC URLs: `/rpc/k/<key>/…`, `/rpc/profile/<slug>/…`, header-auth and provider pins | Serve exactly as before; they're the current URL grammar |
+| RPC key secrets, including `lasso_ak_` keys | Keep working, with their prefix |
+| `/api/v1/management/*`, `/api/v1/me`, `/api/v1/account/management-credentials` | Keep working, with `Deprecation` and `Sunset` headers and a `next_action` naming the new operation |
+| v2 management tokens | Authenticate as agents of their account |
+| v2 claim links | Stay valid until they expire |
+| v2 headers: `x-lasso-profile`, `x-lasso-downgraded`, `x-lasso-balance-warning`, `x-lasso-rate-limit-*` | Still sent on v2 URL forms and v2 routes, alongside the new signals |
+| `error_type` on RPC errors | Still sent alongside `error.data.code` |
+
+Each v2 route answers `gone`, with `next_action`, only after 30 days with no
+traffic on it.
+
+## Where each v2 operation moved
+
+| Agent API v2 | Account API |
+|---|---|
+| `POST /api/v1/management/keys` | `POST /api/v1/keys` |
+| `GET`, `PATCH /api/v1/management/keys/{id}` | `GET`, `PATCH /api/v1/keys/{id}` |
+| `POST /api/v1/management/keys/{id}/rotate` | `POST /api/v1/keys/{id}/rotate` |
+| `POST /api/v1/management/keys/{id}/credit` | `POST /api/v1/accounts/{id}/credit` |
+| `POST /api/v1/management/keys/{id}/custom-access` | `POST /api/v1/accounts/{id}/custom-access` |
+| `POST /api/v1/management/keys/{id}/claim-link` | `POST /api/v1/accounts/{id}/claim-link` |
+| `GET /api/v1/management/me` | `GET /api/v1/agents/current` |
+| `/api/v1/management/connections` | `/api/v1/connections` |
+| `/api/v1/management/profiles/{slug}` | `/api/v1/profiles/{slug}` |
+| `GET /api/v1/management/configuration-schema` | `GET /api/v1/configuration-schema` |
+| `GET /api/v1/management/purchases/{id}` | `GET /api/v1/purchases/{id}` |
+
+## What changed in meaning
+
+- **Balances belong to accounts, not keys.** Every key of an account draws on
+  one USD balance. Payments addressed to a v2 key ID credit that key's
+  account.
+- **Keys reach every profile of their account.** A v2 key pinned to one Custom
+  profile keeps that profile as its default and is scoped to it.
+- **Running out of money doesn't stop a paying app.** Accounts that have paid
+  fall back to public providers for 30 days instead of failing.
+- **Agent-created keys share one rate limit per account** instead of 50 RPS
+  each.
+- **A claim link comes from the agent, not the RPC key**, so an exposed key
+  can't hand over a funded account. Keys from before agents existed still
+  claim with their RPC key.
+
+## Older URL forms
+
+These forms serve until 30 days pass with no traffic on them:
+
+| Form | Served as |
+|---|---|
+| `round-robin` strategy segment | `load-balanced` |
+| `/rpc/<chain>/<provider>` | The provider pin |
+| `?key=` query parameter | The key |
+
+## Next
+
+- [Keys, URLs and profiles](/cloud/keys-and-profiles): the URL grammar.
+- [Accounts, people and agents](/cloud/accounts-and-agents): what an account
+  owns.
+- [Response signals and errors](/cloud/reference/signals-and-errors): the new
+  headers and codes.

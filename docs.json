@@ -3,9 +3,9 @@
   "name": "Lasso",
   "theme": "aspen",
   "colors": {
-    "primary": "#3B82F6",
-    "light": "#60A5FA",
-    "dark": "#1E40AF"
+    "primary": "#9333ea",
+    "light": "#a855f7",
+    "dark": "#9333ea"
   },
   "navbar": {
     "links": [
@@ -48,6 +48,10 @@
           {
             "label": "Versions and evidence",
             "href": "/releases-and-availability"
+          },
+          {
+            "label": "Reliability evidence",
+            "href": "/cloud/websocket-continuity-evidence"
           }
         ]
       }
@@ -57,7 +61,7 @@
     "products": [
       {
         "product": "Lasso Cloud",
-        "description": "Managed EVM RPC routing and provider operations",
+        "description": "Managed EVM RPC: one edge-routed endpoint in front of your nodes and providers",
         "icon": "cloud",
         "groups": [
           {
@@ -65,41 +69,49 @@
             "pages": [
               "cloud/overview",
               "cloud/quickstart",
-              "cloud/adoption"
+              "cloud/install"
             ]
           },
           {
-            "group": "Operate Lasso",
+            "group": "Concepts",
             "pages": [
+              "cloud/accounts-and-agents",
+              "cloud/keys-and-profiles",
               "cloud/routing",
               "cloud/custom-profiles",
-              "cloud/rpc-behavior",
+              "cloud/serving-access-and-pricing",
+              "cloud/balance-and-fallback",
               "cloud/observability"
             ]
           },
           {
-            "group": "Application guides",
+            "group": "Guides",
             "pages": [
-              "cloud/multi-provider-rpc-failover",
+              "cloud/guides/production-rpc-with-an-agent",
               "cloud/bring-your-own-rpc",
-              "cloud/indexer-backfills",
+              "cloud/guides/rotate-a-key",
+              "cloud/multi-provider-rpc-failover",
               "cloud/latency-sensitive-rpc-reads",
-              "cloud/base-rpc-integration"
+              "cloud/indexer-backfills"
             ]
           },
           {
-            "group": "Automation and reference",
+            "group": "Reference",
             "pages": [
-              "cloud/agent-flows",
-              "cloud/features"
-            ]
-          },
-          {
-            "group": "Reliability evidence",
-            "pages": [
-              "cloud/websocket-continuity-evidence",
-              "cloud/historical-workloads",
-              "cloud/json-rpc-compatibility"
+              "cloud/reference/agent-entry-points",
+              "cloud/reference/signals-and-errors",
+              "cloud/reference/chains-and-prices",
+              "cloud/rpc-behavior",
+              "cloud/reference/v2-compatibility",
+              {
+                "group": "Reliability evidence",
+                "pages": [
+                  "cloud/websocket-continuity-evidence",
+                  "cloud/historical-workloads",
+                  "cloud/json-rpc-compatibility",
+                  "cloud/routing-overhead"
+                ]
+              }
             ]
           }
         ]
@@ -234,6 +246,22 @@
     {
       "source": "/api/routing-strategies",
       "destination": "/concepts/routing-strategies"
+    },
+    {
+      "source": "/cloud/adoption",
+      "destination": "/cloud/install"
+    },
+    {
+      "source": "/cloud/agent-flows",
+      "destination": "/cloud/guides/production-rpc-with-an-agent"
+    },
+    {
+      "source": "/cloud/features",
+      "destination": "/cloud/overview"
+    },
+    {
+      "source": "/cloud/base-rpc-integration",
+      "destination": "/cloud/install"
     }
   ]
 }
