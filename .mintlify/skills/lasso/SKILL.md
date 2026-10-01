@@ -13,7 +13,7 @@ compatibility: >
   for an enabled rail.
 metadata:
   author: Lasso
-  version: "12.0"
+  version: "12.1"
   website: https://lasso.sh
   routing_core: https://github.com/jaxernst/lasso-rpc
 ---
@@ -35,8 +35,10 @@ customizing that endpoint over plain HTTP.
 - Never print an RPC key, management token, provider URL with a credential,
   payment credential or account ID. The create response repeats the RPC secret
   in `key` and `rpc_url`; never print them raw.
-- Key and profile requests need no idempotency ceremony: a profile `PUT` is
-  the whole desired state, so repeating it after a lost response is safe.
+- A profile `PUT` is the whole desired state. After a lost response, `GET`
+  the profile and compare its revision before repeating, or send
+  `If-Match: <revision>` so a concurrent edit is refused rather than
+  overwritten. A repeated key creation makes another free key.
 - Live documents outrank this file:
 
 ```bash
@@ -97,14 +99,16 @@ category and last reached provider, with counts and `next_action` guidance.
 
 ## Choose a strategy
 
-Capability and health filtering run first; the strategy orders what remains.
+Capability and health signals steer candidates first, as a preference rather
+than a guarantee: an unknown or impaired pool can still be tried. The strategy
+orders what remains.
 One key can use a different strategy per call site.
 
 | Strategy | Behavior | Use for | Cost |
 |---|---|---|---|
 | `load-balanced` (default) | Random within the healthiest tier | Background reads, indexers | 1x |
 | `latency-weighted` | Favors recent latency and success, keeps exploring | General user traffic | 1.5x |
-| `fastest` | Lowest recent latency per provider, method and transport; concentrates traffic | Latency-critical paths | 2x |
+| `fastest` | Lowest recent latency per provider, kind of request and transport; concentrates traffic | Latency-critical paths | 2x |
 | `priority` | Configured order within the healthy tier | Custom profiles with a preferred primary | 1x |
 
 For anonymous prepaid keys, these are nominal CU factors; integer CU charges
@@ -242,16 +246,19 @@ ID before adding an explicit override.
 `GET /profiles/my-app` with `Accept: application/yaml` exports the profile for
 self-hosted Lasso RPC Core, provider URLs replaced by environment variables.
 `DELETE /profiles/my-app` removes it; bound keys stop routing until rebound.
+The slug can be reused for a new profile, which does not rebind existing keys.
 Applying a profile needs Custom access: buy days with
 `POST /api/v1/management/keys/<key_id>/custom-access` for a claimed key, or have
 the owner subscribe.
 
 ## What stays with the app
 
-Replay-safe reads fail over within one deadline and at most three upstream
-dispatches. Identical signed transaction bytes identify the same transaction;
-an RPC response is not proof of propagation, receipt, or finality. The app
-owns signing, nonces, replacement, receipts, and finality. HTTP filter IDs are
+Replay-safe reads fail over within one deadline and a bounded number of
+upstream dispatches. A signed transaction is sent to one provider and is not
+retried after dispatch. A timeout or lost response leaves its outcome unknown:
+look up the transaction hash before resending or replacing it. An RPC response
+is not proof of propagation, receipt, or finality. The app owns signing,
+nonces, replacement, receipts, and finality. HTTP filter IDs are
 provider-local, so use `eth_getLogs` or subscriptions. Historical depth and
 `eth_getLogs` range caps vary by provider, so keep range splitting in indexers.
 
