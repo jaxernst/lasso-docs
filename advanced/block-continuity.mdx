@@ -3,9 +3,14 @@ title: Block regression protection
 description: Protect latest-block responses with automatic peer sharing.
 ---
 
-Set `head_policy: local` in an existing chain's file-profile configuration.
-Lasso protects successive latest-block responses and shares progress across
-connected instances. `off` is the default; Local needs no publication database.
+Turn on block regression protection for a chain, and Lasso protects
+successive latest-block responses and shares progress across connected
+instances. It's off by default.
+
+| Product | How to turn it on |
+| --- | --- |
+| RPC Core | Set `head_policy: local` on the chain in its file profile. Local needs no publication database |
+| Lasso Cloud | Turn **Block regression protection** **On** in your Custom profile's chain settings |
 
 Applies to:
 
@@ -36,5 +41,8 @@ values at one block, follow [Read at one block](/advanced/read-at-one-block); th
 with protection Off too.
 
 [Routing metadata](/observability/request-metadata#block-protection-metadata) is optional.
-For the separate durable `global` contract, see [fleet operations](/deployment/block-continuity).
-Enrolled Global scopes require coordinated disablement before changing modes.
+For the separate durable `global` contract in RPC Core, see
+[fleet operations](/deployment/block-continuity). Enrolled Global scopes require
+coordinated disablement before changing modes. On Lasso Cloud, existing
+`global` profiles keep strict fleet coordination until protection is turned
+Off; turning it On again enables the standard behavior above.

@@ -71,18 +71,11 @@ PY
 Use `include_meta=body` only when the client accepts a changed response shape.
 That mode adds a top-level `lasso_meta` object; it does not add `x-lasso-meta`.
 
-The metadata record exposes the request ID, strategy, chain, transport,
-candidate and selected providers, selection/upstream/end-to-end latency,
-Lasso overhead, retry count, and circuit state when those fields are available.
-`service_profile_id` identifies the original service profile; `profile_id`
-identifies the effective route, including configured fallback. `executed_channel`
-is present only when an upstream served the request. With **Block regression
-protection** On, provider-backed block choices include `head_policy.policy=local`,
-the application generation, captured floor and recovery evidence. Existing strict
-configurations can return retained block choices with `head_policy.policy=global`
-and no executing provider. Client metadata
-does not include per-attempt error details. Treat the live OpenAPI response and actual record as
-authoritative because optional fields depend on the request path and outcome.
+The metadata fields are defined once, in
+[request metadata](/observability/request-metadata#metadata-fields). On Lasso
+Cloud, `service_profile_id` identifies the original service profile and
+`profile_id` the effective route, including configured fallback. Client
+metadata does not include per-attempt error details.
 
 Provider fields can be withheld for managed profiles or unavailable on a request
 path. A selected candidate is not proof that it served the final response. Retain
@@ -94,34 +87,9 @@ for a follow-up `lasso_meta` notification.
 
 ## Block protection metadata
 
-These optional fields help diagnose [Block regression protection](/cloud/block-continuity).
-They are not required to enable protection or read several values at one block.
-When `head_policy.policy` is `local`, a protected latest-block response can include:
-
-| Field in `head_policy` | Meaning |
-| --- | --- |
-| `block_number`, `block_hash`, `block_age_ms` | The accepted block and its age. |
-| `instance`, `generation` | The serving Lasso instance and application lifetime. A replacement application starts a new generation. |
-| `minimum_height` | The local floor captured when the request started. |
-| `recovery_height` | A best-effort recovery height hint, or `null` if none was available. |
-| `recovery_gap_blocks` | The gap below the recovered height. A nonzero gap is allowed; hints are not mandatory minimums. |
-
-Compare nonoverlapping requests within the same service profile, chain, instance
-and generation to assess local protection. These fields do not prove that a
-particular number of peers received an update or predict recovery time.
-Existing strict policies report `policy=global` and can include attributed
-chain-change observations. Their retained number/header responses have no
-executing upstream provider.
-
-Explicit-number/hash requests can legitimately have no `head_policy` object.
-State-read results do not independently attest which block the provider used
-to execute them. For correlation, use `x-lasso-request-id`, or `x-request-id`
-when no routing context was created. Both profile identity fields are opaque.
-
-HTTP batch headers expose only one item's routing context. Oversized metadata
-can be omitted. If complete per-request diagnostics are required, use individual
-HTTP requests and record missing metadata explicitly; this is a diagnostics
-choice, not a requirement for consistent reads.
+With [block regression protection](/advanced/block-continuity) On, protected
+latest-block responses include a `head_policy` object. Its fields are defined
+once, in [block protection metadata](/observability/request-metadata#block-protection-metadata).
 
 ## Operational workflow
 

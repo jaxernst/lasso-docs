@@ -31,7 +31,10 @@ A connected upstream WebSocket is required. In RPC Core v0.5.0, `subscribe_new_h
 
 ## Supported streams and recovery
 
-The released subset includes `newHeads` and `logs`, not pending transactions. Matching streams can share upstream work. Recovery uses a replacement live stream and bounded HTTP replay. If recovery exceeds its time, replay, attempt, or buffer limits, the affected connection terminates explicitly. Applications should handle reconnects and reconcile their own processing checkpoint.
+The released subset includes `newHeads` and `logs`, not pending transactions.
+Recovery after a provider failure is bounded and can terminate the connection
+explicitly; [WebSocket subscriptions](/advanced/websocket-subscriptions) defines
+it and what your application must checkpoint.
 
 WebSocket batching is not part of the advertised interface. Ordinary RPC execution still follows the [method safety contract](/api/supported-methods).
 

@@ -64,10 +64,8 @@
             "group": "Start here",
             "pages": [
               "cloud/overview",
-              "support-security-lifecycle",
-              "releases-and-availability",
-              "cloud/adoption",
-              "cloud/quickstart"
+              "cloud/quickstart",
+              "cloud/adoption"
             ]
           },
           {
@@ -75,12 +73,7 @@
             "pages": [
               "cloud/routing",
               "cloud/custom-profiles",
-              "cloud/block-continuity",
-              "cloud/read-at-one-block",
               "cloud/rpc-behavior",
-              "cloud/websocket-continuity-evidence",
-              "cloud/historical-workloads",
-              "cloud/json-rpc-compatibility",
               "cloud/observability"
             ]
           },
@@ -100,6 +93,14 @@
               "cloud/agent-flows",
               "cloud/features"
             ]
+          },
+          {
+            "group": "Reliability evidence",
+            "pages": [
+              "cloud/websocket-continuity-evidence",
+              "cloud/historical-workloads",
+              "cloud/json-rpc-compatibility"
+            ]
           }
         ]
       },
@@ -115,8 +116,6 @@
                 "group": "Get Started",
                 "pages": [
                   "introduction",
-                  "support-security-lifecycle",
-                  "releases-and-availability",
                   "quickstart",
                   "guides/route-across-providers",
                   "installation"
@@ -168,7 +167,6 @@
                   "advanced/block-continuity",
                   "advanced/read-at-one-block",
                   "advanced/block-sync",
-                  "advanced/benchmarking",
                   "advanced/error-classification"
                 ]
               }
@@ -181,7 +179,6 @@
                 "group": "HTTP API",
                 "pages": [
                   "api/http-endpoints",
-                  "api/routing-strategies",
                   "api/batch-requests",
                   "api/authentication"
                 ]
@@ -209,11 +206,33 @@
                   "api/error-codes",
                   "api/response-formats"
                 ]
+              },
+              {
+                "group": "Releases and evidence",
+                "pages": [
+                  "releases-and-availability",
+                  "support-security-lifecycle",
+                  "advanced/benchmarking"
+                ]
               }
             ]
           }
         ]
       }
     ]
-  }
+  },
+  "redirects": [
+    {
+      "source": "/cloud/block-continuity",
+      "destination": "/advanced/block-continuity"
+    },
+    {
+      "source": "/cloud/read-at-one-block",
+      "destination": "/advanced/read-at-one-block"
+    },
+    {
+      "source": "/api/routing-strategies",
+      "destination": "/concepts/routing-strategies"
+    }
+  ]
 }

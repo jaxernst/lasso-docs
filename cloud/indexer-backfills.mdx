@@ -42,7 +42,7 @@ recent routing activity. Opt-in [`lasso_meta`](/cloud/observability#opt-in-metad
 can identify the executing upstream when that field is available. Preserve the
 request ID and the query's block selector alongside your result. For HTTP
 batches, items route independently; a batch is neither pinned to one provider
-nor an atomic snapshot. Use [one block hash for related state reads](/cloud/read-at-one-block)
+nor an atomic snapshot. Use [one block hash for related state reads](/advanced/read-at-one-block)
 when you need them to refer to the same block.
 
 Lasso's [dated historical qualification](/cloud/historical-workloads) shows
