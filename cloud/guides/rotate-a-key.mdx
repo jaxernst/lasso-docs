@@ -1,0 +1,86 @@
+---
+title: Rotate a key with no downtime
+description: Replace a production RPC key's secret with an overlap window so every deploy catches up before the old secret stops
+---
+
+# Rotate a key with no downtime
+
+Rotate a key when its secret may have leaked, when someone leaves, or on a
+schedule. With an overlap, the old and new secrets both route until every
+environment has the new one, so no request fails during the change. The key
+keeps its ID, name, default profile, allowed profiles and usage history.
+
+## 1. Rotate with an overlap
+
+Pick an overlap longer than your slowest deploy:
+
+```http
+POST https://lasso.sh/api/v1/keys/{id}/rotate
+Authorization: Bearer <management token>
+Content-Type: application/json
+
+{"grace_seconds": 3600}
+```
+
+```json
+{
+  "key": "lasso_…",
+  "rpc_url": "https://lasso.sh/rpc/k/lasso_…",
+  "ws_url": "wss://lasso.sh/ws/rpc/k/lasso_…",
+  "previous_valid_until": "2026-10-01T13:00:00Z"
+}
+```
+
+Store the new values straight into the secret store. Don't print them.
+
+## 2. Deploy the new secret
+
+Update `LASSO_RPC_URL` and `LASSO_WS_URL` in every environment that uses this
+key, and redeploy or restart. Both secrets route until
+`previous_valid_until`.
+
+## 3. Verify before the overlap ends
+
+```bash
+curl -sS -o /dev/null -w '%{http_code}\n' "$LASSO_RPC_URL/base" \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
+```
+
+Check that each environment sends traffic with the new secret, for example by
+confirming its deployed configuration, before `previous_valid_until`.
+
+## 4. Let the old secret expire
+
+At `previous_valid_until`, requests with the old secret get 401 `key_revoked`,
+and WebSocket connections opened with it close. Clients reconnect with the new
+secret from their configuration.
+
+## Rotate immediately
+
+If a secret leaked, rotate with no overlap, and the old secret stops as each
+region applies the change:
+
+```http
+POST https://lasso.sh/api/v1/keys/{id}/rotate
+Authorization: Bearer <management token>
+Content-Type: application/json
+
+{"grace_seconds": 0}
+```
+
+## Limits
+
+- `grace_seconds` is at most 86,400 (24 hours).
+- The old secret stops in each region as that region applies the change,
+  usually within a second and at most about 75 seconds later.
+- Rotating a key doesn't rotate your management token. An agent rotates its
+  own token with `POST /api/v1/agents/current/rotate`, and the old token stops
+  at once.
+
+## Next
+
+- [Keys, URLs and profiles](/cloud/keys-and-profiles): defaults and scoped
+  keys.
+- [Accounts, people and agents](/cloud/accounts-and-agents): who can rotate
+  and revoke.

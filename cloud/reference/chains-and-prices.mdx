@@ -1,0 +1,47 @@
+---
+title: Chains and prices
+description: Every chain Lasso Cloud's managed pool serves and the USD price of each method by routing strategy, generated from agent.json
+---
+
+import Chains from '/snippets/cloud-chains.mdx';
+import Prices from '/snippets/cloud-prices.mdx';
+
+# Chains and prices
+
+These tables are generated from the live
+[`agent.json`](https://lasso.sh/agent.json), so they match what Lasso serves
+and charges. When you need a value at runtime, read `agent.json` directly.
+
+```bash
+curl -fsSL https://lasso.sh/agent.json | jq '.chains, .pricing'
+```
+
+## Chains
+
+Use the name or the chain ID as the `<chain>` segment of an RPC URL. Your
+Custom profiles can serve any EVM chain your providers serve.
+
+<Chains />
+
+## Request prices
+
+The USD price of one request on premium providers, by method and strategy.
+Requests served on public providers or Custom profiles have no request price.
+A batch is priced per item, and each WebSocket subscription notification is
+priced as an `eth_subscription` request.
+
+<Prices />
+
+## Limits
+
+- A method's presence here is its price, not a promise that every provider in
+  the pool serves it. See [RPC method behavior](/cloud/rpc-behavior).
+- Prices can change; a purchase is always held to the terms in the challenge
+  you signed.
+
+## Next
+
+- [Serving access and pricing](/cloud/serving-access-and-pricing): how prices,
+  included usage and free access fit together.
+- [Balance and payment fallback](/cloud/balance-and-fallback): paying for
+  requests.

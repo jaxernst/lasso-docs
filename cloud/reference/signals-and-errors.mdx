@@ -1,0 +1,139 @@
+---
+title: Response signals and errors
+description: Every Lasso Cloud response header, lasso_meta field, RPC error code and management API error, with the fix for each
+---
+
+# Response signals and errors
+
+This is the reference for what Lasso Cloud adds to responses and the errors it
+returns. Every error Lasso originates names its fix in `next_action`. For how
+to use these signals together, read [routing evidence](/cloud/observability).
+
+```text
+"error": {
+  "code": <JSON-RPC code>,
+  "message": "…",
+  "data": {"code": "balance_exhausted", "next_action": "POST https://lasso.sh/api/v1/accounts/…/credit, or subscribe"}
+}
+```
+
+## Response headers
+
+| Header | Meaning |
+|---|---|
+| `x-lasso-request-id` | Unique per request; quote it when reporting a problem |
+| `x-lasso-access` | What served the request: `premium`, `public` or `custom` |
+| `x-lasso-fallback` | Present only when the request was served somewhere other than the profile it named: `payment`, `free`, `availability` or `profile` |
+| `x-lasso-cu` | The request's size in compute units |
+| `x-lasso-usd` | The request's charge to the balance in USD; `0` when included usage, free access, Custom access or payment fallback covered it |
+| `x-lasso-balance-usd` | The balance as the serving machine knows it after this charge; `GET /api/v1/accounts/{id}` is authoritative |
+| `RateLimit-Policy`, `RateLimit` | IETF rate-limit fields, named after the bucket: `managed` or the Custom profile's slug |
+| `x-lasso-meta` | With `include_meta=headers`: unpadded base64url JSON of `lasso_meta` |
+
+| `x-lasso-fallback` | Why |
+|---|---|
+| `payment` | The account's paid spending ran out within its grace window; served on public providers, uncharged |
+| `free` | Served on public providers under the account's free monthly allowance |
+| `availability` | Every eligible provider in the profile failed; another profile served the request |
+| `profile` | The named Custom profile was deleted or its Custom access lapsed; served as `premium` |
+
+## `lasso_meta`
+
+Add `?include_meta=body` for a top-level `lasso_meta` object, or
+`?include_meta=headers` for the `x-lasso-meta` header. Lasso Cloud returns:
+
+| Field | Meaning |
+|---|---|
+| `strategy` | The strategy actually used; differs from the URL when the serving access doesn't allow the one requested |
+| `chain_id` | The chain served |
+| `candidate_providers` | Providers considered, in order; not a list of attempts |
+| `selected_provider` | The provider that served the request |
+| `upstream_latency_ms` | Time spent at the provider |
+| `lasso_overhead_ms` | Time spent in Lasso |
+| `retries` | Attempts after the first |
+| `access` | The serving access, as in `x-lasso-access` |
+| `fallback` | The fallback reason, when one applied |
+
+Managed providers appear under public aliases; Custom profiles show your
+provider names. The routing engine's full field list, including block
+protection fields, is in [request metadata](/observability/request-metadata).
+WebSocket callers add `"lasso_meta": "notify"` to a request for a follow-up
+`lasso_meta` notification.
+
+## RPC errors
+
+RPC errors stay standard JSON-RPC. Errors Lasso originates carry
+`error.data.code` and `error.data.next_action`:
+
+| `error.data.code` | HTTP | Fix |
+|---|---|---|
+| `balance_exhausted` | 402 | Credit the account (`POST /api/v1/accounts/{id}/credit`) or subscribe |
+| `rate_limited` | 429 | Wait for `Retry-After` |
+| `rpc_route_required` | 422 | Append `/<chain>` or `/<strategy>/<chain>` |
+| `rpc_method_required` | 405 | Send JSON-RPC over HTTP `POST` |
+| `unknown_chain`, `unknown_strategy` | 422 | Use a value from [chains and prices](/cloud/reference/chains-and-prices) |
+| `forbidden` | 403 | The URL named a profile outside a scoped key's allowed profiles; `next_action` lists them |
+| `unknown_profile` | 404 | The URL named a profile the account has never had; `next_action` lists the account's profiles |
+| `key_revoked` | 401 | The key was revoked, or rotated past its overlap; use the current key |
+| `account_closed` | 401 | The provisional account closed after 90 inactive days; create a new key |
+| `deadline_exhausted` | 504 | Narrow the request, such as an `eth_getLogs` range |
+
+Provider errors pass through unchanged, with `code` and `next_action` added
+when Lasso classified them. When every eligible provider fails, the final
+JSON-RPC error arrives inside an HTTP 200 response. An `eth_getLogs` range a
+provider refuses as too large returns `-32005` with
+`data.reason: "log_range_too_large"`; split the range.
+
+## WebSocket close reasons
+
+| Close reason | Cause | Fix |
+|---|---|---|
+| `balance_exhausted` | The account stopped being served | Credit the account, then reconnect |
+| `custom_access_expired` | Custom access lapsed on this profile | Reconnect; the managed pool serves you until access is renewed |
+| `default_profile_changed` | The key's default profile changed | Reconnect; the new default serves you |
+| Code 1011 | Subscription recovery after a provider failure exceeded its bounds | Reconnect and resubscribe |
+
+Revoking a key, or the end of a rotation overlap, closes sockets using that
+secret.
+
+## Management API errors
+
+Management errors use one envelope:
+
+```json
+{"error": {"code": "unknown_chain", "message": "No chain named 'mainnet'.",
+  "next_action": "Use a name or ID from /agent.json chains, such as 'ethereum'.",
+  "docs_url": "https://docs.lasso.sh/…"}}
+```
+
+| Code | Fix |
+|---|---|
+| `unauthorized` | Send a management token (or an RPC key where allowed) as `Authorization: Bearer` |
+| `forbidden` | The credential lacks the named permission |
+| `not_found` | Check the ID; resources outside your account look absent |
+| `invalid_field`, `unknown_field` | Correct the named field |
+| `key_limit` | Revoke an unused key |
+| `profile_limit` | Delete a Custom profile |
+| `custom_access_required` | Buy access (`POST /api/v1/accounts/{id}/custom-access`) or subscribe |
+| `invalid_config` | Fix the field paths listed in `details` |
+| `provider_check_failed` | The named provider failed its chain identity check |
+| `revision_conflict` | Re-read the profile, then reapply |
+| `already_claimed` | The account already has a person; manage it from its members |
+| `already_subscribed` | The account already has open-ended Custom access |
+| `amount_out_of_range` | Stay within the range in `agent.json` |
+| `payment_required` | Sign one challenge and repeat the request with it |
+| `payment_invalid` | Sign the current challenge; don't reuse another |
+| `payment_conflict` | Check the first payment's `status_url`; never pay twice |
+| `payment_pending` | Don't pay again; check `status_url` |
+| `payment_failed` | The transfer didn't settle; request a fresh challenge |
+| `gone` | The route was retired; use the operation named in `next_action` |
+| `rate_limited` | Wait for `Retry-After` |
+| `unavailable` | Not enabled on this deployment; `agent.json` lists what is |
+
+Exact response schemas are in [`openapi.json`](https://lasso.sh/openapi.json).
+
+## Next
+
+- [Routing evidence](/cloud/observability): use these signals to debug.
+- [Agent API v2 compatibility](/cloud/reference/v2-compatibility): older
+  headers and error fields.

@@ -1,122 +1,148 @@
 ---
-title: Custom profiles and provider probes
-description: Build account-owned provider pools and interpret capability probe evidence
+title: Custom profiles
+description: Route over your own nodes and provider accounts behind a profile slug, with chain identity checks and learned provider knowledge
 ---
 
-# Custom profiles and provider probes
+# Custom profiles
 
-A custom profile is an account-owned pool of upstream providers. It uses the
-same routing engine as a managed profile while keeping its membership,
-credentials, billing lifecycle, and route identity separate.
+A Custom profile is an account-owned pool of your own nodes and provider
+accounts, routed by the same engine as Lasso's managed pool. Every key of the
+account reaches it at `/profile/<slug>/…`, or by default once you make it a
+key's default profile. Create one when you already pay for providers or run
+nodes and want failover, latency routing and evidence over them.
 
-Start with the [two-provider evaluation](/cloud/bring-your-own-rpc), or use the
-[agent management workflow](/cloud/agent-flows) when available on your deployment.
-The agent API uses a whole-document `PUT /api/v1/management/profiles/<slug>`;
-read the [configuration schema](https://lasso.sh/api/v1/management/configuration-schema)
-and dry-run a change before storing it. Its document operation differs from
-the dashboard editing steps below.
+```http
+PUT https://lasso.sh/api/v1/profiles/prod-base?dry_run=true
+Authorization: Bearer <management token>
+Content-Type: application/json
 
-## Operator journey
-
-1. Create a draft and choose its display name. Review the generated slug before
-   activation because the slug becomes part of the RPC route.
-2. Add a chain and one or more provider URLs. Credentials remain server-side and
-   must not appear in screenshots, issue comments, client errors, or logs.
-3. Optionally probe each provider. A probe spends upstream quota because it
-   makes representative JSON-RPC and WebSocket calls.
-4. Review method categories, archive behavior, request limits, latency, and
-   WebSocket results. Correct false assumptions before activation.
-5. Activate the profile, then send a harmless request such as `eth_chainId`
-   through its profile route.
-6. Observe traffic and provider health. Add, remove, or update providers as the
-   upstream stack changes; active edits propagate across the running cluster.
-
-An unprobed provider can be activated and routed with conservative defaults.
-That is useful when probe cost or provider quotas matter, but it provides less
-evidence for capability-aware routing.
-
-For HTTP, use an account key authorized for the account-owned profile:
-
-```bash
-curl -sS \
-  -H "x-lasso-api-key: $LASSO_KEY" \
-  -H 'content-type: application/json' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' \
-  "https://lasso.sh/rpc/profile/<slug>/load-balanced/<chain>"
+{"name": "Production Base", "chains": {"base": {"providers": [
+  {"name": "alchemy", "url": "https://base-mainnet.g.alchemy.com/v2/…"},
+  {"name": "my-node", "url": "https://node.example.com"}
+]}}}
 ```
 
-The corresponding WebSocket route is
-`wss://lasso.sh/ws/rpc/profile/<slug>/<strategy>/<chain>?key=$LASSO_KEY`. See the
-[live OpenAPI contract](https://lasso.sh/openapi.json) for profile-scoped HTTP,
-WebSocket, and authentication details. A key from another account is not
-authorized merely because it knows the profile slug.
+The dry run checks every new provider and changes nothing. Repeat the `PUT`
+without `dry_run` to save it, then call it:
 
-## Supported provider connection settings
+```bash
+curl -sS "$LASSO_RPC_URL/profile/prod-base/fastest/base" \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
+```
 
-The current Lasso Cloud editor accepts provider URLs. Use the endpoint URL supplied by your provider and verify the required methods with a probe and a test request.
+## The document
 
-The editor does not currently expose custom authentication headers or independent HTTP and WebSocket endpoint pairing. A provider that requires header-only authentication, or different HTTP and WebSocket hosts or paths, cannot be fully configured through this editor. Do not assume that changing `https` to `wss` creates a valid WebSocket endpoint, or move a header credential into a URL unless your provider explicitly supports that authentication method.
+The profile is one JSON document: the whole desired state. The dashboard edits
+the same document, so a profile an agent builds looks and behaves the same for
+everyone on the account. The minimum is a chain with a provider list; every
+other field is optional:
 
-The management API advertises connection fields in its live configuration schema, including independent HTTP and WebSocket URLs when supported, and a `headers` map that sets secret request headers shared by that provider's HTTP and WebSocket endpoints. A `PUT /api/v1/management/profiles/<slug>` document can set, replace, or clear a provider's `headers`; omitting the field keeps the stored headers. Header names and values are validated with Lasso RPC Core's provider-header rules (a bounded count, no hop-by-hop or WebSocket handshake headers, no control characters). Reads and dry runs never return header values: `GET` reports sorted `header_names`, and dry runs report a `headers_change` of `unchanged`, `set`, `replace`, or `clear`. This header support is API-only; the dashboard editor still has no header input.
+| Field | Level | Use it when |
+|---|---|---|
+| `url`, `ws_url` | provider | Always; add `ws_url` when the app subscribes |
+| `headers` | provider | The provider authenticates with secret request headers, shared by its HTTP and WebSocket endpoints |
+| List order | provider | You use the `priority` strategy; first is preferred |
+| `block_protection` | chain | The app polls the latest block and shouldn't see it go backwards |
+| `max_lag_blocks` | chain | The app tolerates less (or more) staleness than the chain default |
+| `health_checks`: `standard` or `light` | chain | Lasso's checks should spend less of your provider quota |
+| `error_interpretation` | profile | You opt in to Lasso interpreting your providers' error messages |
+| `limits`: `archival`, `logs_span`, `methods_blocked` | provider | You know a limit Lasso hasn't learned, such as your plan's log-span cap |
 
-Lasso RPC Core supports more transport configuration options when self-hosted; those options are separate from the current Cloud editor.
+Chains are keyed by name or decimal ID. The live field list, limits and
+workload recipes are in the
+[configuration schema](https://lasso.sh/api/v1/configuration-schema).
 
-## Interpret probe results
+Editing rules:
 
-A category result summarizes representative method calls; it is not a verdict
-on the provider as a whole.
+- Omit a provider, and it's removed; a dry run lists every removal.
+- Omit `url` on a provider you're keeping, and its stored URL stays.
+- Omit `headers`, and stored headers stay; `{}` clears them; a map replaces
+  them all.
+- Send `If-Match: <revision>` to refuse the change if someone else changed the
+  profile since you read it. After a lost response, re-read the revision
+  rather than repeating the `PUT` blindly.
 
-- **Supported:** the representative methods tested successfully.
-- **Partial:** some methods succeeded and others failed or were unavailable.
-  Inspect the failed methods and compare them with the application's workload.
-- **Blocked:** the endpoint or plan rejected the representative behavior. This
-  can be a provider policy or plan boundary rather than a node failure.
-- **Not served:** Lasso intentionally does not forward the category, so no
-  upstream test is meaningful.
+## Onboarding: what Lasso checks
 
-For example, failure of legacy uncle methods can make the core category partial
-without affecting ordinary Ethereum reads. `eth_createAccessList` can make state
-queries partial even when `eth_call`, balances, code, and storage work. Event
-filters may be blocked while direct `eth_getLogs` or WebSocket subscriptions
-remain the right application path. Judge the individual methods you need.
+When you save, Lasso checks the chain identity (`eth_chainId`) of every new or
+changed provider before storing anything:
 
-## Historical results
+| Status | Meaning |
+|---|---|
+| `verified` | Serves the configured chain, and routes |
+| `verifying` | Didn't answer; saved but kept out of routing, and rechecked every five minutes |
+| `failed` | Definitely wrong, such as another chain. The whole `PUT` is rejected with `provider_check_failed`, naming the provider |
 
-Archive support is not one boolean in the upstream ecosystem. A provider can
-serve old blocks, state, and logs differently, and plan-gated access can look
-like pruning. Lasso records the probe's evidence but current routing uses a
-conservative archive capability model. Validate the exact historical queries
-and ranges your application depends on rather than assuming “reported archival”
-means unlimited history for every method.
+The profile is `live` while each chain has at least one `verified` provider.
 
-## Safe editing model
+## Lasso learns your providers
 
-Profile configuration is database-backed. Successful edits invalidate and
-rebuild the relevant runtime configuration across regions; request routing does
-not query Postgres on every call. Operators are expected to test provider URLs
-and intended behavior before applying changes. The normal recovery path for a
-bad provider is to correct or remove it while the remaining eligible providers
-continue to serve traffic where possible.
+You supply URLs and intent. Lasso works out the rest from health checks and
+live traffic: historical depth per method, methods a provider refuses, and its
+`eth_getLogs` span limit. `GET /api/v1/profiles/{slug}` shows that knowledge
+for each provider, with its source and effect:
 
-## Block regression protection
+```json
+{"name": "my-node", "status": "verified", "knowledge": {
+  "methods_refused": [{"method": "debug_traceTransaction", "source": "learned", "effect": "shadow"}],
+  "logs_span": {"blocks": 10000, "source": "probe", "effect": "on"}
+}}
+```
 
-Turn **Block regression protection** **On** in a chain's settings so sequential
-latest-block requests never return a lower height on the same Lasso server.
-[Block regression protection](/advanced/block-continuity) describes its scope
-and errors, and [read at one block](/advanced/read-at-one-block) covers reading
-several values at the same block.
+`effect: on` means the knowledge changes routing today; `shadow` means Lasso is
+observing it and doesn't act on it yet. Declare `limits` only for what you know
+better than Lasso does; declared limits outrank learned ones.
+`DELETE /api/v1/profiles/{slug}/providers/{name}/knowledge` resets what Lasso
+learned about one provider.
 
-## Live block monitoring
+## Block protection
 
-In a chain's settings, **Live block monitoring** uses the providers selected for
-**Monitor new heads**. Turning it off preserves those selections and uses HTTP
-polling; client subscriptions remain available. Shared providers may still have
-feeds in use by another profile.
+Set `"block_protection": true` on a chain, and sequential latest-block requests
+(`eth_blockNumber`, `eth_getBlockByNumber("latest")`) never return a lower
+height on the same Lasso server. The behavior, scope and errors are on
+[block regression protection](/advanced/block-continuity). To read several
+values at one block, use [read at one block](/advanced/read-at-one-block)
+instead; it works without protection.
 
-Open **Learn more** for polling controls and current status. Custom intervals
-are available when Lasso recognizes credentials in the provider URL. Detection
-uses URL patterns; a private endpoint with an unrecognized short path token still
-receives the managed polling rate. Endpoints classified as public retain Lasso's
-minimum polling interval. Monitoring tracks
-provider freshness, while **Block regression protection** controls the blocks returned to
-callers.
+## Workload recipes
+
+| Workload | Profile | URL strategy |
+|---|---|---|
+| User-facing reads | Two or more providers; `block_protection: true` | `latency-weighted` |
+| Latency-critical trading | Fast providers first; `block_protection: true`; `max_lag_blocks: 1` | `fastest` |
+| Indexer or backfill | Include an archive-capable provider | `load-balanced` |
+| Transaction submission | Preferred broadcast provider first | `priority` |
+| Subscriptions | `ws_url` on at least two providers | Any |
+
+## Other operations
+
+| Call | Result |
+|---|---|
+| `GET /api/v1/profiles`, `GET /api/v1/profiles/{slug}` | Document, revision, provider status and knowledge; URLs and header values are never returned |
+| `GET /api/v1/profiles/{slug}` with `Accept: application/yaml` | The profile as a Lasso RPC Core YAML file, with secrets replaced by environment references, ready to self-host |
+| `DELETE /api/v1/profiles/{slug}` | Removes the profile; keys that defaulted to it default to `premium`, and URLs naming it serve as `premium` with `x-lasso-fallback: profile` |
+
+## Limits
+
+- Holding a Custom profile needs Custom access; a dry run doesn't. Provisional
+  accounts can buy Custom access with a wallet. See
+  [trial your own providers](/cloud/bring-your-own-rpc).
+- An account holds up to five Custom profiles.
+- If Custom access lapses, the profile is kept and its URLs are served as
+  `premium` until you renew. Open WebSocket connections on it close with
+  `custom_access_expired`.
+- Saved changes reach other regions asynchronously, usually within a second.
+- `block_protection` holds on one Lasso server. Across regions or a restart,
+  it's best effort.
+- Chain identity is the only onboarding gate. Historical depth and method
+  coverage are learned from behavior, so test your exact archive queries.
+
+## Next
+
+- [Trial your own providers](/cloud/bring-your-own-rpc): build and test a
+  profile before anyone signs up.
+- [Keys, URLs and profiles](/cloud/keys-and-profiles): make the profile a key's
+  default.
+- [Profiles in RPC Core](/concepts/profiles): the engine's profile model, for
+  self-hosting.
