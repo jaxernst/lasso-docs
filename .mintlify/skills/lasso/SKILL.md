@@ -218,6 +218,12 @@ Content-Type: application/json
 Profile documents are available when `auth.profiles.documents_enabled` is true
 in `/agent.json`.
 
+Start with the provider URLs and omit `limits` unless you already know a
+provider policy you need to enforce. The dry run checks chain identity and
+reachability, not archive coverage. Test the historical reads your app needs
+through the installed Lasso URL, and inspect the selected provider and request
+ID before adding an explicit override.
+
 1. `?dry_run=true` returns the changes and each provider's chain check without
    storing anything, and needs no Custom access.
 2. The same `PUT` without `dry_run` stores it. Lasso checks every new or

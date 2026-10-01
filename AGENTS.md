@@ -36,3 +36,11 @@
 - Keep self-hosting and implementation details in the RPC Core sections.
 - Link to live pricing, chain, and OpenAPI resources instead of copying values
   that can change.
+
+## Generated content
+
+Never edit generated files by hand; regenerate them from the live source.
+
+- `.mintlify/skills/lasso/SKILL.md` is a byte-identical copy of
+  `https://lasso.sh/SKILL.md`: run `node scripts/agent-skill.mjs`, and
+  `--check` to detect drift.
