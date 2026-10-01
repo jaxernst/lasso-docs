@@ -89,6 +89,12 @@ conservative archive capability model. Validate the exact historical queries
 and ranges your application depends on rather than assuming “reported archival”
 means unlimited history for every method.
 
+A learned historical limitation is not permanent: Lasso periodically re-checks
+it in the background (every five minutes by default) and automatically
+retracts it once the provider answers successfully. An inconclusive or failed
+recheck leaves the existing evidence and its expiry unchanged, so a provider
+that stays blocked keeps reporting blocked until a check actually succeeds.
+
 ## Safe editing model
 
 Profile configuration is database-backed. Successful edits invalidate and
