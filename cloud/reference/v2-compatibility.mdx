@@ -56,6 +56,8 @@ traffic on it.
   profile keeps that profile as its default and is scoped to it.
 - **Running out of money doesn't stop a paying app.** Accounts that have paid
   fall back to public providers for 30 days instead of failing.
+- **Included usage is counted per method.** Free allowances and Pro included
+  usage move from byte-based CU to per-method CU, restated for parity.
 - **Agent-created keys share one rate limit per account** instead of 50 RPS
   each.
 - **A claim link comes from the agent, not the RPC key**, so an exposed key

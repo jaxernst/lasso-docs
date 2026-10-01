@@ -56,7 +56,7 @@ nothing to fill in.
 | `allowed_profiles` | The profiles the key may name in its URL | `all`: every current and future profile of the account |
 
 Change a key's default, and every URL without a profile segment moves with it
-on the next request, with no redeploy:
+as each region applies the change, usually within a second, with no redeploy:
 
 ```http
 PATCH https://lasso.sh/api/v1/keys/{id}
@@ -72,8 +72,10 @@ and your client's reconnect follows the new default.
 
 ## Scope keys you expose
 
-A key in a browser bundle or mobile app is public. Scope it to the profiles it
-needs, so a visitor who copies it can't spend your balance:
+A key in a browser bundle or mobile app is public. Scope it to `public`, so a
+visitor who copies it can't spend your balance. A key scoped to a Custom
+profile isn't safe to expose: if Custom access lapses or the profile is
+deleted, its requests are served and charged as `premium`.
 
 ```http
 POST https://lasso.sh/api/v1/keys

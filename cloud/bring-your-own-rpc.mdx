@@ -117,7 +117,8 @@ the incoming one is renamed and the app's URL keeps reaching it.
 
 - Custom access is per account and covers up to five Custom profiles. When the
   trial's days run out, the profile is kept and its URLs serve from Lasso's
-  `premium` pool, marked `x-lasso-fallback: profile`, until access is renewed.
+  `premium` pool, charged at request prices from the balance and marked
+  `x-lasso-fallback: profile`, until access is renewed.
 - Two URLs on the same provider account, region or plan can fail together.
   Test the failure you need to survive.
 - A dry run checks chain identity only. Archive coverage, WebSocket support and
