@@ -32,9 +32,13 @@ When Lasso recognizes a range or result-size limit, the JSON-RPC error has
 `code: -32005` and `data: {"reason": "log_range_too_large", "action":
 "reduce_block_range"}`. Make the next query over a smaller block span. Lasso
 does not split it automatically or repeat the same query against another
-provider. A key-authenticated request that reaches Cloud metering can still
-consume usage when it returns this error; check the key's response charge or
-account usage rather than assuming failed requests are free. See the
+provider. Some providers instead report a plan restriction on `eth_getLogs`
+as a generic `-32600` invalid-request error; Lasso recognizes that case and
+fails over to another eligible provider with the unchanged query rather than
+returning the terminal `-32005`. A key-authenticated request that reaches
+Cloud metering can still consume usage when it returns this error; check the
+key's response charge or account usage rather than assuming failed requests
+are free. See the
 [error-code contract](/api/error-codes#large-eth_getlogs-queries).
 
 See [historical workload qualification](/cloud/historical-workloads) for dated
