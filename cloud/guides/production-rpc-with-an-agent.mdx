@@ -45,8 +45,8 @@ for env in staging worker; do
 done
 ```
 
-If the app has a frontend that calls RPC from the browser, give it a scoped
-key that can't spend the balance:
+If the app has a frontend that calls RPC from the browser, give it its own
+key, scoped to `public`:
 
 ```bash
 curl -sS https://lasso.sh/api/v1/keys \

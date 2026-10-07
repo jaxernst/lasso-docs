@@ -86,8 +86,8 @@ Indexers take the same URL wherever they take an RPC endpoint. Use
 
 ## Browser and mobile apps
 
-A URL that ships to a browser or a phone is public. Give that app its own key,
-scoped to the profiles it needs, and keep unscoped keys on servers:
+Give an app that ships its URL to a browser or a phone its own key, scoped to
+the profiles it needs, and keep unscoped keys on servers:
 
 ```bash
 curl -sS https://lasso.sh/api/v1/keys \
@@ -96,7 +96,8 @@ curl -sS https://lasso.sh/api/v1/keys \
   -d '{"name":"web","default_profile":"public","allowed_profiles":["public"]}'
 ```
 
-A visitor who copies that key can only send public traffic. It shares your
+`allowed_profiles` limits which profiles a key can name, so that key sends
+only public traffic. It shares your
 account's rate limit and, on an account with no balance, its free monthly
 allowance, but it never spends your balance.
 

@@ -68,7 +68,7 @@ curl -fsS --retry 5 "$LASSO_RPC_URL/fastest/base?include_meta=body" \
 `--retry` repeats the errors Lasso marks retryable (HTTP 503 or 429); fix
 anything else. Every response also carries `x-lasso-request-id`,
 `x-lasso-access` (`premium`, `public` or `custom`), `x-lasso-usd` (what it
-cost) and `x-lasso-balance-usd`. Use
+cost) and `x-lasso-balance-usd` (an estimate of the balance after it). Use
 `eth_blockNumber` rather than `eth_chainId` to see routing, since the chain ID
 can be answered without an upstream.
 

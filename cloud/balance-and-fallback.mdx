@@ -102,7 +102,7 @@ can also subscribe in the dashboard.
 | Signal | What it tells you |
 |---|---|
 | `x-lasso-usd` | This request's charge; `0` when included usage, free access, Custom access or payment fallback covered it |
-| `x-lasso-balance-usd` | The balance after this charge |
+| `x-lasso-balance-usd` | An estimate of the balance after this charge |
 | `x-lasso-access` | `premium`, `public` or `custom` |
 | `x-lasso-fallback` | Why a request was served somewhere other than the profile it named |
 | `GET /api/v1/accounts/{id}` | The authoritative balance, subscriptions, included usage, access and grace window |

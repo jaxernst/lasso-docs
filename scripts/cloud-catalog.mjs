@@ -92,7 +92,7 @@ function errors(entries, withRetry) {
     .map(e => [
       `\`${e.code}\``,
       String(e.status),
-      ...(withRetry ? [e.retryable ? 'Yes' : 'No'] : []),
+      ...(withRetry ? [e.retryable == null ? 'Varies' : e.retryable ? 'Yes' : 'No'] : []),
       cell(e.next_action),
     ]);
   return table(['Code', 'HTTP', ...(withRetry ? ['Retryable'] : []), 'Fix'], rows);

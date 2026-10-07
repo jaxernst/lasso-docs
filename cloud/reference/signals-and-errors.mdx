@@ -29,7 +29,7 @@ to use these signals together, read [routing evidence](/cloud/observability).
 | `x-lasso-fallback` | Present only when the request was served somewhere other than the profile it named: `payment`, `free` or `profile` |
 | `x-lasso-cu` | The request's size in compute units |
 | `x-lasso-usd` | The request's charge to the balance in USD; `0` when included usage, free access, Custom access or payment fallback covered it |
-| `x-lasso-balance-usd` | The balance after this charge. `GET /api/v1/accounts/{id}` is authoritative |
+| `x-lasso-balance-usd` | An estimate of the balance after this charge. `GET /api/v1/accounts/{id}` is authoritative |
 | `RateLimit-Policy`, `RateLimit` | IETF rate-limit fields, named after the bucket that bound the request: `managed`, `public` or the Custom profile's slug |
 | `x-lasso-meta` | With `include_meta=headers`: unpadded base64url JSON of `lasso_meta` |
 

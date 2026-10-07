@@ -32,8 +32,9 @@ Content-Type: application/json
 ```
 
 Store the new values straight into the secret store. Don't print them. A 202
-means the new secret isn't serving yet; send traffic with it after
-`Retry-After`.
+means the rotation is done but the new secret isn't serving everywhere yet:
+keep the old secret in use while `previous_valid_until` allows, retry RPC with
+the new secret after `Retry-After` until it succeeds, and don't rotate again.
 
 ## 2. Deploy the new secret
 

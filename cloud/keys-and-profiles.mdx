@@ -70,12 +70,12 @@ Making a Custom profile the default needs Custom access. Open WebSocket
 connections that used the old default close with `default_profile_changed`,
 and your client's reconnect follows the new default.
 
-## Scope keys you expose
+## Scope keys you ship
 
-A key in a browser bundle or mobile app is public. Scope it to `public`, so a
-visitor who copies it can't spend your balance. A key scoped to a Custom
-profile isn't safe to expose: if Custom access lapses or the profile is
-deleted, its requests are served and charged as `premium`.
+Give a key in a browser bundle or mobile app its own scope. `allowed_profiles`
+limits which profiles a key can name; a key scoped to `public` sends only
+public traffic. A key scoped to a Custom profile is served and charged as
+`premium` if Custom access lapses or the profile is deleted.
 
 ```http
 POST https://lasso.sh/api/v1/keys

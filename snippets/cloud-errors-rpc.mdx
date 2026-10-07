@@ -2,7 +2,10 @@
 
 | Code | HTTP | Retryable | Fix |
 | --- | --- | --- | --- |
+| `local_capacity_rejection` | 200 | Varies | Reduce the request size or concurrency, then retry. |
 | `log_range_limit` | 200 | No | Reduce the eth_getLogs block range and retry. |
+| `provider_error` | 200 | Varies | Retry the request; if it keeps failing, report it with its request ID. |
+| `timeout` | 200 | Yes | Narrow the request, such as the eth_getLogs block range, then retry. |
 | `invalid_field` | 400 | No | Use /profile/&lt;slug>/&lt;strategy>/&lt;chain> or /&lt;chain>. |
 | `invalid_request` | 400 | No | Send a bounded JSON-RPC envelope. |
 | `unknown_chain` | 400 | No | Choose a chain from /agent.json. |
@@ -13,4 +16,4 @@
 | `rate_limit_exceeded` | 429 | Yes | Retry after the indicated delay. |
 | `not_prepared` | 503 | Yes | Retry shortly. |
 | `profile_config_unavailable` | 503 | Yes | Retry shortly. |
-| `unavailable` | 503 | Yes | If this key was created or rotated in the last few seconds, retry; otherwise use the key's current secret. |
+| `unavailable` | 503 | Yes | Retry the same request shortly; the key does not need to change. |
