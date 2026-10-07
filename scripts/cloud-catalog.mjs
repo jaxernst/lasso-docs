@@ -1,11 +1,13 @@
 // Renders the Lasso Cloud chain, price and error tables.
 // Chains come from the live service manifest, errors from the error catalog
 // the live OpenAPI document publishes, and prices from the account tariff
-// file in lasso-cloud (config/account_model_cutover_tariff.exs), which is
-// what Lasso charges.
-// Usage: node scripts/cloud-catalog.mjs --tariff <path> [--check]
-//          [--manifest <url-or-path>] [--openapi <url-or-path>]
+// file in lasso-cloud (config/account_model_tariffs.exs), which is what Lasso
+// charges. The file is Elixir, so `elixir` evaluates it; --tariff-version
+// picks a version, otherwise the newest one prices the tables.
+// Usage: node scripts/cloud-catalog.mjs --tariff <path> [--tariff-version <v>]
+//          [--check] [--manifest <url-or-path>] [--openapi <url-or-path>]
 // --check exits 1 when the committed snippets differ from the sources.
+import {execFileSync} from 'node:child_process';
 import {readFileSync, writeFileSync} from 'node:fs';
 
 const args = process.argv.slice(2);
@@ -16,7 +18,7 @@ const option = name => {
 const check = args.includes('--check');
 const source = option('--manifest') ?? 'https://lasso.sh/agent.json';
 const tariffPath = option('--tariff');
-if (!tariffPath) throw new Error('--tariff <path to account_model_cutover_tariff.exs> is required');
+if (!tariffPath) throw new Error('--tariff <path to account_model_tariffs.exs> is required');
 
 const load = async from =>
   from.startsWith('http')
@@ -30,19 +32,38 @@ if (!catalog) throw new Error(`${openapiSource} publishes no x-error-catalog`);
 const row = cells => `| ${cells.join(' | ')} |`;
 const table = (head, rows) => [row(head), row(head.map(() => '---')), ...rows.map(row)].join('\n');
 
-function parseTariff(text) {
-  const version = text.match(/version:\s*"([^"]+)"/)?.[1];
-  const unitNanos = Number(text.match(/unit_nanos:\s*([\d_]+)/)?.[1].replaceAll('_', ''));
-  const block = name => text.match(new RegExp(`${name}:\\s*%\\{([\\s\\S]*?)\\n\\s*\\}`))?.[1] ?? '';
-  const ratio = (body, key) => [...body.matchAll(key)].map(m => [m[1], Number(m[2]) / Number(m[3])]);
+// Evaluates the tariff file, a map or a list of versioned maps, to JSON with
+// rationals {n, d} as [n, d].
+const evaluate = `
+[path, wanted] = System.argv()
+tariffs = path |> Code.eval_file() |> elem(0) |> List.wrap()
+tariff = if wanted == "", do: List.last(tariffs), else: Enum.find(tariffs, &(&1.version == wanted))
+tariff || raise "no tariff #{wanted} in #{path}"
+plain = fn
+  f, m when is_map(m) -> Map.new(m, fn {k, v} -> {to_string(k), f.(f, v)} end)
+  _, {n, d} -> [n, d]
+  _, v -> v
+end
+IO.puts(JSON.encode!(plain.(plain, tariff)))
+`;
+
+function loadTariff(path, version = '') {
+  const raw = JSON.parse(execFileSync('elixir', ['-e', evaluate, path, version], {encoding: 'utf8'}));
+  const ratio = ([n, d]) => n / d;
   const factors = Object.fromEntries(
-    ratio(block('strategy_factors'), /(\w+):\s*\{(\d+),\s*(\d+)\}/g).map(([k, v]) => [k.replaceAll('_', '-'), v]),
+    Object.entries(raw.strategy_factors).map(([k, v]) => [k.replaceAll('_', '-'), ratio(v)]),
   );
-  const weights = Object.fromEntries(ratio(block('method_weights'), /"([^"]+)"\s*=>\s*\{(\d+),\s*(\d+)\}/g));
-  if (!version || !unitNanos || Object.keys(factors).length === 0 || Object.keys(weights).length === 0) {
-    throw new Error(`could not read the tariff at ${tariffPath}`);
-  }
-  return {version, unitNanos, factors, weights};
+  const weights = Object.fromEntries(Object.entries(raw.method_weights).map(([k, v]) => [k, ratio(v)]));
+  return {
+    version: raw.version,
+    unitNanos: raw.unit_nanos,
+    factors,
+    weights,
+    notificationWeight: ratio(raw.notification_weight),
+    includedCu: raw.included_cu,
+    startingGrantNanos: raw.starting_grant_nanos,
+    customDayNanos: raw.custom_day_nanos,
+  };
 }
 
 const usd = nanos => `$${(nanos / 1e9).toFixed(9).replace(/0+$/, '').replace(/\.$/, '')}`;
@@ -76,6 +97,22 @@ function prices({unitNanos, factors, weights}) {
   return table(['Method', 'Weight (CU)', ...order.map(id => `\`${id}\``)], rows);
 }
 
+const count = value => Number(value).toLocaleString('en-US');
+const times = factor => `${factor}x`;
+
+function terms(t) {
+  const order = ['load-balanced', 'latency-weighted', 'fastest', 'priority'];
+  return table(['Item', 'Value'], [
+    ['Rate', `${usd(t.unitNanos)} per CU`],
+    ['Strategy factors', order.map(id => `\`${id}\` ${times(t.factors[id])}`).join(', ')],
+    ['Subscription notification', `${t.notificationWeight} CU`],
+    ['Starting grant for a new provisional account', usd(t.startingGrantNanos)],
+    ['Free access', `${count(t.includedCu.free)} CU per month`],
+    ['Pro included usage', `${count(t.includedCu.pro)} CU per month`],
+    ['Custom access bought with a wallet', `$${(t.customDayNanos / 1e9).toFixed(2)} per day, 1 to 30 days per purchase`],
+  ]);
+}
+
 // Pipes and line breaks would break a Markdown table cell; MDX reads < as a
 // tag and { as an expression.
 const cell = text =>
@@ -98,9 +135,10 @@ function errors(entries, withRetry) {
   return table(['Code', 'HTTP', ...(withRetry ? ['Retryable'] : []), 'Fix'], rows);
 }
 
-const tariff = parseTariff(readFileSync(tariffPath, 'utf8'));
+const tariff = loadTariff(tariffPath, option('--tariff-version'));
 const outputs = {
   'snippets/cloud-chains.mdx': [`{/* Generated by scripts/cloud-catalog.mjs from ${source}. Do not edit. */}`, chains(manifest)],
+  'snippets/cloud-tariff.mdx': [`{/* Generated by scripts/cloud-catalog.mjs from tariff ${tariff.version}. Do not edit. */}`, terms(tariff)],
   'snippets/cloud-prices.mdx': [`{/* Generated by scripts/cloud-catalog.mjs from tariff ${tariff.version}. Do not edit. */}`, prices(tariff)],
   'snippets/cloud-errors-management.mdx': [`{/* Generated by scripts/cloud-catalog.mjs from the x-error-catalog in openapi.json. Do not edit. */}`, errors(catalog.management, false)],
   'snippets/cloud-errors-rpc.mdx': [`{/* Generated by scripts/cloud-catalog.mjs from the x-error-catalog in openapi.json. Do not edit. */}`, errors(catalog.rpc, true)],

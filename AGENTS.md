@@ -57,11 +57,15 @@
 
 Never edit generated files by hand; regenerate them from the live source.
 
-- `snippets/cloud-chains.mdx` comes from `https://lasso.sh/agent.json`, and
-  `snippets/cloud-prices.mdx` from the account tariff in lasso-cloud
-  (`config/account_model_cutover_tariff.exs`): run
-  `node scripts/cloud-catalog.mjs --tariff <path>`, and `--check` to detect
-  drift.
+- `snippets/cloud-chains.mdx` comes from `https://lasso.sh/agent.json`, the
+  error tables from the `x-error-catalog` in `https://lasso.sh/openapi.json`,
+  and `snippets/cloud-prices.mdx` and `snippets/cloud-tariff.mdx` from the
+  account tariffs in lasso-cloud (`config/account_model_tariffs.exs`, or
+  `config/account_model_cutover_tariff.exs` before it existed): run
+  `node scripts/cloud-catalog.mjs --tariff <path>`, passing
+  `--tariff-version <version>` for the version production prices new periods
+  with when it isn't the newest, and `--check` to detect drift. Evaluating the
+  tariff file needs `elixir` on the PATH.
 - `.mintlify/skills/lasso/SKILL.md` is a byte-identical copy of
   `https://lasso.sh/SKILL.md`: run `node scripts/agent-skill.mjs`, and
   `--check` to detect drift.

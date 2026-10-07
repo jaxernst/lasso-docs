@@ -3,6 +3,8 @@ title: Serving access and pricing
 description: What serves each request (premium, public or Custom), what it costs in USD, and how compute units measure included usage
 ---
 
+import CloudTariff from '/snippets/cloud-tariff.mdx';
+
 # Serving access and pricing
 
 Every request Lasso serves has one **serving access**: `premium`, `public` or
@@ -81,15 +83,7 @@ request refused before routing, is free.
 
 ### Current tariff
 
-| Item | Value |
-|---|---|
-| Rate | $0.000005 per CU |
-| Strategy factors | `load-balanced` 1x, `latency-weighted` 1.5x, `fastest` 2x, `priority` 1x |
-| Subscription notification | 3 CU |
-| Starting grant for a new provisional account | $0.025 |
-| Free access | 1,000,000 CU per month |
-| Pro included usage | 65,000,000 CU per month |
-| Custom access bought with a wallet | $1.30 per day, 1 to 30 days per purchase |
+<CloudTariff />
 
 Subscription prices are on [lasso.sh/pricing](https://lasso.sh/pricing).
 `agent.json` publishes the live values agents act on.
