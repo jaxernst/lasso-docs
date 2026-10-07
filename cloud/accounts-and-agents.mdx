@@ -102,17 +102,6 @@ other agents, or changes Stripe subscriptions. It can't spend money either:
 paying needs a wallet signature. An agent can rotate or revoke its own token,
 and any admin can revoke any agent.
 
-## Older keys without an agent
-
-A key created before agents existed has its own provisional account with no
-agent. Its RPC key can request that account's claim link, since it's the
-account's only credential:
-
-```http
-POST https://lasso.sh/api/v1/accounts/current/claim-link
-Authorization: Bearer <rpc key>
-```
-
 ## Limits
 
 - An agent belongs to exactly one account. An agent working for several
@@ -124,7 +113,6 @@ Authorization: Bearer <rpc key>
   revoked or restricted before confirmation claims nothing.
 - If an agent loses its token, the account's keys keep serving. The agent can
   start a new account, and Lasso support can recover the old one.
-- Changes to keys and accounts apply in every region within seconds.
 
 ## Next
 

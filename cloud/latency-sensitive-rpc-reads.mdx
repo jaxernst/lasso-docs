@@ -21,9 +21,9 @@ const reads  = `${process.env.LASSO_RPC_URL}/latency-weighted/base`;
 
 | Strategy | First attempt | Trade-off |
 |---|---|---|
-| `fastest` | The provider with the lowest recent latency for this kind of request | Concentrates traffic on one provider; 2x the price on premium |
-| `latency-weighted` | A random provider, weighted toward lower recent latency | Spreads load while favoring fast providers; 1.5x the price on premium |
-| `load-balanced` | A random healthy provider | Lowest price; no latency preference |
+| `fastest` | Tries the provider with the lowest recent latency for this kind of request first | Concentrates traffic on one provider; 2x the price on premium |
+| `latency-weighted` | Random order weighted toward providers with lower recent latency | Spreads load while favoring fast providers; 1.5x the price on premium |
+| `load-balanced` | Random order across healthy providers | Lowest price; no latency preference |
 
 Health comes first: a provider with an open circuit is skipped whatever its
 latency. [Routing strategies](/concepts/routing-strategies) defines each

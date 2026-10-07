@@ -22,8 +22,10 @@ Content-Type: application/json
 ]}}}
 ```
 
-The dry run checks every new provider and changes nothing. Repeat the `PUT`
-without `dry_run` to save it, then call it:
+The dry run checks every new provider, changes nothing, and needs no Custom
+access. Saving needs Custom access: subscribe, or buy days with a wallet
+([trial your own providers](/cloud/bring-your-own-rpc)). Then repeat the `PUT`
+without `dry_run` and call it:
 
 ```bash
 curl -sS "$LASSO_RPC_URL/profile/prod-base/fastest/base" \
@@ -74,7 +76,9 @@ changed provider before storing anything:
 | `verifying` | Didn't answer; saved but kept out of routing, and rechecked every five minutes |
 | `failed` | Definitely wrong, such as another chain. The whole `PUT` is rejected with `provider_check_failed`, naming the provider |
 
-The profile is `live` while each chain has at least one `verified` provider.
+The profile is `live` while each chain has at least one `verified` provider;
+a chain with none answers its requests with the JSON-RPC error until one
+verifies.
 
 ## Lasso learns your providers
 
@@ -132,7 +136,6 @@ instead; it works without protection.
 - If Custom access lapses, the profile is kept and its URLs are served as
   `premium` until you renew. Open WebSocket connections on it close with
   `custom_access_expired`.
-- Saved changes apply in every region within seconds.
 - `block_protection` holds per Lasso server.
 - Chain identity is the only onboarding gate. Historical depth and method
   coverage are learned from behavior, so test your exact archive queries.

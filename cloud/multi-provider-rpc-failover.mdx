@@ -25,9 +25,7 @@ curl -sS "$LASSO_RPC_URL/load-balanced/base?include_meta=body" \
 Lasso finds the providers that can serve the chain and method, orders them by
 health and your strategy, and sends the request. If the provider fails in a way
 that's safe to retry, such as a timeout, a 5xx or a rate limit, the next
-provider is tried within the same request deadline. On Lasso's managed pool, a
-request that every premium provider fails is retried on public providers and
-marked `x-lasso-fallback: availability`. See [routing](/cloud/routing).
+provider is tried within the same request deadline. See [routing](/cloud/routing).
 
 ## What failover covers
 
@@ -64,8 +62,6 @@ marked `x-lasso-fallback: availability`. See [routing](/cloud/routing).
   recovery can't complete, the socket closes with code 1011, and the client
   reconnects and resubscribes. Keep your own checkpoint for indexer-grade
   processing.
-- The 50-client [continuity soak](/cloud/websocket-continuity-evidence) covered
-  `newHeads` only.
 
 ## Next
 

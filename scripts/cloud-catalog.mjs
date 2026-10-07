@@ -55,9 +55,21 @@ function chains({chains}) {
   return table(['Chain name', 'Chain ID'], rows);
 }
 
+// Lasso answers HTTP filter methods with -32601 (cloud/rpc-behavior), so the
+// tariff's weights for them never apply.
+const rejected = new Set([
+  'eth_newFilter',
+  'eth_newBlockFilter',
+  'eth_newPendingTransactionFilter',
+  'eth_getFilterChanges',
+  'eth_getFilterLogs',
+  'eth_uninstallFilter',
+]);
+
 function prices({unitNanos, factors, weights}) {
   const order = ['load-balanced', 'latency-weighted', 'fastest', 'priority'].filter(id => id in factors);
-  const {_default: fallback, ...named} = weights;
+  const {_default: fallback, ...served} = weights;
+  const named = Object.fromEntries(Object.entries(served).filter(([method]) => !rejected.has(method)));
   const cells = weight => [String(weight), ...order.map(id => usd(weight * factors[id] * unitNanos))];
   const rows = Object.keys(named).sort().map(method => [`\`${method}\``, ...cells(named[method])]);
   if (fallback) rows.push(['Any other method', ...cells(fallback)]);

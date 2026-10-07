@@ -76,7 +76,7 @@ Content-Type: application/json
 ## 5. Verify on real traffic
 
 ```bash
-curl -sS -D - "$LASSO_RPC_URL/fastest/base?include_meta=body" \
+curl -fsS --retry 5 -D - "$LASSO_RPC_URL/fastest/base?include_meta=body" \
   -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
 ```

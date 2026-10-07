@@ -37,7 +37,7 @@ because a hash's age is unknown before dispatch.
 
 `eth_getLogs` also has provider-specific range and result-size limits. When
 Lasso recognizes that limit, it returns `-32005` with
-`data: {"reason": "log_range_too_large", "action": "reduce_block_range"}`.
+`data.code: "log_range_limit"` and a `next_action` to narrow the range.
 Split the range; Lasso doesn't split it or repeat the same query on another
 provider. Qualify your exact queries with
 [indexer backfills](/cloud/indexer-backfills).
@@ -83,8 +83,6 @@ subscriptions aren't served. The engine's behavior is documented in
   [balance and payment fallback](/cloud/balance-and-fallback).
 - Clients must handle network disconnects, duplicates around a reconnect, and
   their own checkpoints for indexer-grade processing.
-- The [continuity soak](/cloud/websocket-continuity-evidence) covered
-  `newHeads` with 50 clients.
 
 ## Next
 

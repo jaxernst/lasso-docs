@@ -45,8 +45,8 @@ test, not as a coverage promise.
 ## Handle range limits
 
 When a provider refuses an `eth_getLogs` range as too large, Lasso returns
-`-32005` with `data.reason: "log_range_too_large"` and
-`data.action: "reduce_block_range"`. Split the range and retry; Lasso doesn't
+`-32005` with `data.code: "log_range_limit"`; follow its `next_action`: split
+the range and retry. Lasso doesn't
 split it for you. On a Custom profile, Lasso learns each provider's span limit
 from these refusals and shows it in the profile's knowledge.
 
@@ -57,8 +57,9 @@ from these refusals and shows it in the profile's knowledge.
 - Keep a durable checkpoint and a reorg overlap, and deduplicate logs by
   identity.
 - A refused range can still be charged on premium; check `x-lasso-usd`.
-- Test from your deployment regions under representative volume, and keep the
-  previous endpoint until the Lasso route passes.
+- Test from your deployment regions under representative volume; the
+  [rollout steps](/cloud/install#roll-out-one-path-at-a-time) cover moving
+  traffic.
 
 ## Next
 

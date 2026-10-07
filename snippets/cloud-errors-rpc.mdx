@@ -2,6 +2,7 @@
 
 | Code | HTTP | Retryable | Fix |
 | --- | --- | --- | --- |
+| `log_range_limit` | 200 | No | Reduce the eth_getLogs block range and retry. |
 | `invalid_field` | 400 | No | Use /profile/&lt;slug>/&lt;strategy>/&lt;chain> or /&lt;chain>. |
 | `invalid_request` | 400 | No | Send a bounded JSON-RPC envelope. |
 | `unknown_chain` | 400 | No | Choose a chain from /agent.json. |

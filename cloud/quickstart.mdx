@@ -30,8 +30,10 @@ curl -sS https://lasso.sh/api/v1/keys \
 }
 ```
 
-That one request creates a provisional account with a small starting balance,
-makes you its agent, and issues your first key. Keep the secrets apart:
+That one request creates a provisional account with a starting balance
+(`pricing.free_grant_usd` in [`agent.json`](https://lasso.sh/agent.json),
+enough to verify but not to run production), makes you its agent, and issues
+your first key. Keep the secrets apart:
 
 | Value | Where it goes |
 |---|---|
@@ -44,11 +46,10 @@ create makes a second, separate account, so reuse the token for more keys.
 
 ### 2. Call it
 
-Append a chain, and optionally a strategy, to `rpc_url`. A new key takes a
-few seconds to reach every server, so the first call retries:
+Append a chain, and optionally a strategy, to `rpc_url`:
 
 ```bash
-curl -sS --retry 10 --retry-all-errors --retry-delay 3 "$LASSO_RPC_URL/fastest/base?include_meta=body" \
+curl -fsS --retry 5 "$LASSO_RPC_URL/fastest/base?include_meta=body" \
   -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
 ```
@@ -64,8 +65,10 @@ curl -sS --retry 10 --retry-all-errors --retry-delay 3 "$LASSO_RPC_URL/fastest/b
 }
 ```
 
-Every response also carries `x-lasso-request-id`, `x-lasso-access` (what
-served it), `x-lasso-usd` (what it cost) and `x-lasso-balance-usd`. Use
+`--retry` repeats the errors Lasso marks retryable (HTTP 503 or 429); fix
+anything else. Every response also carries `x-lasso-request-id`,
+`x-lasso-access` (`premium`, `public` or `custom`), `x-lasso-usd` (what it
+cost) and `x-lasso-balance-usd`. Use
 `eth_blockNumber` rather than `eth_chainId` to see routing, since the chain ID
 can be answered without an upstream.
 
@@ -78,15 +81,15 @@ Change one path segment to switch pools:
 | URL | Served by |
 |---|---|
 | `$LASSO_RPC_URL/fastest/base` | The key's default profile, `premium` |
-| `$LASSO_RPC_URL/profile/public/base` | Lasso's public providers, uncharged, `load-balanced` |
+| `$LASSO_RPC_URL/profile/public/base` | Lasso's public providers, uncharged while the account has spending power, `load-balanced` |
 | `$LASSO_RPC_URL/profile/prod-base/fastest/base` | Your `prod-base` Custom profile |
 
 | Strategy | What it does | Use it for |
 |---|---|---|
-| `load-balanced` (default) | Spreads requests across healthy providers | Backends, indexers |
-| `latency-weighted` | Spreads requests, weighted toward recently fast providers | User-facing reads |
-| `fastest` | Sends each request to the recently fastest provider for its kind of request | Trading and other latency-critical paths |
-| `priority` | Follows your configured provider order | Custom profiles with a preferred primary |
+| `load-balanced` (default) | Spreads requests in random order across healthy providers | Backends, indexers |
+| `latency-weighted` | Random order weighted toward providers with lower recent latency | User-facing reads |
+| `fastest` | Tries the provider with the lowest recent latency for this kind of request first | Trading and other latency-critical paths |
+| `priority` | Tries providers in your Custom profile's configured order | A preferred primary with backups |
 
 Strategies price differently on premium; the live table is in
 [chains and prices](/cloud/reference/chains-and-prices).
@@ -120,14 +123,15 @@ apps.
 ### 5. Fund it and hand it off
 
 When the starting balance isn't enough, credit the account within the budget
-your user approved. The request answers 402 with a standard x402 or MPP
-challenge that a stock client signs with the user's wallet:
+your user approved and the per-purchase range in `account_payments.rails`. The
+request answers 402 with a standard x402 or MPP challenge that a stock client
+signs with the user's wallet ([example](/cloud/balance-and-fallback#top-up)):
 
 ```http
 POST https://lasso.sh/api/v1/accounts/{account_id}/credit
 Content-Type: application/json
 
-{"usd":"5"}
+{"usd":"1"}
 ```
 
 To hand the setup to its owner, request a claim link and give them the URL
@@ -154,8 +158,8 @@ as the account's agent. See
 
 ## Limits
 
-- Creating accounts without credentials is limited per client IP (currently 10
-  per hour). Each provisional account gets its starting balance once.
+- Creating accounts without credentials is limited to 10 per hour per client
+  IP. Each provisional account gets its starting balance once.
 - A provisional account that never pays and sees no activity for 90 days
   closes. Accounts that have paid, or that a person has joined, never expire.
 - The management token can't spend money. Paying always needs a wallet

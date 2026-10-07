@@ -22,7 +22,7 @@ curl -sS -D - -o /dev/null "$LASSO_RPC_URL/fastest/base" \
 ```http
 x-lasso-access: premium
 x-lasso-cu: 2
-x-lasso-usd: 0.000010
+x-lasso-usd: 0.00001
 ```
 
 ## The three kinds of serving access
@@ -39,7 +39,7 @@ served:
 | The URL names | Served as |
 |---|---|
 | `premium`, or no profile with a `premium` default | `premium` while included usage or balance covers it; otherwise `public`, marked with `x-lasso-fallback` (see [balance and payment fallback](/cloud/balance-and-fallback)) |
-| `public` | `public`, always on public providers and uncharged, while the account's balance or included usage, grace window or free allowance would serve it; otherwise 402 `balance_exhausted`. It counts against the free allowance only when free access is what serves it |
+| `public` | `public`, uncharged. It serves while the account has any spending power: balance, included usage, a payment grace window or a free allowance. An account with none gets 402 `balance_exhausted` on every profile, `public` included |
 | A Custom profile | `custom` while your account has Custom access; otherwise `premium`, marked `x-lasso-fallback: profile` |
 
 Choose `public` explicitly for traffic that doesn't need premium providers:
@@ -112,7 +112,7 @@ Current subscription prices and allowances are on
 
 ## Rate limits
 
-Limits apply per account, not per key, and per place requests are served:
+Limits apply per account, not per key, and per pool:
 
 - One **managed bucket** holds every `premium` and `public` request from all
   of the account's keys: 100 RPS with bursts to 200 while the account has
@@ -136,7 +136,6 @@ Lasso support for an account override.
   The same holds for any request served by payment fallback or free access.
 - Public providers' method coverage and historical depth can be narrower than
   the premium pool's.
-- Rate limits are enforced on each serving machine.
 - Custom traffic has no request price; your providers bill you as usual.
 
 ## Next

@@ -41,9 +41,10 @@ agents.
   never authorizes a payment; a wallet signature does.
 - Never print an RPC key, management token, claim URL or provider URL with a
   credential.
-- Retries are safe by construction: `PUT` and `DELETE` are idempotent, each
-  payment carries its own reference, and resubmitting a signed payment returns
-  its first result. There's no `Idempotency-Key` header.
+- `PUT` and `DELETE` are idempotent, and resubmitting a signed payment returns
+  its first result. `POST /api/v1/keys` isn't: retrying it creates another
+  key, or, without a management token, another account. After a lost
+  response, list your keys before creating again.
 - Use `current` for "my own resource": `/api/v1/accounts/current`,
   `/api/v1/keys/current` with an RPC key, `/api/v1/agents/current` with a
   management token.

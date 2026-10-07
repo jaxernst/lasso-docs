@@ -7,9 +7,7 @@ description: How Lasso Cloud picks a provider for each request, what each strate
 
 For every request, Lasso finds the providers in the profile that can serve it,
 orders them by your strategy, and fails over to the next one when an error is
-safe to retry. You choose the strategy per call site in the URL. This page
-covers what that means on Lasso Cloud; the routing engine's full behavior is
-documented once, in the RPC Core concepts linked below.
+safe to retry. You choose the strategy per call site in the URL.
 
 ```bash
 curl -sS "$LASSO_RPC_URL/fastest/base?include_meta=body" \
@@ -41,7 +39,7 @@ curl -sS "$LASSO_RPC_URL/fastest/base?include_meta=body" \
 | `load-balanced` (default) | Spreads requests in random order across healthy providers | Backends, indexers, quota spreading |
 | `latency-weighted` | Random order weighted toward providers with lower recent latency | User-facing reads |
 | `fastest` | Tries the provider with the lowest recent latency for this kind of request first | Trading and latency-critical paths |
-| `priority` | Follows your Custom profile's provider order | A preferred primary with backups |
+| `priority` | Tries providers in your Custom profile's configured order; use it on Custom profiles | A preferred primary with backups |
 
 Latency is measured on the machine serving you, per provider, transport and
 kind of request (a family of related methods). The
@@ -58,8 +56,7 @@ Strategies price differently on premium; see
 | Situation | What happens |
 |---|---|
 | A provider times out or errors on a read | The next provider in the order is tried, within the request deadline |
-| Every premium provider fails | The request is retried on Lasso's public providers and marked `x-lasso-fallback: availability` |
-| Every provider in a Custom profile fails | The request fails with the JSON-RPC error. Custom profiles never borrow providers from other profiles or accounts |
+| Every provider in the profile fails | The final JSON-RPC error returns inside an HTTP 200. A profile never borrows providers from another pool |
 | A signed transaction's response is lost | Lasso doesn't resend it. Look up the transaction hash before you do |
 | A provider keeps failing | Its circuit opens. After a cooldown, a trial request decides whether it returns |
 

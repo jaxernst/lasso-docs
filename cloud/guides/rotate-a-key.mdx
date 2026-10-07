@@ -31,9 +31,9 @@ Content-Type: application/json
 }
 ```
 
-Store the new values straight into the secret store. Don't print them. If
-the rotation answers 202, the new secret is still reaching Lasso's servers:
-wait for `Retry-After` before sending traffic with it.
+Store the new values straight into the secret store. Don't print them. A 202
+means the new secret isn't serving yet; send traffic with it after
+`Retry-After`.
 
 ## 2. Deploy the new secret
 

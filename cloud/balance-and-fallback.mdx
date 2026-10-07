@@ -33,8 +33,8 @@ it's spent, requests return `balance_exhausted` until someone tops it up.
 
 ## Your app keeps serving when the balance runs out
 
-Say your trading bot's balance hits zero at 3 a.m. The next response looks like
-this, and nothing fails:
+Say your indexer's balance hits zero at 3 a.m. Its requests keep succeeding,
+now on public providers, `load-balanced`, at 30 RPS:
 
 ```http
 HTTP/1.1 200 OK
@@ -57,7 +57,7 @@ x402 in `PAYMENT-REQUIRED`, MPP in `WWW-Authenticate: Payment`.
 POST https://lasso.sh/api/v1/accounts/{account_id}/credit
 Content-Type: application/json
 
-{"usd":"20"}
+{"usd":"1"}
 ```
 
 1. Sign one challenge with a standard x402 or MPP client and the payer's
@@ -68,17 +68,40 @@ Content-Type: application/json
    settlement is pending: poll its `status_url`, and never sign a second
    payment for the same top-up.
 
-Resubmitting the same signed payment returns that payment's result and never
-credits twice. Rails, networks, assets and the per-purchase range are in
-[`agent.json`](https://lasso.sh/agent.json). People can also subscribe in the
-dashboard.
+With [`@x402/fetch`](https://www.npmjs.com/package/@x402/fetch), the whole
+exchange is one call. Run it as an ES module with `@x402/fetch`, `@x402/evm`
+and `viem` installed, a funded Base USDC wallet in `PAYER_PRIVATE_KEY`, and
+the account in `LASSO_ACCOUNT_ID`:
+
+```ts
+import { wrapFetchWithPaymentFromConfig } from "@x402/fetch";
+import { ExactEvmScheme } from "@x402/evm";
+import { privateKeyToAccount } from "viem/accounts";
+
+const payer = privateKeyToAccount(process.env.PAYER_PRIVATE_KEY as `0x${string}`);
+const payingFetch = wrapFetchWithPaymentFromConfig(fetch, {
+  schemes: [{ network: "eip155:8453", client: new ExactEvmScheme(payer) }],
+});
+
+const response = await payingFetch(
+  `https://lasso.sh/api/v1/accounts/${process.env.LASSO_ACCOUNT_ID}/credit`,
+  { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ usd: "1" }) },
+);
+console.log(response.status, await response.json());
+```
+
+[`mppx`](https://www.npmjs.com/package/mppx) does the same over MPP on
+Tempo. Resubmitting the same signed payment returns that payment's result and
+never credits twice. Rails, networks, assets and the per-purchase range are in
+`account_payments.rails` in [`agent.json`](https://lasso.sh/agent.json). People
+can also subscribe in the dashboard.
 
 ## Watching spend
 
 | Signal | What it tells you |
 |---|---|
 | `x-lasso-usd` | This request's charge; `0` when included usage, free access, Custom access or payment fallback covered it |
-| `x-lasso-balance-usd` | The balance as the serving machine knows it after this charge |
+| `x-lasso-balance-usd` | The balance after this charge |
 | `x-lasso-access` | `premium`, `public` or `custom` |
 | `x-lasso-fallback` | Why a request was served somewhere other than the profile it named |
 | `GET /api/v1/accounts/{id}` | The authoritative balance, subscriptions, included usage, access and grace window |
@@ -89,14 +112,11 @@ dashboard.
   restarts every time the account pays.
 - Payment fallback serves public providers at the public rate limit
   (30 RPS, bursts to 60) with `load-balanced` only.
-- Charges settle asynchronously and normally book within seconds. Each
-  serving machine admits requests against its own view of the balance, so
-  concurrent responses can report slightly different balances, and a balance
-  can dip a few cents below zero before every machine sees it run out.
-  Balances show negative values truthfully, and the next top-up repays them
-  first.
-- When an account finally stops being served, each region closes its open
-  WebSocket connections with `balance_exhausted` and the credit URL.
+- `x-lasso-balance-usd` is an estimate at the region that served you;
+  `GET /api/v1/accounts/{id}` is authoritative. Concurrent traffic can take a
+  balance slightly below zero; the next top-up repays it first.
+- When the grace window ends without a top-up, open WebSocket connections
+  close with `balance_exhausted` and the credit URL.
 - The management token can't pay. Every purchase needs a wallet signature.
 
 ## Next

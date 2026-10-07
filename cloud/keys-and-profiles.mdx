@@ -19,7 +19,7 @@ LASSO_RPC_URL=https://lasso.sh/rpc/k/lasso_…
 ```ts
 const url = process.env.LASSO_RPC_URL;
 const reads  = `${url}/latency-weighted/base`;           // the key's default profile
-const jobs   = `${url}/profile/public/base`;             // public providers, uncharged
+const jobs   = `${url}/profile/public/base`;             // public providers, uncharged while the account has spending power
 const trades = `${url}/profile/prod-base/fastest/base`;  // your own providers
 ```
 
@@ -55,8 +55,8 @@ nothing to fill in.
 | `default_profile` | The profile a URL with no profile segment uses | `premium` |
 | `allowed_profiles` | The profiles the key can name in its URL | `all`: every current and future profile of the account |
 
-Change a key's default, and every URL without a profile segment moves with it
-within seconds, with no redeploy:
+Change a key's default, and every URL without a profile segment moves with it,
+with no redeploy:
 
 ```http
 PATCH https://lasso.sh/api/v1/keys/{id}
@@ -122,29 +122,18 @@ sequence.
 
 ## Existing URLs keep working
 
-Every URL Lasso has issued keeps serving. `/rpc/k/<key>/…`,
-`/rpc/profile/<slug>/…`, header-auth URLs and provider pins already follow the
-grammar above. Three older forms serve until 30 days pass with no traffic on
-them:
-
-| Older form | Served as |
-|---|---|
-| `round-robin` strategy segment | `load-balanced` |
-| `/rpc/<chain>/<provider>` | The provider pin |
-| `?key=` query parameter | The key |
-
-See [upgrading from Agent API v2](/cloud/reference/v2-compatibility).
+Every URL Lasso has issued keeps serving; the older forms and how they map are
+on [upgrading from Agent API v2](/cloud/reference/v2-compatibility).
 
 ## Limits
 
 - The API returns a key's secret only on create and rotate. If you lose it,
   rotate the key or create another; admins can view active keys' URLs in the
   dashboard.
-- `grace_seconds` defaults to 0, so the old secret stops as each region
-  applies the rotation, and can be at most 86,400.
+- `grace_seconds` defaults to 0, which stops the old secret immediately; the
+  maximum is 86,400.
 - An account holds at most 100 active keys.
 - `premium` and `public` are reserved; Custom profile slugs can't use them.
-- Key changes apply in every region within seconds.
 
 ## Next
 

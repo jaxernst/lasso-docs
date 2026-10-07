@@ -20,8 +20,8 @@ curl -sS -D - "$LASSO_RPC_URL/fastest/base?include_meta=body" \
 x-lasso-request-id: 01J9Z…
 x-lasso-access: premium
 x-lasso-cu: 2
-x-lasso-usd: 0.000010
-x-lasso-balance-usd: 19.874210
+x-lasso-usd: 0.00001
+x-lasso-balance-usd: 19.87421
 ```
 
 ```json
@@ -29,7 +29,7 @@ x-lasso-balance-usd: 19.874210
   "jsonrpc": "2.0", "id": 1, "result": "0x3157d37",
   "lasso_meta": {
     "strategy": "fastest", "chain_id": 8453,
-    "candidate_providers": ["premium_base_2:http", "premium_base_1:http"],
+    "candidate_providers": ["premium/premium_base_2:http", "premium/premium_base_1:http"],
     "selected_provider": { "id": "premium_base_2", "protocol": "http" },
     "upstream_latency_ms": 9.4, "lasso_overhead_ms": 1.9, "retries": 0
   }
@@ -87,8 +87,7 @@ Reports go to the people who operate Lasso. See
 - An HTTP batch's `x-lasso-meta` header describes one item. Use
   `include_meta=body` or individual requests when you need every item's
   evidence.
-- `x-lasso-balance-usd` is the serving machine's view. Charges settle
-  asynchronously and normally book within seconds; the account view is
+- `x-lasso-balance-usd` is the balance after this charge; the account view is
   authoritative.
 - Key usage and recent errors are 24-hour diagnostics, not a billing ledger. The dashboard's recent activity is a live stream, not a
   request log.
