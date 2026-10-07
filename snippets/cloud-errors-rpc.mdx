@@ -13,4 +13,4 @@
 | `rate_limit_exceeded` | 429 | Yes | Retry after the indicated delay. |
 | `not_prepared` | 503 | Yes | Retry shortly. |
 | `profile_config_unavailable` | 503 | Yes | Retry shortly. |
-| `unavailable` | 503 | Yes | Retry shortly with the same key. |
+| `unavailable` | 503 | Yes | If this key was created or rotated in the last few seconds, retry; otherwise use the key's current secret. |
