@@ -7,8 +7,7 @@ description: Point viem, ethers, Foundry, Hardhat or an indexer at Lasso by chan
 
 Lasso is standard EVM JSON-RPC, so installing it means changing one URL. Keep
 your client library, your contract calls and your secret store. This page shows
-the URL in each common client, how to handle browser apps, and how to move
-traffic safely.
+the URL in each common client and how to move traffic safely.
 
 ```bash
 # .env
@@ -83,23 +82,6 @@ Indexers take the same URL wherever they take an RPC endpoint. Use
 | Development, tests and work that doesn't need premium | `$LASSO_RPC_URL/profile/public/<chain>` |
 | Your own providers | `$LASSO_RPC_URL/profile/<slug>/<strategy>/<chain>` |
 | Subscriptions | `$LASSO_WS_URL/<chain>` |
-
-## Browser and mobile apps
-
-Give an app that ships its URL to a browser or a phone its own key, scoped to
-the profiles it needs, and keep unscoped keys on servers:
-
-```bash
-curl -sS https://lasso.sh/api/v1/keys \
-  -H "authorization: Bearer $LASSO_MANAGEMENT_TOKEN" \
-  -H 'content-type: application/json' \
-  -d '{"name":"web","default_profile":"public","allowed_profiles":["public"]}'
-```
-
-`allowed_profiles` limits which profiles a key can name, so that key sends
-only public traffic. It shares your
-account's rate limit and, on an account with no balance, its free monthly
-allowance, but it never spends your balance.
 
 ## Roll out one path at a time
 

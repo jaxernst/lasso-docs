@@ -43,7 +43,7 @@ served:
 | A Custom profile | `custom` while your account has Custom access; otherwise `premium`, marked `x-lasso-fallback: profile` |
 
 Choose `public` explicitly for traffic that doesn't need premium providers:
-background jobs, development, or a browser app. Same key, different path
+background jobs or development. Same key, different path
 segment:
 
 ```ts
@@ -119,8 +119,8 @@ Limits apply per account, not per key:
   premium access, or 30 RPS with bursts to 60 while payment fallback or free
   access serves it.
 - `public` requests also draw on a **public bucket** inside it: 30 RPS with
-  bursts to 60. Public traffic, such as an exposed browser key, can never
-  take more than 30 of your 100 premium RPS.
+  bursts to 60. Public traffic can never take more than 30 of your 100
+  premium RPS.
 - Each Custom profile has its own 1,000 RPS bucket while it serves `custom`.
 
 Every response carries the IETF `RateLimit-Policy` and `RateLimit` headers,

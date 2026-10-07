@@ -2,10 +2,13 @@
 
 | Code | HTTP | Retryable | Fix |
 | --- | --- | --- | --- |
+| `indeterminate_dispatch` | 200 | No | Check whether the transaction landed before sending it again. |
+| `invalid_params` | 200 | No | Fix the request parameters. |
 | `local_capacity_rejection` | 200 | Varies | Reduce the request size or concurrency, then retry. |
 | `log_range_limit` | 200 | No | Reduce the eth_getLogs block range and retry. |
+| `method_not_found` | 200 | No | Use a method Lasso serves; see /agent.json. |
 | `provider_error` | 200 | Varies | Retry the request; if it keeps failing, report it with its request ID. |
-| `timeout` | 200 | Yes | Narrow the request, such as the eth_getLogs block range, then retry. |
+| `timeout` | 200 | Varies | Narrow the request, such as the eth_getLogs block range, then retry. |
 | `invalid_field` | 400 | No | Use /profile/&lt;slug>/&lt;strategy>/&lt;chain> or /&lt;chain>. |
 | `invalid_request` | 400 | No | Send a bounded JSON-RPC envelope. |
 | `unknown_chain` | 400 | No | Choose a chain from /agent.json. |

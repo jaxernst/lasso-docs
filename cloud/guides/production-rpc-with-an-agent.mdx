@@ -17,7 +17,6 @@ Ask your user for anything you can't find in the code:
 | Question | Why it matters |
 |---|---|
 | Which chains and environments (prod, staging, workers)? | One key per environment keeps usage, errors and rotation separate |
-| Does any RPC URL ship to browsers or mobile apps? | Those need a key scoped to the profiles they use |
 | Which calls are latency-critical, and which are bulk? | Each call site picks its own strategy and pool |
 | What can you spend, and from which wallet? | Top-ups need a wallet signature within an approved budget |
 | Do they already have a Lasso account? | The claim can add this setup to it |
@@ -43,16 +42,6 @@ for env in staging worker; do
     -H "authorization: Bearer $LASSO_MANAGEMENT_TOKEN" \
     -H 'content-type: application/json' -d "{\"name\":\"$env\"}"
 done
-```
-
-If the app has a frontend that calls RPC from the browser, give it its own
-key, scoped to `public`:
-
-```bash
-curl -sS https://lasso.sh/api/v1/keys \
-  -H "authorization: Bearer $LASSO_MANAGEMENT_TOKEN" \
-  -H 'content-type: application/json' \
-  -d '{"name":"web","default_profile":"public","allowed_profiles":["public"]}'
 ```
 
 A create without the token makes a separate account. If that happens, your
