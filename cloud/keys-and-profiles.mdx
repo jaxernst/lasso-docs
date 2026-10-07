@@ -53,10 +53,10 @@ nothing to fill in.
 | Field | What it does | Default |
 |---|---|---|
 | `default_profile` | The profile a URL with no profile segment uses | `premium` |
-| `allowed_profiles` | The profiles the key may name in its URL | `all`: every current and future profile of the account |
+| `allowed_profiles` | The profiles the key can name in its URL | `all`: every current and future profile of the account |
 
 Change a key's default, and every URL without a profile segment moves with it
-as each region applies the change, usually within a second, with no redeploy:
+within seconds, with no redeploy:
 
 ```http
 PATCH https://lasso.sh/api/v1/keys/{id}
@@ -86,7 +86,7 @@ Content-Type: application/json
 ```
 
 Keep unscoped keys on servers. A scoped key that names another profile gets
-`forbidden`, listing what it may use.
+`forbidden`, listing what it can use.
 
 ## How a profile segment resolves
 
@@ -144,8 +144,7 @@ See [upgrading from Agent API v2](/cloud/reference/v2-compatibility).
   applies the rotation, and can be at most 86,400.
 - An account holds at most 100 active keys.
 - `premium` and `public` are reserved; Custom profile slugs can't use them.
-- Key changes reach every region within about a second, and a region that
-  misses one catches up within about 75 seconds.
+- Key changes apply in every region within seconds.
 
 ## Next
 

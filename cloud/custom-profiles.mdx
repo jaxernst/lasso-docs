@@ -132,9 +132,8 @@ instead; it works without protection.
 - If Custom access lapses, the profile is kept and its URLs are served as
   `premium` until you renew. Open WebSocket connections on it close with
   `custom_access_expired`.
-- Saved changes reach other regions asynchronously, usually within a second.
-- `block_protection` holds on one Lasso server. Across regions or a restart,
-  it's best effort.
+- Saved changes apply in every region within seconds.
+- `block_protection` holds per Lasso server.
 - Chain identity is the only onboarding gate. Historical depth and method
   coverage are learned from behavior, so test your exact archive queries.
 

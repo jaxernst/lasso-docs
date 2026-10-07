@@ -3,6 +3,9 @@ title: Response signals and errors
 description: Every Lasso Cloud response header, lasso_meta field, RPC error code and management API error, with the fix for each
 ---
 
+import RpcErrors from '/snippets/cloud-errors-rpc.mdx';
+import ManagementErrors from '/snippets/cloud-errors-management.mdx';
+
 # Response signals and errors
 
 This is the reference for what Lasso Cloud adds to responses and the errors it
@@ -62,26 +65,16 @@ WebSocket callers add `"lasso_meta": "notify"` to a request for a follow-up
 ## RPC errors
 
 RPC errors stay standard JSON-RPC. Errors Lasso originates carry
-`error.data.code` and `error.data.next_action`:
+`error.data.code`, `error.data.next_action` and `error.data.retryable`. A
+retryable error with `Retry-After` is safe to repeat as is after the wait.
+These are the requests Lasso answers itself, before routing:
 
-| `error.data.code` | HTTP | Fix |
-|---|---|---|
-| `balance_exhausted` | 402 | Credit the account (`POST /api/v1/accounts/{id}/credit`) or subscribe |
-| `rate_limited` | 429 | Wait for `Retry-After` |
-| `rpc_route_required` | 422 | Append `/<chain>` or `/<strategy>/<chain>` |
-| `rpc_method_required` | 405 | Send JSON-RPC over HTTP `POST` |
-| `unknown_chain`, `unknown_strategy` | 422 | Use a value from [chains and prices](/cloud/reference/chains-and-prices) |
-| `forbidden` | 403 | The URL named a profile outside a scoped key's allowed profiles; `next_action` lists them |
-| `unknown_profile` | 404 | The URL named a profile the account has never had; `next_action` lists the account's profiles |
-| `key_revoked` | 401 | The key was revoked, or rotated past its overlap; use the current key |
-| `account_closed` | 401 | The provisional account closed after 90 inactive days; create a new key |
-| `deadline_exhausted` | 504 | Narrow the request, such as an `eth_getLogs` range |
+<RpcErrors />
 
-Provider errors pass through unchanged, with `code` and `next_action` added
-when Lasso classified them. When every eligible provider fails, the final
-JSON-RPC error arrives inside an HTTP 200 response. An `eth_getLogs` range a
-provider refuses as too large returns `-32005` with
-`data.reason: "log_range_too_large"`; split the range.
+Errors from providers pass through unchanged. When every eligible provider
+fails, the final JSON-RPC error arrives in an HTTP 200 response. An
+`eth_getLogs` range a provider refuses as too large returns `-32005` with
+`data.reason: "log_range_too_large"`; split the range and retry.
 
 ## WebSocket close reasons
 
@@ -105,31 +98,7 @@ Management errors use one envelope:
   "docs_url": "https://docs.lasso.sh/…"}}
 ```
 
-| Code | Fix |
-|---|---|
-| `unauthorized` | Send a management token (or an RPC key where allowed) as `Authorization: Bearer` |
-| `forbidden` | The credential lacks the named permission |
-| `not_found` | Check the ID; resources outside your account look absent |
-| `invalid_field`, `unknown_field` | Correct the named field |
-| `key_limit` | Revoke an unused key |
-| `key_revoked` | Use the current key |
-| `account_closed` | The provisional account closed; create a new key |
-| `profile_limit` | Delete a Custom profile |
-| `custom_access_required` | Buy access (`POST /api/v1/accounts/{id}/custom-access`) or subscribe |
-| `invalid_config` | Fix the field paths listed in `details` |
-| `provider_check_failed` | The named provider failed its chain identity check |
-| `revision_conflict` | Re-read the profile, then reapply |
-| `already_claimed` | The account already has a person; manage it from its members |
-| `already_subscribed` | The account already has open-ended Custom access |
-| `amount_out_of_range` | Stay within the range in `agent.json` |
-| `payment_required` | Sign one challenge and repeat the request with it |
-| `payment_invalid` | Sign the current challenge; don't reuse another |
-| `payment_conflict` | Check the first payment's `status_url`; never pay twice |
-| `payment_pending` | Don't pay again; check `status_url` |
-| `payment_failed` | The transfer didn't settle; request a fresh challenge |
-| `gone` | The route was retired; use the operation named in `next_action` |
-| `rate_limited` | Wait for `Retry-After` |
-| `unavailable` | Not enabled on this deployment; `agent.json` lists what is |
+<ManagementErrors />
 
 Exact response schemas are in [`openapi.json`](https://lasso.sh/openapi.json).
 

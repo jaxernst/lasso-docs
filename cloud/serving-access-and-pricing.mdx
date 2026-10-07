@@ -126,7 +126,7 @@ Limits apply per account, not per key, and per place requests are served:
 Every response carries the IETF `RateLimit-Policy` and `RateLimit` headers,
 named after the bucket that bound the request: `managed`, `public` or the
 Custom profile's slug. `"public";q=60;w=2` means 60 requests per two seconds. Over the
-limit, Lasso answers 429 `rate_limited` with `Retry-After`. Need more? Ask
+limit, Lasso answers 429 `rate_limit_exceeded` with `Retry-After`. Need more? Ask
 Lasso support for an account override.
 
 ## Limits
@@ -137,8 +137,7 @@ Lasso support for an account override.
 - Public providers' method coverage and historical depth can be narrower than
   the premium pool's.
 - Rate limits are enforced on each serving machine.
-- Custom traffic has no request price, but your upstream providers may charge
-  you for it.
+- Custom traffic has no request price; your providers bill you as usual.
 
 ## Next
 

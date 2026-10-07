@@ -47,7 +47,7 @@ create makes a second, separate account, so reuse the token for more keys.
 Append a chain, and optionally a strategy, to `rpc_url`:
 
 ```bash
-curl -sS "$LASSO_RPC_URL/fastest/base?include_meta=body" \
+curl -sS --retry 10 --retry-all-errors --retry-delay 3 "$LASSO_RPC_URL/fastest/base?include_meta=body" \
   -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
 ```

@@ -31,7 +31,9 @@ Content-Type: application/json
 }
 ```
 
-Store the new values straight into the secret store. Don't print them.
+Store the new values straight into the secret store. Don't print them. If
+the rotation answers 202, the new secret is still reaching Lasso's servers:
+wait for `Retry-After` before sending traffic with it.
 
 ## 2. Deploy the new secret
 
@@ -52,14 +54,15 @@ confirming its deployed configuration, before `previous_valid_until`.
 
 ## 4. Let the old secret expire
 
-At `previous_valid_until`, requests with the old secret get 401 `key_revoked`,
+At `previous_valid_until`, requests with the old secret get a
+[401](/cloud/reference/signals-and-errors#rpc-errors),
 and WebSocket connections opened with it close. Clients reconnect with the new
 secret from their configuration.
 
 ## Rotate immediately
 
-If a secret leaked, rotate with no overlap, and the old secret stops as each
-region applies the change:
+If a secret leaked, rotate with no overlap, and the old secret stops within
+seconds:
 
 ```http
 POST https://lasso.sh/api/v1/keys/{id}/rotate
@@ -72,8 +75,6 @@ Content-Type: application/json
 ## Limits
 
 - `grace_seconds` is at most 86,400 (24 hours).
-- The old secret stops in each region as that region applies the change,
-  usually within a second and at most about 75 seconds later.
 - Rotating a key doesn't rotate your management token. An agent rotates its
   own token with `POST /api/v1/agents/current/rotate`, and the old token stops
   at once.
