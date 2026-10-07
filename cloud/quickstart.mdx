@@ -44,7 +44,8 @@ create makes a second, separate account, so reuse the token for more keys.
 
 ### 2. Call it
 
-Append a chain, and optionally a strategy, to `rpc_url`:
+Append a chain, and optionally a strategy, to `rpc_url`. A new key takes a
+few seconds to reach every server, so the first call retries:
 
 ```bash
 curl -sS --retry 10 --retry-all-errors --retry-delay 3 "$LASSO_RPC_URL/fastest/base?include_meta=body" \
