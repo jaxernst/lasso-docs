@@ -114,8 +114,10 @@ Current subscription prices and allowances are on
 
 Limits apply per account, not per key, and per place requests are served:
 
-- One **managed bucket**, 100 RPS with bursts to 200, holds every `premium`
-  and `public` request from all of the account's keys.
+- One **managed bucket** holds every `premium` and `public` request from all
+  of the account's keys: 100 RPS with bursts to 200 while the account has
+  premium access, or 30 RPS with bursts to 60 while payment fallback or free
+  access serves it.
 - `public` requests also draw on a **public bucket** inside it: 30 RPS with
   bursts to 60. Public traffic, such as an exposed browser key, can never
   take more than 30 of your 100 premium RPS.
