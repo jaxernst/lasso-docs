@@ -123,7 +123,8 @@ apps.
 ### 5. Fund it and hand it off
 
 When the starting balance isn't enough, credit the account within the budget
-your user approved and the per-purchase range in `account_payments.rails`. The
+your user approved, of at least the purchase minimum (`minimum_usd` in
+`account_payments.rails`). The
 request answers 402 with a standard x402 or MPP challenge that a stock client
 signs with the user's wallet ([example](/cloud/balance-and-fallback#top-up)):
 
@@ -131,7 +132,7 @@ signs with the user's wallet ([example](/cloud/balance-and-fallback#top-up)):
 POST https://lasso.sh/api/v1/accounts/{account_id}/credit
 Content-Type: application/json
 
-{"usd":"1"}
+{"usd":"5"}
 ```
 
 To hand the setup to its owner, request a claim link and give them the URL
