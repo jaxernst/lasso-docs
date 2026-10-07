@@ -262,6 +262,10 @@
     {
       "source": "/cloud/base-rpc-integration",
       "destination": "/cloud/install"
+    },
+    {
+      "source": "/agents/errors",
+      "destination": "/cloud/reference/signals-and-errors"
     }
   ]
 }

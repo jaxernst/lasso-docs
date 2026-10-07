@@ -30,7 +30,7 @@ x-lasso-usd: 0.000010
 | Serving access | Providers | Strategies | Price | Rate limit |
 |---|---|---|---|---|
 | `premium` | Lasso's premium pool | All four | Charged per request | 100 RPS |
-| `public` | Lasso's public pool | `load-balanced` only | Uncharged | 30 RPS |
+| `public` | Lasso's public pool | `load-balanced` only | Uncharged | 30 RPS, bursts to 60 |
 | `custom` | Your Custom profile's providers | All four | Uncharged; your Custom subscription covers it | 1,000 RPS per profile |
 
 Your URL names the profile, and your account's payment state decides how it is
@@ -75,6 +75,25 @@ and each subscription notification is priced as an `eth_subscription` entry.
 Money is always in USD: prices, balances, purchases and charges. Included
 usage, from free access or a subscription, is counted in CU per month.
 
+Lasso charges only for a response a provider delivered, whether a result or a
+JSON-RPC error. A failure inside Lasso with no provider response, and any
+request refused before routing, is free.
+
+### Current tariff
+
+| Item | Value |
+|---|---|
+| Rate | $0.000005 per CU |
+| Strategy factors | `load-balanced` 1x, `latency-weighted` 1.5x, `fastest` 2x, `priority` 1x |
+| Subscription notification | 3 CU |
+| Starting grant for a new provisional account | $0.025 |
+| Free access | 1,000,000 CU per month |
+| Pro included usage | 65,000,000 CU per month |
+| Custom access bought with a wallet | $1.30 per day, 1 to 30 days per purchase |
+
+Subscription prices are on [lasso.sh/pricing](https://lasso.sh/pricing).
+`agent.json` publishes the live values agents act on.
+
 ## Subscriptions and free access
 
 | | What it gives your account | How you get it |
@@ -95,12 +114,16 @@ Current subscription prices and allowances are on
 
 Limits apply per account, not per key, and per place requests are served:
 
-- One **managed bucket** holds every `premium` and `public` request from all
-  of the account's keys.
-- Each Custom profile has its own bucket while it serves `custom`.
+- One **managed bucket**, 100 RPS with bursts to 200, holds every `premium`
+  and `public` request from all of the account's keys.
+- `public` requests also draw on a **public bucket** inside it: 30 RPS with
+  bursts to 60. Public traffic, such as an exposed browser key, can never
+  take more than 30 of your 100 premium RPS.
+- Each Custom profile has its own 1,000 RPS bucket while it serves `custom`.
 
 Every response carries the IETF `RateLimit-Policy` and `RateLimit` headers,
-named after the bucket (`managed` or the Custom profile's slug). Over the
+named after the bucket that bound the request: `managed`, `public` or the
+Custom profile's slug. `"public";q=60;w=2` means 60 requests per two seconds. Over the
 limit, Lasso answers 429 `rate_limited` with `Retry-After`. Need more? Ask
 Lasso support for an account override.
 

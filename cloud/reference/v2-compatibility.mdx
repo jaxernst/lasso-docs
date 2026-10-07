@@ -1,35 +1,37 @@
 ---
-title: Agent API v2 compatibility
-description: Everything built on Agent API v2 keeps working; how each v2 route, header and URL maps to the account API, and when it retires
+title: Upgrading from Agent API v2
+description: Your RPC URLs and keys keep serving; the v2 management API is retired, and the same secret works on the account API
 ---
 
-# Agent API v2 compatibility
+# Upgrading from Agent API v2
 
-Nothing you deployed against Agent API v2 stops working. Every RPC URL and key
-secret keeps serving, v2 management routes keep answering, and v2 tokens keep
-authenticating as agents. Use this page to move an existing integration to the
-`/api/v1` account API at your own pace.
+Every RPC URL and key secret issued under Agent API v2 keeps serving. The v2
+management API is retired: its routes answer `410 gone` with a `next_action`
+naming the account API operation to use, and the same management secret works
+there. Use this page to move an integration from `/api/v1/management` to the
+account API.
 
 ```bash
-curl -sS -D - -o /dev/null https://lasso.sh/api/v1/management/me \
-  -H "authorization: Bearer $LASSO_MANAGEMENT_TOKEN" \
-  | grep -iE '^(deprecation|sunset):'
+curl -sS https://lasso.sh/api/v1/agents/current \
+  -H "authorization: Bearer $LASSO_MANAGEMENT_TOKEN"
 ```
 
 ## What keeps working
 
-| v2 surface | After the account model |
+| v2 surface | Now |
 |---|---|
-| RPC URLs: `/rpc/k/<key>/…`, `/rpc/profile/<slug>/…`, header-auth and provider pins | Serve exactly as before; they're the current URL grammar |
+| RPC URLs: `/rpc/k/<key>/…`, `/rpc/profile/<slug>/…`, header-auth and provider pins | Serve as before; they're the current URL grammar |
 | RPC key secrets, including `lasso_ak_` keys | Keep working, with their prefix |
-| `/api/v1/management/*`, `/api/v1/me`, `/api/v1/account/management-credentials` | Keep working, with `Deprecation` and `Sunset` headers and a `next_action` naming the new operation |
-| v2 management tokens | Authenticate as agents of their account |
-| v2 claim links | Stay valid until they expire |
-| v2 headers: `x-lasso-profile`, `x-lasso-downgraded`, `x-lasso-balance-warning`, `x-lasso-rate-limit-*` | Still sent on v2 URL forms and v2 routes, alongside the new signals |
-| `error_type` on RPC errors | Still sent alongside `error.data.code` |
+| v2 management tokens | Authenticate as agents of their account on the account API |
+| v2 RPC headers (`x-lasso-profile`, `x-lasso-downgraded`, `x-lasso-balance-warning`, `x-lasso-rate-limit-*`) and RPC `error_type` | Still sent on v2 URL forms, alongside the new signals |
 
-Each v2 route answers `gone`, with `next_action`, only after 30 days with no
-traffic on it.
+## What's retired
+
+| v2 surface | Now |
+|---|---|
+| `/api/v1/management/*`, `/api/v1/me`, `/api/v1/account/management-credentials` | `410 gone`, with `next_action` naming the account API operation |
+| v2 claim links issued before accounts went live | Not supported; request a new link from the account API |
+| The v2 fields in `agent.json` and the v2 paths in `openapi.json` | Removed; read `endpoints.account_resources` |
 
 ## Where each v2 operation moved
 
@@ -56,8 +58,9 @@ traffic on it.
   profile keeps that profile as its default and is scoped to it.
 - **Running out of money doesn't stop a paying app.** Accounts that have paid
   fall back to public providers for 30 days instead of failing.
-- **Included usage is counted per method.** Free allowances and Pro included
-  usage move from byte-based CU to per-method CU, restated for parity.
+- **Usage is counted per method.** Requests are sized in per-method CU and
+  priced in USD; free allowances and Pro included usage are restated in
+  per-method CU.
 - **Agent-created keys share one rate limit per account** instead of 50 RPS
   each.
 - **A claim link comes from the agent, not the RPC key**, so an exposed key

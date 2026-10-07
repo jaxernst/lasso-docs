@@ -88,11 +88,13 @@ dashboard.
 - The grace window lasts 30 days from when paid spending power runs out, and
   restarts every time the account pays.
 - Payment fallback serves public providers at the public rate limit
-  (30 RPS) with `load-balanced` only.
-- Serving machines reconcile usage every 10 seconds, so concurrent responses
-  can report slightly different balances, and a balance can dip below zero by
-  about one interval of spend. Balances show negative values truthfully, and
-  the next top-up repays them first.
+  (30 RPS, bursts to 60) with `load-balanced` only.
+- Charges settle asynchronously and normally book within seconds. Each
+  serving machine admits requests against its own view of the balance, so
+  concurrent responses can report slightly different balances, and a balance
+  can dip a few cents below zero before every machine sees it run out.
+  Balances show negative values truthfully, and the next top-up repays them
+  first.
 - When an account finally stops being served, each region closes its open
   WebSocket connections with `balance_exhausted` and the credit URL.
 - The management token can't pay. Every purchase needs a wallet signature.
