@@ -1,11 +1,11 @@
 ---
 title: 'Metrics API'
-description: 'Retrieve default-profile performance metrics from RPC Core v0.5.0'
+description: 'Retrieve default-profile performance metrics from RPC Core v0.5.1'
 ---
 
 ## Overview
 
-In Lasso RPC Core v0.5.0, the metrics API reports a chain in the default
+In Lasso RPC Core v0.5.1, the metrics API reports a chain in the default
 `public` profile, including provider statistics, RPC method performance, and
 VM resource usage. It does not accept a profile parameter or report a chain
 configured only in a custom profile.
@@ -334,7 +334,7 @@ GET /api/metrics/:chain
 
 This includes chains configured only in another profile. The response's
 `available_chains` lists canonical chain names in `public`; see the released
-[metrics controller](https://github.com/jaxernst/lasso-rpc/blob/v0.5.0/lib/lasso_web/controllers/metrics_controller.ex).
+[metrics controller](https://github.com/jaxernst/lasso-rpc/blob/v0.5.1/lib/lasso_web/controllers/metrics_controller.ex).
 
 ## Use Cases
 
@@ -403,7 +403,7 @@ setInterval(async () => {
 ```
 
 `rpc_calls_per_second`, `failovers_last_minute`, and `recent_activity` are
-reserved fields that return `null` in v0.5.0. Derive a rate from successive
+reserved fields that return `null` in v0.5.1. Derive a rate from successive
 `total_calls` samples if your monitoring system needs one.
 
 ## Notes

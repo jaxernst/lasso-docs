@@ -5,7 +5,7 @@ description: 'Monitor Lasso RPC instance health and cluster status'
 
 ## Overview
 
-In Lasso RPC Core v0.5.0, this endpoint reports application liveness, uptime,
+In Lasso RPC Core v0.5.1, this endpoint reports application liveness, uptime,
 and cluster connectivity. It does not test whether an upstream can serve a request.
 
 ## Endpoint
@@ -106,8 +106,8 @@ The `cluster.status` field indicates the overall health of your cluster deployme
 The status calculation uses `nodes_connected`, not `nodes_total`. Monitor both
 counts to detect missing expected nodes; `cluster.status` alone does not prove
 full cluster coverage. This is the behavior of the released
-[health controller](https://github.com/jaxernst/lasso-rpc/blob/v0.5.0/lib/lasso_web/controllers/health_controller.ex)
-and [topology status function](https://github.com/jaxernst/lasso-rpc/blob/v0.5.0/lib/lasso/cluster/health_topology.ex).
+[health controller](https://github.com/jaxernst/lasso-rpc/blob/v0.5.1/lib/lasso_web/controllers/health_controller.ex)
+and [topology status function](https://github.com/jaxernst/lasso-rpc/blob/v0.5.1/lib/lasso/cluster/health_topology.ex).
 
 ## Route readiness
 

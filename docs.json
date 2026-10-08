@@ -157,6 +157,7 @@
                   "observability/dashboard",
                   "observability/metrics",
                   "observability/logging",
+                  "observability/tracing",
                   "observability/request-metadata"
                 ]
               },

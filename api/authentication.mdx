@@ -17,7 +17,7 @@ Since Lasso doesn't have built-in authentication, use these strategies to secure
 
 ### Reverse Proxy Authentication
 
-Deploy Lasso behind a reverse proxy (nginx, Caddy, Traefik) with authentication. Apply the boundary to every exposed RPC, WebSocket, dashboard, and operational route. Core v0.5.0 exposes JSON metrics at `/api/metrics/:chain` and Prometheus text at `/metrics`; it does not expose a management API. For nginx, keep the authentication at the site level so it also covers WebSocket upgrades:
+Deploy Lasso behind a reverse proxy (nginx, Caddy, Traefik) with authentication. Apply the boundary to every exposed RPC, WebSocket, dashboard, and operational route. Core v0.5.1 exposes JSON metrics at `/api/metrics/:chain` and Prometheus text at `/metrics`; it does not expose a management API. For nginx, keep the authentication at the site level so it also covers WebSocket upgrades:
 
 ```nginx
 map $http_upgrade $lasso_connection_upgrade {
