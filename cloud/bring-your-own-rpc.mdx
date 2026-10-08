@@ -1,16 +1,16 @@
 ---
 title: Trial your own providers behind Lasso
-description: Put the provider accounts and nodes you already use behind one Lasso URL, from a provisional account, before anyone signs up
+description: Put the provider accounts and nodes you already use behind one Lasso URL
 canonical: https://docs.lasso.sh/cloud/bring-your-own-rpc
 "og:title": Trial your own providers behind Lasso
 ---
 
 # Trial your own providers behind Lasso
 
-An agent can put your existing provider accounts and nodes behind Lasso,
-prove it works on your app's real traffic, and hand you the result, all before
-anyone signs up. This guide builds a Custom profile from a provisional
-account, routes the app's key over it, and verifies failover.
+An agent can put your existing provider accounts and nodes behind Lasso: it
+checks them with a dry run before anyone signs up, then, once the account has
+Custom access, saves the profile, routes the app's key over it, and verifies
+failover.
 
 ## 1. Create an endpoint
 
@@ -42,22 +42,13 @@ Each provider comes back `verified`, `verifying` (didn't answer yet) or
 add `limits` only for a cap you know, such as your plan's log span. Lasso
 learns the rest from traffic.
 
-## 3. Buy Custom access for the trial
+## 3. Subscribe to Custom
 
-Holding a profile needs Custom access. Buy a few days with the user's wallet,
-within their approved budget:
-
-```http
-POST https://lasso.sh/api/v1/accounts/{account_id}/custom-access
-Content-Type: application/json
-
-{"days": 7}
-```
-
-The 402 exchange is the same as a balance top-up: sign one x402 or MPP
-challenge and repeat the request with it. The per-day price and day range are
-in [`agent.json`](https://lasso.sh/agent.json). Traffic on your own providers
-has no request price.
+Holding a profile needs Custom access, which comes with the Custom
+subscription. A person subscribes from the account's dashboard
+([prices](https://lasso.sh/pricing)); if an agent set the account up, hand it
+to its owner with a [claim link](/cloud/accounts-and-agents) first. Traffic on
+your own providers has no request price.
 
 ## 4. Save it and route the key over it
 
@@ -115,8 +106,8 @@ the incoming one is renamed and the app's URL keeps reaching it.
 
 ## Limits
 
-- Custom access is per account and covers up to five Custom profiles. When the
-  trial's days run out, the profile is kept and its URLs serve from Lasso's
+- Custom access is per account and covers up to five Custom profiles. If it
+  lapses, the profile is kept and its URLs serve from Lasso's
   `premium` pool, charged at request prices from the balance and marked
   `x-lasso-fallback: profile`, until access is renewed.
 - Two URLs on the same provider account, region or plan can fail together.

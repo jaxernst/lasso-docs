@@ -58,7 +58,7 @@ accept this amount, each with a challenge: x402 in `PAYMENT-REQUIRED`, MPP in
 POST https://lasso.sh/api/v1/accounts/{account_id}/credit
 Content-Type: application/json
 
-{"usd":"20"}
+{"usd":"1"}
 ```
 
 1. Sign one challenge with a standard x402 or MPP client and the payer's
@@ -86,15 +86,15 @@ const payingFetch = wrapFetchWithPaymentFromConfig(fetch, {
 
 const response = await payingFetch(
   `https://lasso.sh/api/v1/accounts/${process.env.LASSO_ACCOUNT_ID}/credit`,
-  { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ usd: "20" }) },
+  { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ usd: "1" }) },
 );
 console.log(response.status, await response.json());
 ```
 
 [`mppx`](https://www.npmjs.com/package/mppx) does the same over MPP on
 Tempo. Resubmitting the same signed payment returns that payment's result and
-never credits twice. Rails, networks, assets and the purchase minimum
-(`minimum_usd`) are in `account_payments.rails` in
+never credits twice. Rails, networks, assets and the per-purchase range
+(`minimum_usd` to `maximum_usd`) are in `account_payments.rails` in
 [`agent.json`](https://lasso.sh/agent.json). People
 can also subscribe in the dashboard.
 
