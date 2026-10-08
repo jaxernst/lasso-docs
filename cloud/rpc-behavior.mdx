@@ -1,78 +1,95 @@
 ---
-title: RPC workload behavior
-description: Plan routing for reads, historical state, writes, filters, and WebSocket subscriptions
+title: RPC method behavior
+description: How Lasso Cloud handles reads, historical state and logs, traces, transactions, filters and WebSocket subscriptions
 ---
 
-# RPC workload behavior
+# RPC method behavior
 
-Routing guarantees depend on the operation. Classify the workload before
-choosing a rollout and recovery plan.
+Lasso treats methods differently depending on whether they're safe to retry,
+depend on history, or hold state on one provider. Use this table to plan each
+workload's rollout and recovery; the sections below give the details.
 
-## Stateless reads
+| Workload | Failover | What your app owns |
+|---|---|---|
+| Current reads | Retried on another provider when safe | Chain reorgs and provider freshness differences |
+| Historical state and logs | Steered toward providers known to serve that history | Splitting large `eth_getLogs` ranges; checkpoints |
+| Trace and debug methods | Retried when safe; coverage varies by provider | Choosing providers that serve them |
+| `eth_sendRawTransaction` | Sent once, never resent | Nonces, replacement, reconciliation by hash, receipts, finality |
+| HTTP filters | Not served | Use `eth_getLogs` or subscriptions |
+| WebSocket `newHeads` and `logs` | Moved to another provider with bounded backfill | Reconnecting and resubscribing; durable checkpoints |
 
-Methods such as `eth_chainId`, `eth_blockNumber`, current balances, transaction
-receipts, and many contract calls are the cleanest failover candidates. Lasso
-can try another eligible provider when a failure is safe to retry. Applications
-must still tolerate ordinary chain reorganization and provider freshness
-differences.
+## Current reads
+
+Methods such as `eth_blockNumber`, balances, receipts and most contract calls
+fail over to another eligible provider when an error is safe to retry. Your app
+still handles ordinary reorgs, and providers can differ by a block or two at
+the head. For a latest block that never goes backwards on a Custom profile, set
+[block protection](/cloud/custom-profiles#block-protection). For several reads
+at the same block, use [read at one block](/advanced/read-at-one-block).
 
 ## Historical state and logs
 
-Historical block, state, and log coverage varies independently across provider
-plans. Lasso analyzes block references and provider capabilities, but a probe is
-evidence from selected depths and representative calls—not proof of unlimited
-history.
+Historical state, receipts and logs have separate coverage at each provider. A
+provider that serves old logs may lack old state, and the reverse. Lasso infers
+a request's age from its block selector and steers it toward providers known to
+serve that depth. State reads by block hash go only to archival providers,
+because a hash's age is unknown before dispatch.
 
-`eth_getLogs` also has provider-specific block-range and result-size limits.
-Split large ranges, paginate with an overlap appropriate for reorg handling,
-and verify the exact range used by an indexer. A provider that serves old logs
-may still lack old state, and the reverse is also possible.
-
-When Lasso recognizes a range or result-size limit, the JSON-RPC error has
-`code: -32005` and `data: {"reason": "log_range_too_large", "action":
-"reduce_block_range"}`. Make the next query over a smaller block span. Lasso
-does not split it automatically or repeat the same query against another
-provider. A key-authenticated request that reaches Cloud metering can still
-consume usage when it returns this error; check the key's response charge or
-account usage rather than assuming failed requests are free. See the
-[error-code contract](/api/error-codes#large-eth_getlogs-queries).
-
-See [historical workload qualification](/cloud/historical-workloads) for dated
-positive-witness results, known gaps and an application acceptance path.
+`eth_getLogs` also has provider-specific range and result-size limits. When
+Lasso recognizes that limit, it returns `-32005` with
+`data.code: "log_range_limit"` and a `next_action` to narrow the range.
+Split the range; Lasso doesn't split it or repeat the same query on another
+provider. Some providers report a plan restriction on `eth_getLogs` as a
+generic `-32600`; Lasso recognizes that and tries the unchanged query on
+another eligible provider instead. Qualify your exact queries with
+[indexer backfills](/cloud/indexer-backfills).
 
 ## Trace and debug methods
 
-Trace namespaces are often plan-gated or client-specific. Include only providers
-that support the exact trace method and parameters your application sends.
-Treat a successful representative probe as a starting point, then test real
-payload shapes and timeouts.
+Trace namespaces are often plan-gated or client-specific. Test your exact
+methods, parameters and timeouts through the profile you'll use. On a Custom
+profile, Lasso learns which providers refuse a method and shows it in the
+profile's knowledge.
 
-## Transaction broadcast
+## Transactions
 
-`eth_sendRawTransaction` sends the signed bytes to one selected upstream under
-one deadline. Lasso does not automatically retry or fan out after dispatch
-because a lost response may still mean the transaction was applied. Production
-senders should own signing, nonce allocation, idempotency, reconciliation by
-transaction hash, rebroadcast policy, and receipt/finality tracking.
+`eth_sendRawTransaction` goes to one provider under one deadline. Lasso doesn't
+retry or fan it out after dispatch, because a lost response may still mean the
+transaction landed. Your sender owns signing, nonce allocation, reconciliation
+by transaction hash, rebroadcast policy and receipt and finality tracking.
 
-## Stateful HTTP filters
+## HTTP filters
 
-Lasso currently rejects `eth_newFilter`, `eth_newBlockFilter`,
-`eth_newPendingTransactionFilter`, `eth_getFilterChanges`,
-`eth_getFilterLogs`, and `eth_uninstallFilter` locally with `-32601`. Their IDs
-are provider-local, and Lasso does not yet have an accepted affinity lifecycle
-for creation, follow-up calls, owner loss, and expiry. Use `eth_getLogs` for
-historical scans and WebSocket subscriptions for real-time delivery.
+Lasso rejects `eth_newFilter`, `eth_newBlockFilter`,
+`eth_newPendingTransactionFilter`, `eth_getFilterChanges`, `eth_getFilterLogs`
+and `eth_uninstallFilter` with `-32601`. Filter IDs live on one provider and
+can't follow a request to another. Use `eth_getLogs` for scans and WebSocket
+subscriptions for real-time delivery. Self-hosted RPC Core forwards these
+methods without failover; see [supported methods](/api/supported-methods).
 
 ## WebSocket subscriptions
 
-Lasso accepts `newHeads` and `logs` subscriptions, not pending transactions,
-and can move them to another provider within the profile, backfilling the gap
-over HTTP. Recovery is bounded; when it can't complete, the client's
-connection closes explicitly. How recovery works, and what your application
-must still checkpoint, is defined once, in
+Lasso shares upstream subscriptions across your clients and moves them to
+another provider in the same profile when one fails, backfilling missed
+`newHeads` and `logs` over HTTP and suppressing duplicates. Pending-transaction
+subscriptions aren't served. The engine's behavior is documented in
 [WebSocket subscriptions](/advanced/websocket-subscriptions).
 
-Subscriptions don't fall back across profiles. Clients must reconnect after a
-network interruption, handle duplicate or delayed events, and keep their own
-durable checkpoint for indexer-grade processing.
+## Limits
+
+- Subscription recovery is bounded by a replay window and a deadline. When it
+  can't complete, the socket closes with code 1011, and the client reconnects
+  and resubscribes. Lasso never continues after a partial backfill.
+- Subscriptions don't move between profiles. Payment changes and Custom
+  access lapses follow the rules in
+  [balance and payment fallback](/cloud/balance-and-fallback).
+- Clients must handle network disconnects, duplicates around a reconnect, and
+  their own checkpoints for indexer-grade processing.
+
+## Next
+
+- [Routing](/cloud/routing): how failover chooses the next provider.
+- [Ethereum JSON-RPC compatibility](/cloud/json-rpc-compatibility): the
+  standards Lasso follows.
+- [Response signals and errors](/cloud/reference/signals-and-errors): every
+  error code.

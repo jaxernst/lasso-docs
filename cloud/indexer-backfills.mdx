@@ -1,52 +1,69 @@
 ---
 title: RPC routing for indexers and historical backfills
-description: Test historical state and eth_getLogs through your actual EVM RPC route before moving an indexer or backfill behind Lasso Cloud.
+description: Qualify historical state and eth_getLogs through your exact Lasso URL before moving an indexer or backfill behind it
 canonical: https://docs.lasso.sh/cloud/indexer-backfills
 "og:title": RPC routing for indexers and historical backfills
 ---
 
-**Lasso Cloud · For indexer operators.** Route historical EVM reads through a
-profile of configured providers, then qualify the exact blocks and methods your
-indexer needs. A provider serving an old block header may still lack old state
-or logs at that block.
+# RPC routing for indexers and historical backfills
 
-## Match the provider to the query
+Indexers and backfills spread heavy historical reads across providers with
+`load-balanced`, so one provider's quota stops being your ceiling. Historical
+state, receipts and logs have different coverage across providers, so qualify
+your exact queries through your exact Lasso URL before you move.
 
-Lasso considers declared and probed history evidence when admitting a request.
-Selected depths do not prove unlimited archive coverage. Historical state,
-receipts, and logs have different coverage; `eth_getLogs` also faces
-provider-specific block-range and result-size limits. See
-[RPC workload behavior](/cloud/rpc-behavior#historical-state-and-logs) for the
-method boundary.
+```ts
+const backfill = `${process.env.LASSO_RPC_URL}/load-balanced/ethereum`;
+```
 
-Build a small set of known positive queries from your own contracts and chain
-history. Keep the expected block hash, nonempty log or receipt identity, and
-expected state value. Run each query against the direct provider and the exact
-Lasso endpoint and credential your indexer will use. An empty response is not
-proof that the provider covered the requested history.
+## Qualify the queries you depend on
+
+Build a small set of known-good answers from your own contracts and history:
+an expected state value, a block hash, a nonempty log set or a receipt. Run
+each through the direct provider and through Lasso.
 
 | Indexer task | Trial query | Check |
-| --- | --- | --- |
-| Rebuild state | `eth_call` or a state method at a known old block | Expected value and block selector support |
-| Scan events | `eth_getLogs` over a representative range | Complete known logs, range limits, and result size |
-| Reconcile transactions | `eth_getTransactionReceipt` for known hashes | Receipt identity and expected block |
+|---|---|---|
+| Rebuild state | `eth_call` or a state method at a known old block | The expected value, with both selector forms your client uses |
+| Scan events | `eth_getLogs` over a representative range | Every known log is present; range and result-size limits |
+| Reconcile transactions | `eth_getTransactionReceipt` for known hashes | Receipt identity and block |
 
-Split large log ranges to fit the upstreams you use. Keep a durable checkpoint
-and a reorg overlap in your indexer, then deduplicate by log identity. Test the
-same path from your deployment regions and under representative request volume.
+An empty result doesn't prove a provider covered the history you asked for.
 
-## Inspect routing during a backfill
+## Choose the pool
 
-The [dashboard](https://lasso.sh/dashboard) shows current provider health and
-recent routing activity. Opt-in [`lasso_meta`](/cloud/observability#opt-in-metadata)
-can identify the executing upstream when that field is available. Preserve the
-request ID and the query's block selector alongside your result. For HTTP
-batches, items route independently; a batch is neither pinned to one provider
-nor an atomic snapshot. Use [one block hash for related state reads](/advanced/read-at-one-block)
-when you need them to refer to the same block.
+| Pool | When |
+|---|---|
+| Lasso's `premium` pool | You want commercial providers with deep history and no provider accounts of your own |
+| A Custom profile with an archive-capable provider | You already pay for archive access or run an archive node |
+| `public` | Only for recent blocks; public providers' history is shallower |
 
-Lasso's [dated historical qualification](/cloud/historical-workloads) shows
-positive samples and gaps across selected chains, depths, and methods. It is a
-model for testing, not a coverage promise for your contracts or a later
-deployment. Retain your previous endpoint until the Lasso route passes your
-own correctness, latency, and failure trials.
+Lasso's [historical workload evidence](/cloud/historical-workloads) shows dated
+results across chains, depths and methods. Use it as a model for your own
+test, not as a coverage promise.
+
+## Handle range limits
+
+When a provider refuses an `eth_getLogs` range as too large, Lasso returns
+`-32005` with `data.code: "log_range_limit"`; follow its `next_action`: split
+the range and retry. Lasso doesn't
+split it for you. On a Custom profile, Lasso learns each provider's span limit
+from these refusals and shows it in the profile's knowledge.
+
+## Limits
+
+- Batches route per item. A batch isn't pinned to one provider or one block.
+  For related reads at one block, use [read at one block](/advanced/read-at-one-block).
+- Keep a durable checkpoint and a reorg overlap, and deduplicate logs by
+  identity.
+- A refused range can still be charged on premium; check `x-lasso-usd`.
+- Test from your deployment regions under representative volume; the
+  [rollout steps](/cloud/install#roll-out-one-path-at-a-time) cover moving
+  traffic.
+
+## Next
+
+- [RPC method behavior](/cloud/rpc-behavior): history, logs and trace methods.
+- [Custom profiles](/cloud/custom-profiles): declare a log-span cap you know.
+- [Historical workload evidence](/cloud/historical-workloads): what Lasso has
+  measured.

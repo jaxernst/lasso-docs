@@ -10,8 +10,7 @@ Applications use ordinary JSON-RPC while Lasso handles provider differences in
 transport behavior, error delivery, method coverage, history, limits, and
 chain-specific extensions.
 
-The goal is one predictable interface. It is not a claim that every provider
-implements every method identically.
+The goal is one predictable interface over providers that differ.
 
 ## Compatibility target
 
@@ -67,23 +66,21 @@ ambiguity:
 - Values authored by Lasso, including downstream subscription IDs, use
   canonical Ethereum quantity encoding.
 
-Provider result-shape and value-encoding checks run in tests and provider
-canaries rather than adding schema validation to the routing path.
+Provider result shapes and value encodings are checked in Lasso's tests, not
+on the routing path.
 
 ## Methods, extensions, and affinity
 
 Lasso does not treat every method as interchangeable:
 
-- Reviewed replay-safe reads can use bounded failover.
+- Reads that are safe to repeat fail over within one deadline.
 - `eth_sendRawTransaction` receives one upstream dispatch because a lost
   response may still mean the transaction was applied.
-- Unknown and vendor methods remain forward-compatible, but receive one
-  dispatch unless reviewed policy marks them replay-safe.
-- Provider-local HTTP filter lifecycles are rejected until Lasso has an
-  explicit affinity contract for creation, follow-up calls, owner loss, and
-  expiry.
-- WebSocket subscriptions use a connection-scoped continuity path. The launch
-  subset supports `newHeads` and `logs` with bounded recovery.
+- Unknown and vendor methods pass through, with one dispatch each.
+- HTTP filter methods are rejected, because a filter ID belongs to one
+  provider; use `eth_getLogs` or subscriptions.
+- WebSocket subscriptions support `newHeads` and `logs`, with failover and
+  backfill.
 
 Profiles can include chain extensions, bundler methods, or client-specific
 namespaces. Their transport, replay safety, affinity, capability, cost, and
@@ -101,12 +98,7 @@ single dispatch.
 | Extension | A client-, provider-, or chain-specific method is routed without being presented as standard Ethereum JSON-RPC. |
 | Unsupported | Lasso rejects or does not advertise the surface. Missing evidence is unknown, not proof of support or lack of support. |
 
-## Claim boundary
-
-It is accurate to describe Lasso as a standards-led Ethereum JSON-RPC
-unification layer. It is not accurate to claim universal method support,
-identical provider semantics, conformance by every upstream, or complete
-implementation of every method in a rolling specification.
+## Next
 
 Read [Cloud RPC workload behavior](/cloud/rpc-behavior) for the managed method,
 execution-safety and continuity boundaries, including rejected filter lifecycle

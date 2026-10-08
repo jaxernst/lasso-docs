@@ -1,0 +1,137 @@
+---
+title: Set up production RPC with an agent
+description: Give an app separate keys per environment, one balance, verified routing and a clean handoff to its owner
+---
+
+# Set up production RPC with an agent
+
+This guide is for an agent asked to "set up reliable RPC for this app". By the
+end, the app has one Lasso key per environment, the account has a balance your
+user approved, routing is verified, and your user owns the account while you
+keep managing it.
+
+## Before you start
+
+Ask your user for anything you can't find in the code:
+
+| Question | Why it matters |
+|---|---|
+| Which chains and environments (prod, staging, workers)? | One key per environment keeps usage, errors and rotation separate |
+| Which calls are latency-critical, and which are bulk? | Each call site picks its own strategy and pool |
+| What can you spend, and from which wallet? | Top-ups need a wallet signature within an approved budget |
+| Do they already have a Lasso account? | The claim can add this setup to it |
+
+## 1. Create the account and the production key
+
+```bash
+curl -sS https://lasso.sh/api/v1/keys \
+  -H 'content-type: application/json' -d '{"name":"prod"}'
+```
+
+Save `management_token` in your own private store, and put `rpc_url` and
+`ws_url` in the production secret store. Don't print either.
+
+## 2. Add a key per environment
+
+Use the management token, so every key lands in the same account and shares
+one balance:
+
+```bash
+for env in staging worker; do
+  curl -sS https://lasso.sh/api/v1/keys \
+    -H "authorization: Bearer $LASSO_MANAGEMENT_TOKEN" \
+    -H 'content-type: application/json' -d "{\"name\":\"$env\"}"
+done
+```
+
+A create without the token makes a separate account. If that happens, your
+user can add it to their account when they claim it.
+
+## 3. Install the URLs
+
+Put each environment's `rpc_url` (and `ws_url` if the app subscribes) in that
+environment's secret store as `LASSO_RPC_URL`, then choose a pool and strategy
+per call site:
+
+| Call site | URL suffix |
+|---|---|
+| User-facing reads | `/latency-weighted/<chain>` |
+| Trading, quoting, liquidations | `/fastest/<chain>` |
+| Indexers and backfills | `/load-balanced/<chain>` |
+| Development, tests and background jobs that don't need premium | `/profile/public/<chain>` |
+
+Change only the URL in the app. Clients such as viem and ethers keep their
+existing configuration. See [install Lasso in your app](/cloud/install).
+
+## 4. Verify routing
+
+Send one request through each environment's URL and check the evidence:
+
+```bash
+curl -fsS --retry 5 -D - "$LASSO_RPC_URL/latency-weighted/base?include_meta=body" \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
+```
+
+Confirm `x-lasso-access: premium`, a `selected_provider` in `lasso_meta`, and
+an `x-lasso-usd` charge. Then run the app's own methods and block ranges, for
+example its largest `eth_getLogs` range, before moving traffic.
+
+## 5. Fund the account once
+
+The starting balance is enough to verify, not to run production. Credit the
+account within your user's budget:
+
+```http
+POST https://lasso.sh/api/v1/accounts/{account_id}/credit
+Content-Type: application/json
+
+{"usd":"1"}
+```
+
+The response is a 402 with a challenge for each rail in its `offer.rails`.
+Have the approved wallet sign one with a standard client, then repeat the
+request with the signature. A
+`202` means settlement is pending: check `status_url`, and never sign a second
+payment for the same top-up. Every key draws on this one balance.
+
+## 6. Hand the account to your user
+
+```http
+POST https://lasso.sh/api/v1/accounts/current/claim-link
+Authorization: Bearer <management token>
+```
+
+Give your user the `claim_url` privately. It works once and expires in 24
+hours. When they open it, they choose **Keep as a new account**, becoming its
+first admin, or **Add to your account**, moving everything into the account
+they already have. Keeping it changes nothing about how the app serves. Adding
+it shows a preview of what changes before they confirm. Either way your token
+keeps working, and you appear in their dashboard under **Agents**.
+
+## What to tell your user
+
+- Where each key is installed, and which pool and strategy each call site uses.
+- The balance you added and the approximate cost per day at current traffic
+  (sum `x-lasso-usd`, or read `usage` on each key).
+- That if the balance runs out, the app keeps serving on public providers for
+  30 days and the account shows when that window ends.
+- That they can rotate any key with no downtime, and restrict or revoke your
+  access at any time.
+
+## Limits
+
+- Stay within your user's approved budget. The management token can't pay; a
+  wallet signature must approve every purchase.
+- Never print keys, tokens or claim URLs anywhere they can be logged or
+  committed.
+- Only an unrestricted agent can request a claim link.
+
+## Next
+
+- [Accounts, people and agents](/cloud/accounts-and-agents): what each claim
+  choice does in detail.
+- [Balance and payment fallback](/cloud/balance-and-fallback): how spend and
+  fallback work.
+- [Rotate a key with no downtime](/cloud/guides/rotate-a-key): replace a
+  production secret safely.

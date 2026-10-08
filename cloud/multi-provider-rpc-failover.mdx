@@ -1,75 +1,72 @@
 ---
 title: Multi-provider RPC failover for production apps
-description: Route EVM reads across configured providers, inspect the serving upstream, and plan separate recovery for signed transactions and subscriptions.
+description: Route EVM reads across several providers, see which upstream served each request, and plan separately for signed transactions and subscriptions
 canonical: https://docs.lasso.sh/cloud/multi-provider-rpc-failover
 "og:title": Multi-provider RPC failover for production apps
 ---
 
-**Lasso Cloud · For application and infrastructure teams.** Put configured EVM
-providers behind one standard JSON-RPC endpoint. Lasso selects an eligible
-upstream for each request and can fail over when replay is safe for that work.
+# Multi-provider RPC failover for production apps
+
+Put several providers behind one standard JSON-RPC URL, and a provider's outage
+or rate limit stops being your app's outage. Use this guide to confirm that
+failover covers the failure you need to survive, using your app's own
+requests. It works on Lasso's managed pool or on a
+[Custom profile](/cloud/bring-your-own-rpc) over your own providers.
+
+```bash
+curl -sS "$LASSO_RPC_URL/load-balanced/base?include_meta=body" \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}' \
+  | jq '.lasso_meta | {candidate_providers, selected_provider, retries}'
+```
 
 ## What happens to a read
 
-Lasso first filters providers by chain, method, transport, configured limits,
-and known health. The requested strategy orders the eligible providers. A
-replay-safe read can use another upstream when execution safety, dispatch
-certainty, failure cause, remaining deadline, and live availability permit.
-The entire attempt sequence stays within one request deadline and work budget.
+Lasso finds the providers that can serve the chain and method, orders them by
+health and your strategy, and sends the request. If the provider fails in a way
+that's safe to retry, such as a timeout, a 5xx or a rate limit, the next
+provider is tried within the same request deadline. See [routing](/cloud/routing).
 
-For a trial, use a method your app already calls, such as `eth_blockNumber` or
-an ordinary contract read. Run it through the old endpoint and Lasso under the
-same workload. Compare correctness, error rate, latency, head freshness, and
-which upstream served the response. Two configured URLs may share a vendor,
-quota, or underlying infrastructure, so test the failure you need to survive.
+## What failover covers
 
-## See the provider that served the request
+| Work | On a provider failure |
+|---|---|
+| Reads: balances, calls, receipts, blocks, logs | Retried on the next eligible provider |
+| Historical reads | Retried on the next provider, steered toward those known to serve that history |
+| `eth_sendRawTransaction` | Sent once and never resent; reconcile by transaction hash |
+| WebSocket subscriptions | Moved to another provider, with missed `newHeads` and logs backfilled within a bounded window |
+| HTTP filters (`eth_newFilter`) | Not served; use `eth_getLogs` or subscriptions |
+| A pinned provider (`/provider/<name>/`) | No failover |
 
-The [dashboard](https://lasso.sh/dashboard) shows provider state and recent
-activity. For an individual HTTP request, opt into routing metadata with
-`?include_meta=body`. In the following **illustrative excerpt**, the optional
-`executed_channel` identifies the upstream that served a successful response:
+## Run the trial
 
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": "0x64",
-  "lasso_meta": {
-    "request_id": "example-request",
-    "executed_channel": {"provider_id": "backup", "transport": "http"}
-  }
-}
-```
+1. Pick a method your app already calls, such as `eth_blockNumber` or a
+   contract read.
+2. Send the same workload through the old endpoint and through Lasso. Compare
+   correctness, error rate, latency and head freshness.
+3. Read `lasso_meta` with `?include_meta=body` to see which provider served
+   each request, and how many retries it took. See
+   [routing evidence](/cloud/observability).
+4. Force the failure you care about, such as throttling or taking down one of
+   your own nodes, and confirm the app's requests keep succeeding.
+5. Test writes and subscriptions separately, by their own rules above.
 
-Keep the raw JSON-RPC envelope when inspecting `lasso_meta`; an SDK may return
-only `result`. Managed routes can withhold provider fields, and some outcomes
-have no executing upstream. Record absent attribution as unknown. The
-[routing evidence guide](/cloud/observability#opt-in-metadata) explains header
-mode, optional fields, and request ID correlation.
+## Limits
 
-## Treat writes and streams separately
+- Failover only helps when another provider can serve the same method,
+  history and chain. Two URLs on the same provider account, region or plan can
+  fail together.
+- A request has one deadline and a bounded number of attempts. When every
+  attempt fails, you get the JSON-RPC error inside an HTTP 200 response.
+- WebSocket recovery is bounded by a replay window and a deadline. When a
+  recovery can't complete, the socket closes with code 1011, and the client
+  reconnects and resubscribes. Keep your own checkpoint for indexer-grade
+  processing.
 
-Lasso sends `eth_sendRawTransaction` to one selected upstream and does not
-automatically retry or fan out after dispatch. If the response is lost, your
-application reconciles by transaction hash and owns nonce, replacement,
-receipt, and finality handling. Provider-local HTTP filter IDs cannot move
-between upstreams; use `eth_getLogs` or a supported WebSocket subscription.
-See the [workload behavior guide](/cloud/rpc-behavior) for the full method
-contract.
+## Next
 
-For a surviving downstream WebSocket connection, Lasso can replace a provider
-and reconcile a bounded replay window within one profile. A controlled
-30-minute `newHeads` test with 50 clients and 119 forced replacements recorded
-zero gaps or replay-created duplicates. That result covers the tested window;
-clients still need checkpoints and recovery after disconnection. Read the
-[WebSocket continuity evidence](/cloud/websocket-continuity-evidence) and
-[subscription recovery limits](/advanced/websocket-subscriptions#application-checkpoints-and-reorgs).
-
-## Try one application path
-
-Start with [your existing providers](/cloud/bring-your-own-rpc) or a
-[managed profile](/cloud/adoption#managed-profile). Keep the previous RPC URL
-available while you test. The [routing guide](/cloud/routing) describes strategy
-and health behavior, while [versions and evidence](/releases-and-availability)
-separates released Lasso RPC Core from the managed deployment.
+- [Trial your own providers](/cloud/bring-your-own-rpc): put your providers
+  behind Lasso.
+- [RPC method behavior](/cloud/rpc-behavior): the full method contract.
+- [WebSocket subscriptions](/advanced/websocket-subscriptions): how subscription
+  failover and backfill work.

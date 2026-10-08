@@ -1,0 +1,123 @@
+---
+title: Accounts, people and agents
+description: Who owns keys, profiles and balance, how agents and people share them, and how a handoff works
+---
+
+# Accounts, people and agents
+
+Everything in Lasso Cloud belongs to an account: its RPC keys, Custom profiles,
+balance and subscriptions. People and agents act on an account as its members.
+An agent can create an account on its own, and a person can claim it later
+without changing a single URL.
+
+```bash
+curl -sS https://lasso.sh/api/v1/accounts/current \
+  -H "authorization: Bearer $LASSO_MANAGEMENT_TOKEN"
+```
+
+## The model
+
+| Thing | What it is |
+|---|---|
+| **Account** | Owns keys, Custom profiles, the balance and subscriptions |
+| **Provisional account** | An account no person has joined yet, usually created by an agent; it works like any other account |
+| **Person** | A signed-in human; an admin of any number of accounts |
+| **Agent** | A non-human member of exactly one account, signed in with a management token |
+| **RPC key** | What your app sends traffic with; it reaches every profile of its account unless you scope it. See [keys, URLs and profiles](/cloud/keys-and-profiles) |
+
+Accounts own; members act. An agent belongs to its account, not to the person
+who approved it, so it keeps working when that person leaves.
+
+## Credentials
+
+| Credential | Held by | Can do |
+|---|---|---|
+| RPC key | Your app | Send RPC traffic to the profiles it's allowed; read its own key and account |
+| Management token | One agent | Manage the account, within the agent's restrictions |
+| Dashboard session | A person | Everything an admin can do, including members, agents, subscriptions and viewing any active key's URLs |
+| Wallet signature | Whoever pays | One payment; no Lasso credential is needed to pay |
+
+An RPC key never grants control of its account, so holding one can't be used
+to take the account over.
+
+## How an account starts
+
+| Starting point | What happens |
+|---|---|
+| An agent with nothing | `POST /api/v1/keys` creates a provisional account, makes the caller its agent, and returns a key and token |
+| A person in the dashboard | Signing in creates only the person. Their first endpoint or Custom profile creates an account with them as admin |
+| A person with a claim link | Claiming creates or extends their account, as described below |
+| An agent joining an existing account | `POST /api/v1/connections` returns an approval URL; once an admin approves, the agent joins that account |
+
+## Hand off without changing anything
+
+When an agent built something for a person, it requests a claim link and gives
+the URL to that person privately:
+
+```http
+POST https://lasso.sh/api/v1/accounts/current/claim-link
+Authorization: Bearer <management token>
+```
+
+The link is valid for 24 hours and works once. Requesting another link
+invalidates the previous one. The person opens it signed in and chooses:
+
+| Choice | Result |
+|---|---|
+| **Keep as a new account** | They become the account's first admin. Every key, URL, agent, profile and the balance stay exactly as they are, and the account gains free access if they have a sponsorship to give. This is the default when they administer no other account |
+| **Add to your account** | The account's keys, agents, Custom profiles, balance and Custom access move into an account they already administer. The claim page previews every consequence before they confirm. This is the default when they administer exactly one other account |
+
+Adding to an account:
+
+- renames a colliding Custom profile (`prod-base` becomes `prod-base-2`),
+  while the incoming keys' URLs keep reaching their own profile;
+- adds the balances together, including negative ones, and keeps the later
+  grace window;
+- moves the keys under the receiving account's access and shared rate limits,
+  and the receiving account's existing keys start drawing on the combined
+  balance;
+- keeps the old account ID working, so late payments addressed to it still
+  land;
+- keeps every incoming agent's token and full authority. The preview names
+  each agent, and an admin can restrict or revoke them afterward.
+
+Someone who manages accounts for several clients chooses **Keep as a new
+account** to keep each client separate.
+
+## What agents can and can't do
+
+An agent manages the account's keys, Custom profiles and its own token, and an
+unrestricted agent can list the account's agents and request claim links. An
+admin can narrow an agent with optional restrictions:
+
+| Restriction | Effect |
+|---|---|
+| `profiles` | The agent sees only these Custom profiles and the keys allowed only those profiles; keys it creates are scoped to them |
+| `read_only` | The agent can read but not change anything |
+| `expires_at` | The agent stops working at this time |
+
+Whatever its restrictions, an agent never manages people, creates or approves
+other agents, or changes Stripe subscriptions. It can't spend money either:
+paying needs a wallet signature. An agent can rotate or revoke its own token,
+and any admin can revoke any agent.
+
+## Limits
+
+- An agent belongs to exactly one account. An agent working for several
+  clients holds one token per client account.
+- An account holds up to 100 active keys and up to 5 Custom profiles. Adding
+  an account can exceed these; you then can't create more until you're back
+  within them.
+- Only an unrestricted agent can request a claim link. A link whose agent was
+  revoked or restricted before confirmation claims nothing.
+- If an agent loses its token, the account's keys keep serving. The agent can
+  start a new account, and Lasso support can recover the old one.
+
+## Next
+
+- [Keys, URLs and profiles](/cloud/keys-and-profiles): one key across every
+  profile, scoping and rotation.
+- [Set up production RPC with an agent](/cloud/guides/production-rpc-with-an-agent):
+  the whole flow from first key to handoff.
+- [Balance and payment fallback](/cloud/balance-and-fallback): how the account
+  pays.

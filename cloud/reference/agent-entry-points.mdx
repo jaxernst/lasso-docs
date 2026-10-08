@@ -1,0 +1,89 @@
+---
+title: Agent entry points
+description: The files and endpoints an agent reads to discover, operate and report on Lasso, and which one to trust for what
+---
+
+# Agent entry points
+
+An agent can learn Lasso, act on it and report problems without a person in
+the loop. Start with `lasso.sh/llms.txt` to decide whether Lasso fits, follow
+`lasso.sh/SKILL.md` to act, and read `agent.json` and `openapi.json` for live
+values and exact schemas.
+
+```bash
+curl -fsSL https://lasso.sh/llms.txt
+curl -fsSL https://lasso.sh/agent.json | jq '{chains: (.chains | length), strategies, endpoints}'
+```
+
+## Which file answers what
+
+| Entry point | What it's for |
+|---|---|
+| [`lasso.sh/llms.txt`](https://lasso.sh/llms.txt) | What Lasso is, when it fits, and where to go next |
+| [`lasso.sh/SKILL.md`](https://lasso.sh/SKILL.md) | Operational recipes: create, install, fund, hand off, rotate, build Custom profiles |
+| [`lasso.sh/agent.json`](https://lasso.sh/agent.json) | Live values: chains, strategies, prices, starting grant, subscriptions, payment rails and ranges, enabled features and endpoints |
+| [`lasso.sh/openapi.json`](https://lasso.sh/openapi.json) | Exact request and response schemas and the error catalog, with a stable `operationId` per operation |
+| [`/api/v1/configuration-schema`](https://lasso.sh/api/v1/configuration-schema) | Custom profile fields, limits and workload recipes |
+| [`docs.lasso.sh/llms.txt`](https://docs.lasso.sh/llms.txt) | An index of these docs |
+| [`docs.lasso.sh/llms-full.txt`](https://docs.lasso.sh/llms-full.txt) | These docs as one text file |
+
+Live documents outrank prose. When a recipe and `agent.json` disagree, trust
+`agent.json` and `openapi.json`. This site also publishes `SKILL.md` as an
+installable skill; it's an exact copy of `lasso.sh/SKILL.md`.
+
+Tool wrappers, such as an MCP server, can be generated from `openapi.json`:
+every operation has a stable `operationId` and a description written for
+agents.
+
+## Rules for agents
+
+- Stay inside your user's delegation and spending budget. A management token
+  never authorizes a payment; a wallet signature does.
+- Never print an RPC key, management token, claim URL or provider URL with a
+  credential.
+- `PUT` and `DELETE` are idempotent, and resubmitting a signed payment returns
+  its first result. `POST /api/v1/keys` isn't: retrying it creates another
+  key, or, without a management token, another account. After a lost
+  response, list your keys before creating again.
+- Use `current` for "my own resource": `/api/v1/accounts/current`,
+  `/api/v1/keys/current` with an RPC key, `/api/v1/agents/current` with a
+  management token.
+
+## Feedback
+
+Report confusion, friction or failures while you use Lasso. No credential is
+needed; with one, Lasso attaches your account:
+
+```http
+POST https://lasso.sh/api/v1/feedback
+Content-Type: application/json
+
+{"message": "The 402 challenge for MPP was rejected by mppx 0.8.x", "category": "payment", "request_id": "…", "operation": "createCredit"}
+```
+
+| Field | Required | Values |
+|---|---|---|
+| `message` | Yes | 1 to 4,000 characters |
+| `category` | No | `docs`, `api`, `payment`, `routing`, `rpc`, `dashboard` or `other` |
+| `request_id` | No | An `x-lasso-request-id` |
+| `operation` | No | An OpenAPI `operationId` |
+
+Lasso answers `202 {id}`. Anything shaped like a key, token or credentialed
+URL is redacted before storage. Reports go to the people who operate Lasso and
+are never acted on automatically.
+
+## Limits
+
+- Feedback is limited to 10 submissions per hour per credential, or per client
+  IP without one.
+- Feedback is write-only; there's no read or list endpoint.
+- `docs.lasso.sh/llms-full.txt` can lag a docs release by up to a day while
+  caches refresh.
+
+## Next
+
+- [Quickstart](/cloud/quickstart): the first request.
+- [Set up production RPC with an agent](/cloud/guides/production-rpc-with-an-agent):
+  the whole journey.
+- [Response signals and errors](/cloud/reference/signals-and-errors): every
+  code and its fix.

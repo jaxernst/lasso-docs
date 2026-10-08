@@ -1,84 +1,126 @@
 ---
-title: Use your existing RPC providers with Lasso Cloud
-description: Put the EVM provider accounts and nodes you already use behind one Lasso Cloud URL, then verify routing and upstream behavior.
+title: Trial your own providers behind Lasso
+description: Put the provider accounts and nodes you already use behind one Lasso URL
 canonical: https://docs.lasso.sh/cloud/bring-your-own-rpc
-"og:title": Use your existing RPC providers with Lasso Cloud
+"og:title": Trial your own providers behind Lasso
 ---
 
-**Lasso Cloud · For teams with existing provider accounts or nodes.** Use a
-custom profile to put those EVM upstreams behind one application RPC URL.
-Your application keeps a standard JSON-RPC client. Lasso Cloud manages the provider
-pool behind its endpoint, so changing an upstream does not require an application
-redeployment.
+# Trial your own providers behind Lasso
 
-## Start with one request flow
+An agent can put your existing provider accounts and nodes behind Lasso: it
+checks them with a dry run before anyone signs up, then, once the account has
+Custom access, saves the profile, routes the app's key over it, and verifies
+failover.
 
-Choose one chain and a stateless read your app already uses. Keep the existing
-endpoint available for rollback. Record its latency, errors and request volume
-before changing the route. Two providers can improve your options during an
-outage, but they may share infrastructure or disagree about the chain head.
+## 1. Create an endpoint
 
-Custom access and upstream provider charges are separate. Check
-[live pricing](https://lasso.sh/pricing) and your provider quotas before the trial.
+```bash
+curl -sS https://lasso.sh/api/v1/keys \
+  -H 'content-type: application/json' -d '{"name":"prod"}'
+```
 
-## Configure the pool
+Keep `management_token` private, and put `rpc_url` in the app's secret store.
 
-1. Create a custom profile in the [dashboard](https://lasso.sh/dashboard).
-2. Add the chosen chain and the two HTTP URLs from your existing providers.
-3. Check that each URL serves the intended chain and methods. Start with
-   `eth_chainId`, `eth_blockNumber` and the exact read your app needs.
-4. Choose your block policy using the guidance below, then activate the profile.
-5. Send the same read through the profile endpoint and inspect its
-   [routing evidence](/cloud/observability).
+## 2. Dry-run the profile
 
-Keep provider credentials in the configuration secret store. Do not put them in
-support screenshots, chat transcripts or application logs. Check the
-[supported connection settings](/cloud/custom-profiles#supported-provider-connection-settings)
-if a provider needs header authentication or a distinct WebSocket endpoint.
+List the provider URLs the app already uses. A dry run checks each provider's
+chain identity and stores nothing, so it needs no payment:
 
-Dashboard capability probes and management API probes have different scopes.
-The management probe, when advertised by the live API, checks chain identity and
-head within the call budget in its
-[live configuration schema](https://lasso.sh/api/v1/management/configuration-schema).
-It does not establish archive, WebSocket or method coverage. Test those
-requirements separately.
+```http
+PUT https://lasso.sh/api/v1/profiles/prod-base?dry_run=true
+Authorization: Bearer <management token>
+Content-Type: application/json
+
+{"name": "Production Base", "chains": {"base": {"providers": [
+  {"name": "primary", "url": "<existing primary RPC URL>"},
+  {"name": "backup",  "url": "<existing backup RPC URL>"}
+]}}}
+```
+
+Each provider comes back `verified`, `verifying` (didn't answer yet) or
+`failed` (wrong chain). Fix any failure before you pay. Start with URLs only;
+add `limits` only for a cap you know, such as your plan's log span. Lasso
+learns the rest from traffic.
+
+## 3. Subscribe to Custom
+
+Holding a profile needs Custom access, which comes with the Custom
+subscription. A person subscribes from the account's dashboard
+([prices](https://lasso.sh/pricing)); if an agent set the account up, hand it
+to its owner with a [claim link](/cloud/accounts-and-agents) first. Traffic on
+your own providers has no request price.
+
+## 4. Save it and route the key over it
+
+Repeat the `PUT` without `dry_run`. Then point the app at it, either by URL or
+by making it the key's default so the app's existing URL moves with no
+redeploy:
+
+```http
+PATCH https://lasso.sh/api/v1/keys/{key_id}
+Authorization: Bearer <management token>
+Content-Type: application/json
+
+{"default_profile": "prod-base"}
+```
+
+## 5. Verify on real traffic
+
+```bash
+curl -fsS --retry 5 -D - "$LASSO_RPC_URL/fastest/base?include_meta=body" \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
+```
+
+Confirm `x-lasso-access: custom` and a `selected_provider` from your list.
+Then run the app's own reads, its largest `eth_getLogs` range and any
+historical queries through the profile. Compare latency, errors and head
+freshness with the direct provider URLs.
+
+To see failover, pin each provider once with
+`$LASSO_RPC_URL/profile/prod-base/provider/primary/base`, then watch which
+provider serves the unpinned URL while one of them is throttled or down.
+
+## 6. Hand it over
+
+Request a claim link and give it to your user privately:
+
+```http
+POST https://lasso.sh/api/v1/accounts/current/claim-link
+Authorization: Bearer <management token>
+```
+
+When they claim it, the profile, its Custom access, the key and its URL come
+with it. If they add it to an account that already has a `prod-base` profile,
+the incoming one is renamed and the app's URL keeps reaching it.
 
 ## Choose behavior for your workload
 
-| Requirement | Starting point | What to verify |
-| --- | --- | --- |
-| Responsive current reads | `fastest` strategy with block regression protection off | Tail latency, errors and head freshness under your traffic |
-| Sequential latest-block observations | Enable block regression protection for the chain | Lag behavior and how your app handles a continuity error |
-| Several values from one state | Select a block hash and reuse it for all reads | Upstream support for the block-hash selector |
-| Real-time logs | Account-backed WebSocket endpoint | Reconnect, duplicate handling and bounded replay recovery |
+| Requirement | Profile setting | URL strategy |
+|---|---|---|
+| Responsive current reads | Two or more providers | `fastest` or `latency-weighted` |
+| Latest block never goes backwards | `block_protection: true` | Any |
+| Several values from one block | Nothing; use [read at one block](/advanced/read-at-one-block) | Any |
+| Subscriptions survive a provider outage | `ws_url` on at least two providers | Any |
+| Preferred primary with a backup | Primary first in the list | `priority` |
 
-[Block regression protection](/advanced/block-continuity) does not make independent
-`latest` contract calls a snapshot. Use [Read at one block](/advanced/read-at-one-block)
-for related balances, nonces or contract values. Neither feature guarantees finality.
+## Limits
 
-## Update without changing the app endpoint
+- Custom access is per account and covers up to five Custom profiles. If it
+  lapses, the profile is kept and its URLs serve from Lasso's
+  `premium` pool, charged at request prices from the balance and marked
+  `x-lasso-fallback: profile`, until access is renewed.
+- Two URLs on the same provider account, region or plan can fail together.
+  Test the failure you need to survive.
+- A dry run checks chain identity only. Archive coverage, WebSocket support and
+  method coverage come from testing and from what Lasso learns over time.
+- Your upstream providers still bill you for the traffic they serve.
 
-Start by adding or adjusting one provider. Verify its behavior, apply the profile
-change, then inspect routing evidence from the application. Cluster publication is
-not instantaneous; a successful local reconciliation does not prove every region
-has observed the change.
+## Next
 
-For agent-managed changes, follow the [management workflow](/cloud/agent-flows).
-Read the current revision, dry-run the complete desired profile document, then
-apply the same document with `If-Match: <revision>`. Repeating the same `PUT`
-after a lost response is safe; re-read before changing an already updated
-profile. Omitting a provider removes it; omitting an existing provider's URL
-preserves that secret.
-
-If a provider performs poorly, remove or correct it while other eligible providers
-remain available. Keep an application rollback for the evaluation. Provider outages,
-quota exhaustion across the whole pool and unsupported methods can still prevent a
-successful request.
-
-## Decide whether the trial worked
-
-Compare the same request flow before and after the change: successful responses,
-p95/p99 latency, head freshness, upstream request volume and operational effort.
-Expand only when the evidence supports your workload. Add transaction broadcasting,
-historical queries and subscriptions as separate tests with their own
-[recovery behavior](/cloud/rpc-behavior).
+- [Custom profiles](/cloud/custom-profiles): every field and what Lasso
+  learns.
+- [Multi-provider failover](/cloud/multi-provider-rpc-failover): decide whether
+  the trial worked.
+- [Accounts, people and agents](/cloud/accounts-and-agents): what the claim
+  does.
