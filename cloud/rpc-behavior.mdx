@@ -39,7 +39,9 @@ because a hash's age is unknown before dispatch.
 Lasso recognizes that limit, it returns `-32005` with
 `data.code: "log_range_limit"` and a `next_action` to narrow the range.
 Split the range; Lasso doesn't split it or repeat the same query on another
-provider. Qualify your exact queries with
+provider. Some providers report a plan restriction on `eth_getLogs` as a
+generic `-32600`; Lasso recognizes that and tries the unchanged query on
+another eligible provider instead. Qualify your exact queries with
 [indexer backfills](/cloud/indexer-backfills).
 
 ## Trace and debug methods

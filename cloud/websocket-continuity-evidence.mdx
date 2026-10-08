@@ -3,7 +3,8 @@ title: WebSocket continuity evidence
 description: Scope and result of Lasso's controlled newHeads provider-replacement soak.
 ---
 
-In a 30-minute soak, 50 clients sharing one `newHeads` subscription rode
+In a controlled 30-minute soak, a synthetic test rather than production
+traffic, 50 clients sharing one `newHeads` subscription rode
 through 119 forced provider replacements with zero gaps and zero duplicates.
 The test covered one profile, one running process and `newHeads`; clients that
 disconnect resubscribe from their own checkpoint (see
