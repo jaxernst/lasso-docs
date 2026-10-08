@@ -1,0 +1,65 @@
+---
+title: OpenTelemetry tracing
+description: Optional OTLP traces for HTTP requests, routed RPC items, and upstream attempts in RPC Core.
+---
+
+RPC Core v0.5.1 can export OpenTelemetry traces over OTLP. Tracing is off by default. When it is off, Lasso does no tracing work on the request path, and JSON logs and Prometheus metrics work without a trace backend. Export runs outside request workers, so a slow or failed collector never delays or changes an RPC result.
+
+## Enable tracing
+
+Point Lasso at an OTLP receiver, such as the OpenTelemetry Collector or Grafana Alloy, then set `LASSO_OTEL_ENABLED`:
+
+```sh
+LASSO_OTEL_ENABLED=true
+OTEL_SERVICE_NAME=lasso
+OTEL_EXPORTER_OTLP_ENDPOINT=http://collector.observability.svc:4318
+OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+OTEL_TRACES_SAMPLER=parentbased_traceidratio
+OTEL_TRACES_SAMPLER_ARG=0.01
+LOG_FORMAT=json
+```
+
+`LASSO_OTEL_ENABLED` accepts `true`, `false`, `1`, or `0`; any other value fails startup. The remaining variables are the standard OpenTelemetry SDK settings:
+
+- `OTEL_EXPORTER_OTLP_ENDPOINT` is a base URL; the exporter appends `/v1/traces`. Use `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` for an exact trace URL.
+- HTTP/protobuf is the default transport and `grpc` is supported. HTTP/JSON is not.
+- Pass receiver credentials through `OTEL_EXPORTER_OTLP_HEADERS` from your secret store. Never put credentials in provider IDs, profile names, or resource attributes.
+- `OTEL_SDK_DISABLED=true` turns the SDK off even when the Lasso flag is on.
+
+## Sampling
+
+Root traces sample at 1% by default. A request that arrives with a W3C `traceparent` keeps its parent's sampling decision, so an indexer whose HTTP client propagates trace context sees Lasso's spans inside its own traces. Because callers can send sampled parents, parent-based sampling does not cap trace volume from untrusted clients. To enforce a local policy, strip or replace incoming `traceparent` at your ingress. Use `always_on` only for short staging investigations.
+
+## Spans
+
+```text
+caller span (when its HTTP client propagates traceparent)
+  lasso.http        HTTP RPC request, SERVER
+    lasso.rpc       one routed JSON-RPC item, INTERNAL
+      lasso.upstream  first upstream attempt, CLIENT
+      lasso.upstream  failover attempt, CLIENT
+```
+
+Batch items are children of the HTTP span. Outgoing provider requests carry the attempt's `traceparent`. WebSocket RPC items get `lasso.rpc` and `lasso.upstream` spans with their own roots; Lasso does not create spans for long-lived sockets or subscription notifications. Health, metrics, and dashboard routes do not create spans.
+
+Compare a `lasso.rpc` span's duration with its `lasso.upstream` attempts: a failed attempt followed by a successful request is a recovered failover, while a failed request span means every eligible attempt was exhausted.
+
+Span attributes include chain ID, profile and provider identifiers, transport, origin, the RPC method (unknown methods become `other`), outcome, and attempt count. Lasso never exports request bodies or params, wallet addresses, transaction data, upstream URLs, query strings, caller request IDs, or exception messages. Incoming baggage and `tracestate` are not propagated.
+
+## Log correlation
+
+While a request is active, JSON log entries carry `trace_id` and `span_id`. To link Loki to Tempo, add a derived field named `trace_id` with the regex `"trace_id":"([a-f0-9]{32})"`. Keep trace IDs out of Loki stream labels and Prometheus labels.
+
+In Grafana Explore, find Lasso's client traffic with TraceQL:
+
+```text
+{ resource.service.name = "lasso" && span.lasso.origin = "client" }
+```
+
+## Limits
+
+Tracing is best-effort. The SDK's batch processor drops spans under pressure or at shutdown; tune it with `OTEL_BSP_MAX_QUEUE_SIZE`, `OTEL_BSP_SCHEDULE_DELAY_MILLIS`, and `OTEL_BSP_EXPORT_TIMEOUT_MILLIS`. Spans still open after 60 seconds are ended by the SDK sweeper; tune it with the `OTEL_SPAN_SWEEPER_*` variables if your longest requests need complete traces. The final flush at shutdown can delay process exit, so allow for it in your termination grace period.
+
+If traces stop appearing, check `LASSO_OTEL_ENABLED`, `OTEL_SDK_DISABLED`, the receiver address, protocol and credentials, the sampler, and the collector's own export and drop metrics. An empty trace search does not show that traffic is idle; use [metrics](/observability/metrics) for that. To turn tracing off, set `LASSO_OTEL_ENABLED=false` and restart.
+
+See the [released tracing guide](https://github.com/jaxernst/lasso-rpc/blob/v0.5.1/docs/TRACING.md) for a Collector pipeline example and sweeper tuning details.

@@ -15,7 +15,7 @@ The dashboard request tester generates real upstream traffic. Its success, error
 
 The request pipeline also emits `[:lasso, :rpc, :request, :stop]` with a millisecond `duration` measurement and metadata for chain, method, strategy, provider, transport, result, and failovers. This event describes routed request completion. Locally handled methods, invalid requests, and pre-dispatch failures follow other paths, so it is not a complete ingress counter. An embedding deployment can attach its own telemetry handler and export measurements to its monitoring system.
 
-Optional [OpenTelemetry tracing](https://github.com/jaxernst/lasso-rpc/blob/v0.5.1/docs/TRACING.md) adds HTTP, routed-request, and upstream-attempt spans with W3C context propagation and JSON-log trace correlation. Set `LASSO_OTEL_ENABLED=true` to enable it; tracing is disabled by default and never affects routing results.
+Optional [OpenTelemetry tracing](/observability/tracing) adds HTTP, routed-request, and upstream-attempt spans with W3C context propagation and JSON-log trace correlation. Set `LASSO_OTEL_ENABLED=true` to enable it; tracing is disabled by default and never affects routing results.
 
 VM/system metrics are disabled by default. Set `LASSO_VM_METRICS_ENABLED=true` to collect and display them in the dashboard; Prometheus's `lasso_vm_*` BEAM totals export without that flag. Protect metrics and dashboard routes at your ingress when deployed publicly.
 

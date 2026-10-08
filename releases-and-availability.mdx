@@ -10,13 +10,13 @@ Core release and the hosted service have identical behavior.
 
 ## Version reference
 
-Checked October 7, 2026:
+Checked October 8, 2026:
 
 | Surface | Version or observation | What it establishes |
 | --- | --- | --- |
 | RPC Core source | [v0.5.1](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.5.1), source `bd028b0870afc714e4d85fa94fe0bc2af94df628` | The released source described by the Core API guides. [Exact-commit CI](https://github.com/jaxernst/lasso-rpc/actions/runs/37555600096) passed; container publication is a separate gate. |
 | RPC Core container | v0.5.1, image index `sha256:6861712eef30dc29850e6259cba55402202092768e4e82b294dbaca53857f307` | The [release manifest](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.1/container-release.json) binds source and image digests. Native AMD64 and ARM64 installation checks passed before [publication completed](https://github.com/jaxernst/lasso-rpc/actions/runs/37556196437). |
-| Managed Cloud | Public health reported source `4a3b1a68a53235b5ba0cd7a4060113b68cd34823` in four regions (`iad`, `lhr`, `sin`, `sjc`) at `2026-10-07T04:18:12Z` | The production rollout passed exact-fleet attestation. Recheck [health](https://lasso.sh/api/health) and [service discovery](https://lasso.sh/agent.json) for your evaluation. Process health does not qualify your workload. |
+| Managed Cloud | Public health reported source `e56d59598639778ed9328f566a5d39a43fcb43f9` in four regions (`iad`, `lhr`, `sin`, `sjc`) at `2026-10-08T06:37:41Z` | The production rollout passed exact-fleet attestation. Recheck [health](https://lasso.sh/api/health) and [service discovery](https://lasso.sh/agent.json) for your evaluation. Process health does not qualify your workload. |
 | Cloud APIs and payment availability | Live [OpenAPI](https://lasso.sh/openapi.json), [manifest](https://lasso.sh/agent.json), and [deployment guide](https://lasso.sh/SKILL.md) | Available routes, credential classes, and enabled payment rails on that deployment. An implemented API can still be disabled. |
 
 ## Workload and ownership matrix
@@ -52,10 +52,10 @@ circuit and WebSocket continuity series, and BEAM runtime pressure, plus a
 refreshed Grafana dashboard. It adds opt-in OpenTelemetry tracing
 (`LASSO_OTEL_ENABLED`, disabled by default and never affecting routing results)
 with W3C propagation and JSON-log correlation. It fixes a bug that could leave
-a rate-limited provider ineligible until restart after its first 429 response —
-upgrade if your providers return 429s, since restarting only masks the issue —
-and records successful upstream execution before a terminal head-policy
-rejection so provider health and attempt diagnostics stay accurate. No profile
+a rate-limited provider ineligible until restart after its first 429 response,
+and it records successful upstream execution before a terminal head-policy
+rejection so provider health and attempt diagnostics stay accurate. Upgrade if
+your providers return 429s; restarting only masks the issue. No profile
 schema or publication-journal migration is required; Prometheus consumers
 should review the new metric families and the added `transport`, `profile`,
 and `origin` labels.
