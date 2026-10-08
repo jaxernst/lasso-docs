@@ -355,6 +355,7 @@ Every error Lasso originates carries `code` and `next_action`; follow it.
 | 504 `deadline_exhausted`, or `-32005` `log_range_too_large` | Narrow the `eth_getLogs` block range |
 | `custom_access_required` | Buy Custom access or have the owner subscribe |
 | `payment_conflict`, `payment_pending` or payment 202 | Read `GET /api/v1/purchases/<id>` using the returned purchase ID; never pay again |
+| 409 `beneficiary_conflict` | Never pay again; keep the purchase ID and signed payment, report the key with `POST /api/v1/feedback`, then retry the same request |
 | Rotation 202 with `serving_ready: false` | Honor `Retry-After`; retain valid grace authority and retry replacement RPC, not rotation |
 | 429 `rate_limited` | Honor `Retry-After` |
 | 503 `unavailable` | Check disabled capabilities in `/agent.json`; for temporary refusal honor `Retry-After`, retry the same operation and retain its original payment identity. Never pay twice. |
