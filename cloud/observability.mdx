@@ -58,8 +58,9 @@ routing engine's metadata fields are defined once, in
    expected, and if not, why?
 3. Read `lasso_meta`: which strategy applied, which providers were candidates,
    which one served it, and how many retries it took.
-4. For an error, read `error.data.code` and `error.data.next_action`; they name
-   the fix.
+4. For an error Lasso originates, read `error.data.code` and
+   `error.data.next_action`; they name the fix. A provider's error arrives as
+   the provider sent it.
 5. Check the key's `recent_errors` and the dashboard's provider health for a
    pattern across requests.
 

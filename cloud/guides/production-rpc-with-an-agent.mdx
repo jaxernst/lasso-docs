@@ -89,8 +89,9 @@ Content-Type: application/json
 {"usd":"20"}
 ```
 
-The response is a 402 with x402 and MPP challenges. Have the approved wallet
-sign one with a standard client, then repeat the request with the signature. A
+The response is a 402 with a challenge for each rail in its `offer.rails`.
+Have the approved wallet sign one with a standard client, then repeat the
+request with the signature. A
 `202` means settlement is pending: check `status_url`, and never sign a second
 payment for the same top-up. Every key draws on this one balance.
 

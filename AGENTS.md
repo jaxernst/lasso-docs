@@ -58,8 +58,10 @@
 Never edit generated files by hand; regenerate them from the live source.
 
 - `snippets/cloud-chains.mdx` comes from `https://lasso.sh/agent.json`, the
-  error tables from the `x-error-catalog` in `https://lasso.sh/openapi.json`,
-  and `snippets/cloud-prices.mdx` and `snippets/cloud-tariff.mdx` from the
+  error tables from the `x-error-catalog` in `https://lasso.sh/openapi.json`
+  once production publishes it (until then, run
+  `scripts/cloud-errors-from-source.exs` from a lasso-cloud checkout at the
+  deployed release, as its header shows), and `snippets/cloud-prices.mdx` and `snippets/cloud-tariff.mdx` from the
   account tariffs in lasso-cloud (`config/account_model_tariffs.exs`, or
   `config/account_model_cutover_tariff.exs` before it existed): run
   `node scripts/cloud-catalog.mjs --tariff <path>`, passing
