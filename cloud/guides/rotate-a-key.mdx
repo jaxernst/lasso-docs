@@ -27,14 +27,16 @@ Content-Type: application/json
   "key": "lasso_…",
   "rpc_url": "https://lasso.sh/rpc/k/lasso_…",
   "ws_url": "wss://lasso.sh/ws/rpc/k/lasso_…",
-  "previous_valid_until": "2026-10-01T13:00:00Z"
+  "previous_valid_until": "2026-10-01T13:00:00Z",
+  "serving_ready": true
 }
 ```
 
-Store the new values straight into the secret store. Don't print them. A 202
-means the rotation is done but the new secret isn't serving everywhere yet:
-keep the old secret in use while `previous_valid_until` allows, retry RPC with
-the new secret after `Retry-After` until it succeeds, and don't rotate again.
+Store the new values straight into the secret store. Don't print them. A 200
+with `serving_ready: true` means the new secret serves now. A 202 with
+`serving_ready: false` returns the committed replacement: keep the old secret
+in use while `previous_valid_until` allows, wait the `Retry-After` seconds,
+then call RPC with the new secret, and don't rotate again.
 
 ## 2. Deploy the new secret
 

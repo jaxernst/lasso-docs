@@ -9,6 +9,22 @@ that explains the change. To check what's serving right now, read `source_sha`
 from [`/api/health`](https://lasso.sh/api/health). RPC Core releases have their
 own notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
 
+<Update label="October 9, 2026" description="Release 266" tags={["Accounts", "Payments"]}>
+
+- **A new key tells you when it's ready.** Creating or rotating a key returns
+  `serving_ready`. `true` means it serves now. A 202 with `false` returns the
+  same saved credentials and a `Retry-After`, so the first call waits instead
+  of failing. [Keys and profiles](/cloud/keys-and-profiles)
+- **Buy Custom access with a wallet.** One purchase can now be up to $100
+  instead of $1, so a stablecoin wallet can buy Custom days at $1.30 a day, no
+  subscription needed. [Trial your own providers](/cloud/bring-your-own-rpc)
+- **The claim page stays responsive** while it prepares the preview and
+  completes the claim, even far from Lasso's database.
+- **Usage charges stay exact through billing restarts.** If a node's usage
+  collector restarts, each request is still charged exactly once.
+
+</Update>
+
 <Update label="October 3–8, 2026" description="Releases 258–265: accounts for people and agents" tags={["Accounts", "Payments", "API", "Routing", "Dashboard"]}>
 
 Lasso Cloud moved to accounts on October 7. Your existing RPC URLs and keys kept

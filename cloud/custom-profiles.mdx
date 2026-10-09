@@ -23,7 +23,7 @@ Content-Type: application/json
 ```
 
 The dry run checks every new provider, changes nothing, and needs no Custom
-access. Saving needs Custom access, which comes with the Custom subscription
+access. Saving needs Custom access: subscribe, or buy days with a wallet
 ([trial your own providers](/cloud/bring-your-own-rpc)). Then repeat the `PUT`
 without `dry_run` and call it:
 
@@ -129,8 +129,9 @@ instead; it works without protection.
 
 ## Limits
 
-- Holding a Custom profile needs Custom access, from the Custom subscription;
-  a dry run doesn't.
+- Holding a Custom profile needs Custom access; a dry run doesn't. Provisional
+  accounts can buy Custom access with a wallet. See
+  [trial your own providers](/cloud/bring-your-own-rpc).
 - An account holds up to five Custom profiles.
 - If Custom access lapses, the profile is kept and its URLs are served as
   `premium` until you renew. Open WebSocket connections on it close with
@@ -141,8 +142,8 @@ instead; it works without protection.
 
 ## Next
 
-- [Trial your own providers](/cloud/bring-your-own-rpc): check your providers
-  with a dry run, then save the profile.
+- [Trial your own providers](/cloud/bring-your-own-rpc): build and test a
+  profile before anyone signs up.
 - [Keys, URLs and profiles](/cloud/keys-and-profiles): make the profile a key's
   default.
 - [Profiles in RPC Core](/concepts/profiles): the engine's profile model, for
