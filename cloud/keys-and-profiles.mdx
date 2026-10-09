@@ -18,7 +18,7 @@ LASSO_RPC_URL=https://lasso.sh/rpc/k/lasso_…
 
 ```ts
 const url = process.env.LASSO_RPC_URL;
-const reads  = `${url}/latency-weighted/base`;           // the key's default profile
+const reads  = `${url}/balanced-fast/base`;           // the key's default profile
 const jobs   = `${url}/profile/public/base`;             // public providers, uncharged while the account has spending power
 const trades = `${url}/profile/prod-base/fastest/base`;  // your own providers
 ```
@@ -38,7 +38,8 @@ const trades = `${url}/profile/prod-base/fastest/base`;  // your own providers
 
 - `<chain>` is a chain name or decimal chain ID from
   [chains and prices](/cloud/reference/chains-and-prices).
-- `<strategy>` is optional; `load-balanced` is the default. See
+- `<strategy>` is optional; `balanced-fast` is the default on Premium and
+  `load-balanced` elsewhere. See
   [routing](/cloud/routing).
 - `<profile>` is `premium`, `public` or one of your Custom profile slugs.
   Without it, the key's default profile serves the request.
