@@ -113,7 +113,7 @@ instead; it works without protection.
 
 | Workload | Profile | URL strategy |
 |---|---|---|
-| User-facing reads | Two or more providers; `block_protection: true` | `latency-weighted` |
+| User-facing reads | Two or more providers; `block_protection: true` | `balanced-fast` |
 | Latency-critical trading | Fast providers first; `block_protection: true`; `max_lag_blocks: 1` | `fastest` |
 | Indexer or backfill | Include an archive-capable provider | `load-balanced` |
 | Transaction submission | Preferred broadcast provider first | `priority` |

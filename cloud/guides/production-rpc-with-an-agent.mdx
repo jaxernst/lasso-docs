@@ -55,7 +55,7 @@ per call site:
 
 | Call site | URL suffix |
 |---|---|
-| User-facing reads | `/latency-weighted/<chain>` |
+| User-facing reads | `/balanced-fast/<chain>` |
 | Trading, quoting, liquidations | `/fastest/<chain>` |
 | Indexers and backfills | `/load-balanced/<chain>` |
 | Development, tests and background jobs that don't need premium | `/profile/public/<chain>` |
@@ -68,7 +68,7 @@ existing configuration. See [install Lasso in your app](/cloud/install).
 Send one request through each environment's URL and check the evidence:
 
 ```bash
-curl -fsS --retry 5 -D - "$LASSO_RPC_URL/latency-weighted/base?include_meta=body" \
+curl -fsS --retry 5 -D - "$LASSO_RPC_URL/balanced-fast/base?include_meta=body" \
   -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
 ```

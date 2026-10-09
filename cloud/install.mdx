@@ -27,7 +27,7 @@ import { base } from "viem/chains";
 
 const client = createPublicClient({
   chain: base,
-  transport: http(`${process.env.LASSO_RPC_URL}/latency-weighted/base`),
+  transport: http(`${process.env.LASSO_RPC_URL}/balanced-fast/base`),
 });
 
 const subscriber = createPublicClient({
@@ -42,7 +42,7 @@ const subscriber = createPublicClient({
 import { JsonRpcProvider, WebSocketProvider } from "ethers";
 
 const provider = new JsonRpcProvider(
-  `${process.env.LASSO_RPC_URL}/latency-weighted/base`,
+  `${process.env.LASSO_RPC_URL}/balanced-fast/base`,
   8453,
   { staticNetwork: true, polling: true },
 );
@@ -76,7 +76,7 @@ Indexers take the same URL wherever they take an RPC endpoint. Use
 
 | Call site | URL |
 |---|---|
-| User-facing reads | `$LASSO_RPC_URL/latency-weighted/<chain>` |
+| User-facing reads | `$LASSO_RPC_URL/balanced-fast/<chain>` |
 | Trading, quoting, liquidations | `$LASSO_RPC_URL/fastest/<chain>` |
 | Backfills and batch jobs | `$LASSO_RPC_URL/load-balanced/<chain>` |
 | Development, tests and work that doesn't need premium | `$LASSO_RPC_URL/profile/public/<chain>` |

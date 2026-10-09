@@ -86,8 +86,8 @@ Change one path segment to switch pools:
 
 | Strategy | What it does | Use it for |
 |---|---|---|
-| `load-balanced` (default) | Spreads requests in random order across healthy providers | Backends, indexers |
-| `latency-weighted` | Random order weighted toward providers with lower recent latency | User-facing reads |
+| `load-balanced` | Spreads requests in random order across healthy providers | Backends, indexers |
+| `balanced-fast` (default on Premium) | Random order weighted toward providers with lower recent latency | User-facing reads |
 | `fastest` | Tries the provider with the lowest recent latency for this kind of request first | Trading and other latency-critical paths |
 | `priority` | Tries providers in your Custom profile's configured order | A preferred primary with backups |
 
@@ -110,7 +110,7 @@ import { base } from "viem/chains";
 
 const client = createPublicClient({
   chain: base,
-  transport: http(`${process.env.LASSO_RPC_URL}/latency-weighted/base`),
+  transport: http(`${process.env.LASSO_RPC_URL}/balanced-fast/base`),
 });
 ```
 
