@@ -32,17 +32,10 @@ curl -sS https://lasso.sh/api/v1/keys \
 
 That one request creates a provisional account with a starting balance
 (`pricing.free_grant_usd` in [`agent.json`](https://lasso.sh/agent.json),
-enough to verify but not to run production), makes you its agent, and issues
-your first key. Keep the secrets apart:
-
-| Value | Where it goes |
-|---|---|
-| `key`, `rpc_url`, `ws_url` | The app's secret store or `.env` |
-| `management_token` | Your own private store, never the app or the repository |
-| `account_id` | Anywhere; it identifies the account for top-ups and support |
-
-A second create makes a second, separate account, so reuse the token for more
-keys.
+enough to verify but not to run production) and issues your first key. The
+key is all you need to call, read the account and top it up.
+`management_token` makes you the account's agent, for when you later add keys,
+build Custom profiles or hand the account to a person.
 
 ### 2. Call it
 
@@ -119,32 +112,30 @@ subscriptions, use `${LASSO_WS_URL}/base` with a WebSocket transport. Run your
 app's real methods and block ranges through the new URL before moving traffic.
 [Install Lasso in your app](/cloud/install) covers each client.
 
-### 5. Fund it and hand it off
+### 5. Fund it
 
-When the starting balance isn't enough, credit the account within the budget
-your user approved, within the per-purchase range (`minimum_usd` to
-`maximum_usd` in `account_payments.rails`). The
-request answers 402 with a standard x402 or MPP challenge that a stock client
-signs with the user's wallet ([example](/cloud/balance-and-fallback#top-up)):
+When the starting balance isn't enough, look up the account with the key, then
+credit it within the budget your user approved:
+
+```bash
+curl -sS https://lasso.sh/api/v1/accounts/current \
+  -H "authorization: Bearer <RPC key>" | jq '{id, balance_usd}'
+```
 
 ```http
-POST https://lasso.sh/api/v1/accounts/{account_id}/credit
+POST https://lasso.sh/api/v1/accounts/{id}/credit
 Content-Type: application/json
 
 {"usd":"1"}
 ```
 
-To hand the setup to its owner, request a claim link and give them the URL
-privately. It's valid for 24 hours and works once:
+The credit answers 402 with a standard x402 or MPP challenge that a stock
+client signs with the user's wallet, within the per-purchase range
+(`minimum_usd` to `maximum_usd` in `account_payments.rails`)
+([example](/cloud/balance-and-fallback#top-up)).
 
-```http
-POST https://lasso.sh/api/v1/accounts/current/claim-link
-Authorization: Bearer <management token>
-```
-
-When they claim it, every key and URL keeps working, and you keep your access
-as the account's agent. See
-[accounts, people and agents](/cloud/accounts-and-agents).
+To add keys per environment or hand the account to its owner, see
+[set up production RPC with an agent](/cloud/guides/production-rpc-with-an-agent).
 
 ## With the dashboard
 
@@ -162,8 +153,8 @@ as the account's agent. See
   IP. Each provisional account gets its starting balance once.
 - A provisional account that never pays and sees no activity for 90 days
   closes. Accounts that have paid, or that a person has joined, never expire.
-- The management token can't spend money. Paying always needs a wallet
-  signature.
+- Paying always needs a wallet signature; no Lasso credential can spend
+  money.
 - `public` serves `load-balanced` only. A different strategy in a `public` URL
   is served as `load-balanced`, and `lasso_meta.strategy` says so.
 

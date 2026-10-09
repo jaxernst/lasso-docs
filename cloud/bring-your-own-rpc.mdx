@@ -19,7 +19,8 @@ curl -sS https://lasso.sh/api/v1/keys \
   -H 'content-type: application/json' -d '{"name":"prod"}'
 ```
 
-Keep `management_token` private, and put `rpc_url` in the app's secret store.
+Put `rpc_url` in the app's secret store. The profile steps below use the
+response's `management_token`, which makes you the account's agent.
 
 ## 2. Dry-run the profile
 
