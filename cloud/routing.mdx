@@ -36,10 +36,13 @@ curl -sS "$LASSO_RPC_URL/fastest/base?include_meta=body" \
 
 | Strategy | What it does | Use it for |
 |---|---|---|
-| `load-balanced` (default) | Spreads requests in random order across healthy providers | Backends, indexers, quota spreading |
-| `latency-weighted` | Random order weighted toward providers with lower recent latency | User-facing reads |
+| `load-balanced` | Spreads requests in random order across healthy providers | Backends, indexers, quota spreading |
+| `balanced-fast` (default on Premium) | Random order weighted toward providers with lower recent latency | User-facing reads |
 | `fastest` | Tries the provider with the lowest recent latency for this kind of request first | Trading and latency-critical paths |
 | `priority` | Tries providers in your Custom profile's configured order; use it on Custom profiles | A preferred primary with backups |
+
+A URL without a strategy uses `balanced-fast` on Premium and `load-balanced` on
+other profiles. `latency-weighted` is an alias of `balanced-fast`.
 
 Latency is measured on the machine serving you, per provider, transport and
 kind of request (a family of related methods). The

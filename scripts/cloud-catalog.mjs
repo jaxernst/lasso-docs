@@ -89,7 +89,7 @@ const rejected = new Set([
 ]);
 
 function prices({unitNanos, factors, weights}) {
-  const order = ['load-balanced', 'latency-weighted', 'fastest', 'priority'].filter(id => id in factors);
+  const order = ['load-balanced', 'balanced-fast', 'fastest', 'priority'].filter(id => id in factors);
   const {_default: fallback, ...served} = weights;
   const named = Object.fromEntries(Object.entries(served).filter(([method]) => !rejected.has(method)));
   const cells = weight => [String(weight), ...order.map(id => usd(weight * factors[id] * unitNanos))];
@@ -102,7 +102,7 @@ const count = value => Number(value).toLocaleString('en-US');
 const times = factor => `${factor}x`;
 
 function terms(t) {
-  const order = ['load-balanced', 'latency-weighted', 'fastest', 'priority'];
+  const order = ['load-balanced', 'balanced-fast', 'fastest', 'priority'];
   return table(['Item', 'Value'], [
     ['Rate', `${usd(t.unitNanos)} per CU`],
     ['Strategy factors', order.map(id => `\`${id}\` ${times(t.factors[id])}`).join(', ')],

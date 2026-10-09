@@ -98,7 +98,7 @@ the incoming one is renamed and the app's URL keeps reaching it.
 
 | Requirement | Profile setting | URL strategy |
 |---|---|---|
-| Responsive current reads | Two or more providers | `fastest` or `latency-weighted` |
+| Responsive current reads | Two or more providers | `fastest` or `balanced-fast` |
 | Latest block never goes backwards | `block_protection: true` | Any |
 | Several values from one block | Nothing; use [read at one block](/advanced/read-at-one-block) | Any |
 | Subscriptions survive a provider outage | `ws_url` on at least two providers | Any |
