@@ -68,6 +68,8 @@ Content-Type: application/json
 3. `200` returns `credited_usd`, `balance_usd` and a receipt. `202` means
    settlement is pending: poll its `status_url`, and never sign a second
    payment for the same top-up.
+4. The `200` confirms the credit. `x-lasso-access: premium` on your next RPC
+   response confirms premium serving resumed.
 
 With [`@x402/fetch`](https://www.npmjs.com/package/@x402/fetch), the whole
 exchange is one call. Run it as an ES module with `@x402/fetch`, `@x402/evm`

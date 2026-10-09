@@ -9,12 +9,16 @@ that explains the change. To check what's serving right now, read `source_sha`
 from [`/api/health`](https://lasso.sh/api/health). RPC Core releases have their
 own notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
 
-<Update label="October 9, 2026" description="Release 266" tags={["Accounts", "Payments"]}>
+<Update label="October 9, 2026" description="Release 266" tags={["Accounts", "Payments", "Reliability"]}>
 
-- **A new key tells you when it's ready.** Creating or rotating a key returns
+- **A new key works on its first call.** Creating or rotating a key returns
   `serving_ready`. `true` means it serves now. A 202 with `false` returns the
   same saved credentials and a `Retry-After`, so the first call waits instead
   of failing. [Keys and profiles](/cloud/keys-and-profiles)
+- **Topping up never interrupts serving.** After a credit or Custom purchase,
+  nodes in other regions keep serving premium while the payment reaches them,
+  instead of refusing the account until they catch up.
+  [Balance and payment fallback](/cloud/balance-and-fallback)
 - **Buy Custom access with a wallet.** One purchase can now be up to \$100
   instead of \$1, so a stablecoin wallet can buy Custom days at $1.30 a day, no
   subscription needed. [Trial your own providers](/cloud/bring-your-own-rpc)
@@ -22,6 +26,8 @@ own notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
   completes the claim, even far from Lasso's database.
 - **Usage charges stay exact through billing restarts.** If a node's usage
   collector restarts, each request is still charged exactly once.
+- **Disconnects end cleanly.** When a client closes its connection
+  mid-request, Lasso cancels the in-flight upstream attempt.
 
 </Update>
 
