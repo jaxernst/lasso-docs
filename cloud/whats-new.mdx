@@ -1,37 +1,24 @@
 ---
 title: What's new
-description: Changes to Lasso Cloud, one entry per production release.
+description: New in Lasso Cloud, one entry per production release.
 rss: true
 ---
 
-Each entry covers one production release of Lasso Cloud and links to the page
-that explains the change. To check what's serving right now, read `source_sha`
-from [`/api/health`](https://lasso.sh/api/health). RPC Core releases have their
-own notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
+What each production release of Lasso Cloud adds, with a link to the page that
+explains it. To check what's serving right now, read `source_sha` from
+[`/api/health`](https://lasso.sh/api/health). RPC Core releases have their own
+notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
 
-<Update label="October 9, 2026" description="Release 266" tags={["Accounts", "Payments", "Reliability"]}>
+<Update label="October 9, 2026" description="Release 266" tags={["Payments", "Custom profiles"]}>
 
-- **A new key works on its first call.** Creating or rotating a key returns
-  `serving_ready`. `true` means it serves now. A 202 with `false` returns the
-  same saved credentials and a `Retry-After`, so the first call waits instead
-  of failing. [Keys and profiles](/cloud/keys-and-profiles)
-- **Topping up never interrupts serving.** After a credit or Custom purchase,
-  nodes in other regions keep serving premium while the payment reaches them,
-  instead of refusing the account until they catch up.
-  [Balance and payment fallback](/cloud/balance-and-fallback)
-- **Buy Custom access with a wallet.** One purchase can now be up to \$100
-  instead of \$1, so a stablecoin wallet can buy Custom days at $1.30 a day, no
-  subscription needed. [Trial your own providers](/cloud/bring-your-own-rpc)
-- **The claim page stays responsive** while it prepares the preview and
-  completes the claim, even far from Lasso's database.
-- **Usage charges stay exact through billing restarts.** If a node's usage
-  collector restarts, each request is still charged exactly once.
-- **Disconnects end cleanly.** When a client closes its connection
-  mid-request, Lasso cancels the in-flight upstream attempt.
+- **Buy Custom access with a stablecoin wallet.** A single purchase can now be
+  up to \$100, enough for up to 30 days of Custom access at $1.30 a day, with no
+  subscription or signup. An agent can put your own providers behind Lasso and
+  pay for the trial itself. [Trial your own providers](/cloud/bring-your-own-rpc)
 
 </Update>
 
-<Update label="October 3–8, 2026" description="Releases 258–265: accounts for people and agents" tags={["Accounts", "Payments", "API", "Routing", "Dashboard"]}>
+<Update label="October 3–8, 2026" description="Releases 258–265: accounts for people and agents" tags={["Accounts", "Payments", "API"]}>
 
 Lasso Cloud moved to accounts on October 7. Your existing RPC URLs and keys kept
 working through the change.
@@ -39,7 +26,8 @@ working through the change.
 ### Accounts for people and agents
 
 - **One account holds your keys, profiles and balance.** People and agents work
-  on it as members, each with their own credential and permissions.
+  on it as members, each with their own credential and permissions, and the
+  dashboard shows its balance, subscriptions and usage per key.
   [Accounts, people and agents](/cloud/accounts-and-agents)
 - **An agent can set up Lasso without a signup.** One unauthenticated
   `POST /api/v1/keys` creates an account with its agent, a first key and a
@@ -50,9 +38,12 @@ working through the change.
   have, with a preview of the combined balance, keys, rate limits and agents
   before you confirm. Every key and URL keeps working.
   [Accounts, people and agents](/cloud/accounts-and-agents)
+- **Bring an agent into an existing account.** The agent asks to connect and
+  gets an approval link; once an admin approves, it works on that account.
+  [Accounts, people and agents](/cloud/accounts-and-agents)
 - **Rotate a key with no downtime.** The old secret keeps serving for the grace
-  period you choose. A revoked or expired secret now gets a clear 401
-  `key_revoked`. [Rotate a key](/cloud/guides/rotate-a-key)
+  period you choose, so each deploy switches over in its own time.
+  [Rotate a key](/cloud/guides/rotate-a-key)
 
 ### One balance, priced per method
 
@@ -74,43 +65,15 @@ working through the change.
 ### API and signals
 
 - **The account API lives at `/api/v1`**, described in full by
-  [`openapi.json`](https://lasso.sh/openapi.json). The Agent API v2 management
-  routes answer 410 with the `/api/v1` operation to use; v2 RPC URLs keep
+  [`openapi.json`](https://lasso.sh/openapi.json). Agent API v2 RPC URLs keep
   working. [Upgrading from Agent API v2](/cloud/reference/v2-compatibility)
-- **WebSocket RPC works with every key.** [Keys and profiles](/cloud/keys-and-profiles)
+- **WebSocket RPC on every key**, including keys an agent creates.
+  [Keys and profiles](/cloud/keys-and-profiles)
 - **Every response explains itself.** `x-lasso-request-id`, `x-lasso-access`,
   `x-lasso-balance-usd` and the `RateLimit` headers show who served the request,
   what it cost and how much room is left. Errors that Lasso originates carry a
   `code` and a `next_action`, listed in one reference.
   [Signals and errors](/cloud/reference/signals-and-errors)
-
-### Routing and reliability
-
-- **Load balancing counts providers, not connections.** A provider that offers
-  both HTTP and WebSocket no longer gets two first-pick chances against an
-  HTTP-only one. [Routing](/cloud/routing)
-- **More provider errors fail over.** A provider that reports a plan
-  restriction as a generic `-32600` error now gets skipped, and the request
-  goes to the next provider. [RPC behavior](/cloud/rpc-behavior)
-- **Rate-limited providers come back.** A provider that answered 429 returns to
-  rotation after its cooldown instead of staying demoted until a restart.
-  [Routing](/cloud/routing)
-- **RPC keeps serving through database trouble.** Routing and key checks run
-  from each node's last-known state, so a database or billing outage no longer
-  refuses requests or fails health checks. [Routing](/cloud/routing)
-- **Profile edits can't break routing.** An edit the router can't build is
-  rejected before it saves, and routing keeps the previous configuration.
-  [Custom profiles](/cloud/custom-profiles)
-- **Restarts close WebSockets cleanly.** Open connections get close code 1012
-  before a node restarts, so clients reconnect straight away.
-  [Signals and errors](/cloud/reference/signals-and-errors#websocket-close-reasons)
-
-### Dashboard
-
-- **Signed-in pages open faster**, especially far from the database. An account
-  with many keys now loads in a fixed number of queries, and live activity
-  stays responsive with several tabs open.
-- **One app header** with an Account tab, the same on every signed-in page.
 
 ### Changes to note
 
