@@ -16,7 +16,7 @@ Checked October 8, 2026:
 | --- | --- | --- |
 | RPC Core source | [v0.5.1](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.5.1), source `bd028b0870afc714e4d85fa94fe0bc2af94df628` | The released source described by the Core API guides. [Exact-commit CI](https://github.com/jaxernst/lasso-rpc/actions/runs/37555600096) passed; container publication is a separate gate. |
 | RPC Core container | v0.5.1, image index `sha256:6861712eef30dc29850e6259cba55402202092768e4e82b294dbaca53857f307` | The [release manifest](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.1/container-release.json) binds source and image digests. Native AMD64 and ARM64 installation checks passed before [publication completed](https://github.com/jaxernst/lasso-rpc/actions/runs/37556196437). |
-| Managed Cloud | Public health reported source `e56d59598639778ed9328f566a5d39a43fcb43f9` in four regions (`iad`, `lhr`, `sin`, `sjc`) at `2026-10-08T06:37:41Z` | The production rollout passed exact-fleet attestation. Recheck [health](https://lasso.sh/api/health) and [service discovery](https://lasso.sh/agent.json) for your evaluation. Process health does not qualify your workload. |
+| Managed Cloud | The source each region serves, in `source_sha` from [`/api/health`](https://lasso.sh/api/health) | What changed in each production release is in [What's new](/cloud/whats-new). Process health does not qualify your workload. |
 | Cloud APIs and payment availability | Live [OpenAPI](https://lasso.sh/openapi.json), [manifest](https://lasso.sh/agent.json), and [deployment guide](https://lasso.sh/SKILL.md) | Available routes, credential classes, and enabled payment rails on that deployment. An implemented API can still be disabled. |
 
 ## Workload and ownership matrix

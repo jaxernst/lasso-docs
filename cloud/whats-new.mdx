@@ -1,0 +1,104 @@
+---
+title: What's new
+description: Changes to Lasso Cloud, one entry per production release.
+rss: true
+---
+
+Each entry covers one production release of Lasso Cloud and links to the page
+that explains the change. To check what's serving right now, read `source_sha`
+from [`/api/health`](https://lasso.sh/api/health). RPC Core releases have their
+own notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
+
+<Update label="October 3–8, 2026" description="Releases 258–265: accounts for people and agents" tags={["Accounts", "Payments", "API", "Routing", "Dashboard"]}>
+
+Lasso Cloud moved to accounts on October 7. Your existing RPC URLs and keys kept
+working through the change.
+
+### Accounts for people and agents
+
+- **One account holds your keys, profiles and balance.** People and agents work
+  on it as members, each with their own credential and permissions.
+  [Accounts, people and agents](/cloud/accounts-and-agents)
+- **An agent can set up Lasso without a signup.** One unauthenticated
+  `POST /api/v1/keys` creates an account with its agent, a first key and a
+  $0.025 starting balance, and returns its RPC URL.
+  [Quickstart](/cloud/quickstart)
+- **Hand an agent's setup to a person.** The agent requests a single-use claim
+  link. Claiming keeps it as a new account or merges it into one you already
+  have, with a preview of the combined balance, keys, rate limits and agents
+  before you confirm. Every key and URL keeps working.
+  [Accounts, people and agents](/cloud/accounts-and-agents)
+- **Rotate a key with no downtime.** The old secret keeps serving for the grace
+  period you choose. A revoked or expired secret now gets a clear 401
+  `key_revoked`. [Rotate a key](/cloud/guides/rotate-a-key)
+
+### One balance, priced per method
+
+- **One USD balance per account.** Every request is priced by method and
+  strategy, and each response tells you what it cost in `x-lasso-cu` and
+  `x-lasso-usd`. [Chains and prices](/cloud/reference/chains-and-prices)
+- **Top up with a stablecoin wallet, no Lasso credential needed.** Credit
+  requests answer with a standard 402 challenge for x402 (USDC on Base) or MPP
+  (USDC.e on Tempo); any stock client can pay it.
+  [Balance and payment fallback](/cloud/balance-and-fallback)
+- **Your app keeps serving when the money runs out.** An account that has paid
+  before falls back to public providers for 30 days while you top up, marked
+  with `x-lasso-fallback: payment`.
+  [Balance and payment fallback](/cloud/balance-and-fallback)
+- **Free access, Pro and Custom are account subscriptions.** Included usage is
+  counted in CU per month, and usage beyond it draws on the balance.
+  [Serving access and pricing](/cloud/serving-access-and-pricing)
+
+### API and signals
+
+- **The account API lives at `/api/v1`**, described in full by
+  [`openapi.json`](https://lasso.sh/openapi.json). The Agent API v2 management
+  routes answer 410 with the `/api/v1` operation to use; v2 RPC URLs keep
+  working. [Upgrading from Agent API v2](/cloud/reference/v2-compatibility)
+- **WebSocket RPC works with every key.** [Keys and profiles](/cloud/keys-and-profiles)
+- **Every response explains itself.** `x-lasso-request-id`, `x-lasso-access`,
+  `x-lasso-balance-usd` and the `RateLimit` headers show who served the request,
+  what it cost and how much room is left. Errors that Lasso originates carry a
+  `code` and a `next_action`, listed in one reference.
+  [Signals and errors](/cloud/reference/signals-and-errors)
+
+### Routing and reliability
+
+- **Load balancing counts providers, not connections.** A provider that offers
+  both HTTP and WebSocket no longer gets two first-pick chances against an
+  HTTP-only one. [Routing](/cloud/routing)
+- **More provider errors fail over.** A provider that reports a plan
+  restriction as a generic `-32600` error now gets skipped, and the request
+  goes to the next provider. [RPC behavior](/cloud/rpc-behavior)
+- **Rate-limited providers come back.** A provider that answered 429 returns to
+  rotation after its cooldown instead of staying demoted until a restart.
+  [Routing](/cloud/routing)
+- **RPC keeps serving through database trouble.** Routing and key checks run
+  from each node's last-known state, so a database or billing outage no longer
+  refuses requests or fails health checks. [Routing](/cloud/routing)
+- **Profile edits can't break routing.** An edit the router can't build is
+  rejected before it saves, and routing keeps the previous configuration.
+  [Custom profiles](/cloud/custom-profiles)
+- **Restarts close WebSockets cleanly.** Open connections get close code 1012
+  before a node restarts, so clients reconnect straight away.
+  [Signals and errors](/cloud/reference/signals-and-errors#websocket-close-reasons)
+
+### Dashboard
+
+- **Signed-in pages open faster**, especially far from the database. An account
+  with many keys now loads in a fixed number of queries, and live activity
+  stays responsive with several tabs open.
+- **One app header** with an Account tab, the same on every signed-in page.
+
+### Changes to note
+
+- An RPC key can no longer request a claim link for an account an agent
+  created; the agent requests it. Accounts migrated from keys that predate
+  agents still claim with their key.
+  [Accounts, people and agents](/cloud/accounts-and-agents)
+- Keys an agent creates share their account's rate limit instead of each
+  getting 50 RPS. [Serving access and pricing](/cloud/serving-access-and-pricing#rate-limits)
+- Free access is counted in per-method CU instead of bytes.
+  [Serving access and pricing](/cloud/serving-access-and-pricing)
+
+</Update>
