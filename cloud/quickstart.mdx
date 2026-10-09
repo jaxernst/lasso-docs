@@ -26,8 +26,7 @@ curl -sS https://lasso.sh/api/v1/keys \
   "rpc_url": "https://lasso.sh/rpc/k/lasso_…",
   "ws_url": "wss://lasso.sh/ws/rpc/k/lasso_…",
   "account_id": "…",
-  "management_token": "lasso_mk_…",
-  "serving_ready": true
+  "management_token": "lasso_mk_…"
 }
 ```
 
@@ -42,13 +41,8 @@ your first key. Keep the secrets apart:
 | `management_token` | Your own private store, never the app or the repository |
 | `account_id` | Anywhere; it identifies the account for top-ups and support |
 
-A 201 with `serving_ready: true` means the key works now. A 202 with
-`serving_ready: false` returns the same credentials, already saved on Lasso's
-side: keep them, wait the `Retry-After` seconds, then call RPC with that key.
-Never repeat the create; a second create makes a second, separate account, so
-reuse the token for more keys.
-
-Never print a key or token into chat, logs or source control.
+A second create makes a second, separate account, so reuse the token for more
+keys.
 
 ### 2. Call it
 

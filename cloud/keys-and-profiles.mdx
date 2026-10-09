@@ -45,10 +45,8 @@ const trades = `${url}/profile/prod-base/fastest/base`;  // your own providers
 - `<base>[/profile/<profile>]/provider/<name>/<chain>` pins one provider for
   debugging. Managed providers use their public aliases.
 
-Creating or rotating a key returns `rpc_url` and `ws_url` with nothing to fill
-in. `serving_ready: true` means they serve now. A 202 with
-`serving_ready: false` means wait the `Retry-After` seconds, then call RPC with
-them; don't repeat the create or the rotation.
+Creating or rotating a key returns `rpc_url` and `ws_url` ready to use, with
+nothing to fill in.
 
 ## Default and allowed profiles
 
