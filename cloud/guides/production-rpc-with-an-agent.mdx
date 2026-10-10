@@ -28,8 +28,9 @@ curl -sS https://lasso.sh/api/v1/keys \
   -H 'content-type: application/json' -d '{"name":"prod"}'
 ```
 
-Save `management_token` in your own private store, and put `rpc_url` and
-`ws_url` in the production secret store.
+Put `rpc_url` and `ws_url` in the production secret store. The response's
+`management_token` makes you the account's agent; the next steps use it to add
+keys and hand the account over.
 
 ## 2. Add a key per environment
 

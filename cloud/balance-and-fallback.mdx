@@ -10,10 +10,12 @@ with USDC through a standard 402 exchange, with no Lasso credential. If your
 account has paid before and the money runs out, your app keeps serving on
 public providers for 30 days while you top up.
 
+Any of the account's RPC keys reads it:
+
 ```bash
 curl -sS https://lasso.sh/api/v1/accounts/current \
-  -H "authorization: Bearer $LASSO_MANAGEMENT_TOKEN" \
-  | jq '{balance_usd, managed_access, fallback, included_usage}'
+  -H "authorization: Bearer <RPC key>" \
+  | jq '{id, balance_usd, managed_access, fallback, included_usage}'
 ```
 
 ## Where premium requests are paid from
@@ -50,9 +52,9 @@ and no redeploy.
 
 ## Top up
 
-Credit the account. Lasso answers 402; its `offer.rails` lists the rails that
-accept this amount, each with a challenge: x402 in `PAYMENT-REQUIRED`, MPP in
-`WWW-Authenticate: Payment`.
+Credit the account by its `id` from the account view above. Lasso answers 402;
+its `offer.rails` lists the rails that accept this amount, each with a
+challenge: x402 in `PAYMENT-REQUIRED`, MPP in `WWW-Authenticate: Payment`.
 
 ```http
 POST https://lasso.sh/api/v1/accounts/{account_id}/credit
@@ -121,7 +123,7 @@ can also subscribe in the dashboard.
   balance slightly below zero; the next top-up repays it first.
 - When the grace window ends without a top-up, open WebSocket connections
   close with `balance_exhausted` and the credit URL.
-- The management token can't pay. Every purchase needs a wallet signature.
+- No Lasso credential can pay. Every purchase needs a wallet signature.
 
 ## Next
 
