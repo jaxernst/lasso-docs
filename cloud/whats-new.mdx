@@ -1,0 +1,89 @@
+---
+title: What's new
+description: New in Lasso Cloud, one entry per production release.
+rss: true
+---
+
+What each production release of Lasso Cloud adds, with a link to the page that
+explains it. To check what's serving right now, read `source_sha` from
+[`/api/health`](https://lasso.sh/api/health). RPC Core releases have their own
+notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
+
+<Update label="October 9, 2026" description="Release 266" tags={["Payments", "Custom profiles"]}>
+
+- **Buy Custom access with a stablecoin wallet.** A single purchase can now be
+  up to \$100, enough for up to 30 days of Custom access at $1.30 a day, with no
+  subscription or signup. An agent can put your own providers behind Lasso and
+  pay for the trial itself. [Trial your own providers](/cloud/bring-your-own-rpc)
+
+</Update>
+
+<Update label="October 3–8, 2026" description="Releases 258–265: accounts for people and agents" tags={["Accounts", "Payments", "API"]}>
+
+Lasso Cloud moved to accounts on October 7. Your existing RPC URLs and keys kept
+working through the change.
+
+### Accounts for people and agents
+
+- **One account holds your keys, profiles and balance.** People and agents work
+  on it as members, each with their own credential and permissions, and the
+  dashboard shows its balance, subscriptions and usage per key.
+  [Accounts, people and agents](/cloud/accounts-and-agents)
+- **An agent can set up Lasso without a signup.** One unauthenticated
+  `POST /api/v1/keys` creates an account with its agent, a first key and a
+  $0.025 starting balance, and returns its RPC URL.
+  [Quickstart](/cloud/quickstart)
+- **Hand an agent's setup to a person.** The agent requests a single-use claim
+  link. Claiming keeps it as a new account or merges it into one you already
+  have, with a preview of the combined balance, keys, rate limits and agents
+  before you confirm. Every key and URL keeps working.
+  [Accounts, people and agents](/cloud/accounts-and-agents)
+- **Bring an agent into an existing account.** The agent asks to connect and
+  gets an approval link; once an admin approves, it works on that account.
+  [Accounts, people and agents](/cloud/accounts-and-agents)
+- **Rotate a key with no downtime.** The old secret keeps serving for the grace
+  period you choose, so each deploy switches over in its own time.
+  [Rotate a key](/cloud/guides/rotate-a-key)
+
+### One balance, priced per method
+
+- **One USD balance per account.** Every request is priced by method and
+  strategy, and each response tells you what it cost in `x-lasso-cu` and
+  `x-lasso-usd`. [Chains and prices](/cloud/reference/chains-and-prices)
+- **Top up with a stablecoin wallet, no Lasso credential needed.** Credit
+  requests answer with a standard 402 challenge for x402 (USDC on Base) or MPP
+  (USDC.e on Tempo); any stock client can pay it.
+  [Balance and payment fallback](/cloud/balance-and-fallback)
+- **Your app keeps serving when the money runs out.** An account that has paid
+  before falls back to public providers for 30 days while you top up, marked
+  with `x-lasso-fallback: payment`.
+  [Balance and payment fallback](/cloud/balance-and-fallback)
+- **Free access, Pro and Custom are account subscriptions.** Included usage is
+  counted in CU per month, and usage beyond it draws on the balance.
+  [Serving access and pricing](/cloud/serving-access-and-pricing)
+
+### API and signals
+
+- **The account API lives at `/api/v1`**, described in full by
+  [`openapi.json`](https://lasso.sh/openapi.json). Agent API v2 RPC URLs keep
+  working. [Upgrading from Agent API v2](/cloud/reference/v2-compatibility)
+- **WebSocket RPC on every key**, including keys an agent creates.
+  [Keys and profiles](/cloud/keys-and-profiles)
+- **Every response explains itself.** `x-lasso-request-id`, `x-lasso-access`,
+  `x-lasso-balance-usd` and the `RateLimit` headers show who served the request,
+  what it cost and how much room is left. Errors that Lasso originates carry a
+  `code` and a `next_action`, listed in one reference.
+  [Signals and errors](/cloud/reference/signals-and-errors)
+
+### Changes to note
+
+- An RPC key can no longer request a claim link for an account an agent
+  created; the agent requests it. Accounts migrated from keys that predate
+  agents still claim with their key.
+  [Accounts, people and agents](/cloud/accounts-and-agents)
+- Keys an agent creates share their account's rate limit instead of each
+  getting 50 RPS. [Serving access and pricing](/cloud/serving-access-and-pricing#rate-limits)
+- Free access is counted in per-method CU instead of bytes.
+  [Serving access and pricing](/cloud/serving-access-and-pricing)
+
+</Update>

@@ -36,7 +36,7 @@ curl -sS "$LASSO_RPC_URL/fastest/base?include_meta=body" \
 
 | Strategy | What it does | Use it for |
 |---|---|---|
-| `load-balanced` (default) | Spreads requests in random order across healthy providers | Backends, indexers, quota spreading |
+| `load-balanced` (default) | Spreads requests in random order across healthy providers, counting a provider once even when it serves both HTTP and WebSocket | Backends, indexers, quota spreading |
 | `latency-weighted` | Random order weighted toward providers with lower recent latency | User-facing reads |
 | `fastest` | Tries the provider with the lowest recent latency for this kind of request first | Trading and latency-critical paths |
 | `priority` | Tries providers in your Custom profile's configured order; use it on Custom profiles | A preferred primary with backups |
@@ -58,10 +58,18 @@ Strategies price differently on premium; see
 | A provider times out or errors on a read | The next provider in the order is tried, within the request deadline |
 | Every provider in the profile fails | The final JSON-RPC error returns inside an HTTP 200. A profile never borrows providers from another pool |
 | A signed transaction's response is lost | Lasso doesn't resend it. Look up the transaction hash before you do |
+| A provider answers 429 | It moves behind healthy providers and returns to normal order when its cooldown ends |
 | A provider keeps failing | Its circuit opens. After a cooldown, a trial request decides whether it returns |
 
 Pin one provider with `<base>/provider/<name>/<chain>` to debug it. A pin has
 no failover.
+
+## When Lasso's own systems fail
+
+Each node routes from its last-known keys, profiles and provider state. A
+database, billing or metering outage doesn't refuse requests or fail health
+checks; changes made elsewhere during the outage take effect once the node can
+read them again.
 
 ## Limits
 

@@ -110,6 +110,7 @@ function terms(t) {
     ['Starting grant for a new provisional account', usd(t.startingGrantNanos)],
     ['Free access', `${count(t.includedCu.free)} CU per month`],
     ['Pro included usage', `${count(t.includedCu.pro)} CU per month`],
+    ['Custom access bought with a wallet', `$${(t.customDayNanos / 1e9).toFixed(2)} per day, 1 to 30 days per purchase`],
   ]);
 }
 

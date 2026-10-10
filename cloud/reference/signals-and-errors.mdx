@@ -83,11 +83,16 @@ fails, the final JSON-RPC error arrives in an HTTP 200 response. An
 | `custom_access_expired` | Custom access lapsed on this profile | Reconnect; the managed pool serves you until access is renewed |
 | `default_profile_changed` | The key's default profile changed | Reconnect; the new default serves you |
 | Code 1011 | Subscription recovery after a provider failure exceeded its bounds | Reconnect and resubscribe |
+| Code 1012 | The node serving you is restarting | Reconnect and resubscribe; another node serves you |
 
 Revoking a key, or the end of a rotation overlap, closes sockets using that
 secret.
 
 ## Management API errors
+
+A `202` with `Retry-After` means Lasso accepted the request and is finishing it.
+Keep the response, wait, then continue with what it returned; don't send the
+request again.
 
 Management errors use one envelope:
 

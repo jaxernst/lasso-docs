@@ -39,8 +39,6 @@ agents.
 
 - Stay inside your user's delegation and spending budget. A management token
   never authorizes a payment; a wallet signature does.
-- Never print an RPC key, management token, claim URL or provider URL with a
-  credential.
 - `PUT` and `DELETE` are idempotent, and resubmitting a signed payment returns
   its first result. `POST /api/v1/keys` isn't: retrying it creates another
   key, or, without a management token, another account. After a lost
