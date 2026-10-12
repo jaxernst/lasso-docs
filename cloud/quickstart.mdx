@@ -23,8 +23,8 @@ curl -sS https://lasso.sh/api/v1/keys \
 {
   "id": "…",
   "key": "lasso_…",
-  "rpc_url": "https://lasso.sh/rpc/k/lasso_…",
-  "ws_url": "wss://lasso.sh/ws/rpc/k/lasso_…",
+  "rpc_url": "https://lasso.sh/rpc/k/lasso_…/profile/premium",
+  "ws_url": "wss://lasso.sh/ws/rpc/k/lasso_…/profile/premium",
   "account_id": "…",
   "management_token": "lasso_mk_…"
 }
@@ -67,20 +67,20 @@ can be answered without an upstream.
 
 ### 3. Pick a pool and a strategy per call site
 
-The same key reaches every profile of its account. With no profile segment,
-the key's default profile (`premium` unless you change it) serves the request.
-Change one path segment to switch pools:
+The same key reaches every profile of its account, and the URL picks one.
+`rpc_url` ends in `/profile/premium`; to switch pools, replace that segment
+rather than adding another:
 
 | URL | Served by |
 |---|---|
-| `$LASSO_RPC_URL/fastest/base` | The key's default profile, `premium` |
-| `$LASSO_RPC_URL/profile/public/base` | Lasso's public providers, uncharged while the account has spending power, `load-balanced` |
-| `$LASSO_RPC_URL/profile/prod-base/fastest/base` | Your `prod-base` Custom profile |
+| `$LASSO_RPC_URL/fastest/base` | `premium` |
+| `https://lasso.sh/rpc/k/<key>/profile/public/base` | Lasso's public providers, uncharged while the account has spending power, `load-balanced` |
+| `https://lasso.sh/rpc/k/<key>/profile/prod-base/fastest/base` | Your `prod-base` Custom profile |
 
 | Strategy | What it does | Use it for |
 |---|---|---|
-| `load-balanced` (default) | Spreads requests in random order across healthy providers | Backends, indexers |
-| `latency-weighted` | Random order weighted toward providers with lower recent latency | User-facing reads |
+| `load-balanced` | Spreads requests in random order across healthy providers | Backends, indexers |
+| `balanced-fast` (default on Premium) | Random order weighted toward providers with lower recent latency | User-facing reads |
 | `fastest` | Tries the provider with the lowest recent latency for this kind of request first | Trading and other latency-critical paths |
 | `priority` | Tries providers in your Custom profile's configured order | A preferred primary with backups |
 
@@ -93,8 +93,8 @@ Save the key once in `.env` and build every URL from it:
 
 ```bash
 # .env
-LASSO_RPC_URL=https://lasso.sh/rpc/k/lasso_…
-LASSO_WS_URL=wss://lasso.sh/ws/rpc/k/lasso_…
+LASSO_RPC_URL=https://lasso.sh/rpc/k/lasso_…/profile/premium
+LASSO_WS_URL=wss://lasso.sh/ws/rpc/k/lasso_…/profile/premium
 ```
 
 ```ts
@@ -103,7 +103,7 @@ import { base } from "viem/chains";
 
 const client = createPublicClient({
   chain: base,
-  transport: http(`${process.env.LASSO_RPC_URL}/latency-weighted/base`),
+  transport: http(`${process.env.LASSO_RPC_URL}/balanced-fast/base`),
 });
 ```
 
@@ -162,7 +162,7 @@ To add keys per environment or hand the account to its owner, see
 
 - [Set up production RPC with an agent](/cloud/guides/production-rpc-with-an-agent):
   separate keys per environment, one balance, a clean handoff.
-- [Keys, URLs and profiles](/cloud/keys-and-profiles): default profiles,
+- [Keys, URLs and profiles](/cloud/keys-and-profiles): profile URLs,
   scoped keys and rotation.
 - [Serving access and pricing](/cloud/serving-access-and-pricing): what serves
   each request and what it costs.

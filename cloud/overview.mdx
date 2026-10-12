@@ -37,7 +37,7 @@ JSON-RPC to a new URL. You choose three things in that URL, and nothing else in
 your app changes:
 
 - **Your routing strategy**, per call site: `load-balanced`,
-  `latency-weighted`, `fastest` or `priority`.
+  `balanced-fast`, `fastest` or `priority`.
 - **Your provider pool**: Lasso's `premium` pool, its `public` pool, or a
   Custom profile over your own nodes and provider accounts. One key reaches
   all of them; `/profile/<name>` picks one.
@@ -49,7 +49,7 @@ your app changes:
 | Your situation | What Lasso gives you |
 |---|---|
 | A provider's outages or rate limits show up as errors in your app | Failover across a pool of providers behind one URL |
-| Latency matters: trading, wallets, bots | `fastest` and `latency-weighted` routing, measured from the region serving you |
+| Latency matters: trading, wallets, bots | `fastest` and `balanced-fast` routing, measured from the region serving you |
 | Backends and indexers exhaust one provider's quota | Load spread across providers with `load-balanced` |
 | You already pay for provider accounts or run your own nodes | A Custom profile routes over them, reachable with the key you already have |
 | Subscriptions must survive a provider outage | WebSocket failover that backfills the gap |

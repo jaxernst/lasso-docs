@@ -7,8 +7,7 @@ description: Route over your own nodes and provider accounts behind a profile sl
 
 A Custom profile is an account-owned pool of your own nodes and provider
 accounts, routed by the same engine as Lasso's managed pool. Every key of the
-account reaches it at `/profile/<slug>/…`, or by default once you make it a
-key's default profile. Create one when you already pay for providers or run
+account reaches it at `/profile/<slug>/…`. Create one when you already pay for providers or run
 nodes and want failover, latency routing and evidence over them.
 
 ```http
@@ -28,7 +27,7 @@ access. Saving needs Custom access: subscribe, or buy days with a wallet
 without `dry_run` and call it:
 
 ```bash
-curl -sS "$LASSO_RPC_URL/profile/prod-base/fastest/base" \
+curl -sS "https://lasso.sh/rpc/k/<key>/profile/prod-base/fastest/base" \
   -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
 ```
@@ -113,7 +112,7 @@ instead; it works without protection.
 
 | Workload | Profile | URL strategy |
 |---|---|---|
-| User-facing reads | Two or more providers; `block_protection: true` | `latency-weighted` |
+| User-facing reads | Two or more providers; `block_protection: true` | `balanced-fast` |
 | Latency-critical trading | Fast providers first; `block_protection: true`; `max_lag_blocks: 1` | `fastest` |
 | Indexer or backfill | Include an archive-capable provider | `load-balanced` |
 | Transaction submission | Preferred broadcast provider first | `priority` |

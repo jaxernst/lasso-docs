@@ -12,15 +12,15 @@ move an app between pools without a redeploy, scope keys you have to expose,
 and rotate secrets with no downtime.
 
 ```bash
-# .env: one key for every pool
-LASSO_RPC_URL=https://lasso.sh/rpc/k/lasso_…
+# .env: the key, which reaches every pool
+LASSO_KEY=lasso_…
 ```
 
 ```ts
-const url = process.env.LASSO_RPC_URL;
-const reads  = `${url}/latency-weighted/base`;           // the key's default profile
-const jobs   = `${url}/profile/public/base`;             // public providers, uncharged while the account has spending power
-const trades = `${url}/profile/prod-base/fastest/base`;  // your own providers
+const base   = `https://lasso.sh/rpc/k/${process.env.LASSO_KEY}`;
+const reads  = `${base}/profile/premium/balanced-fast/base`;  // Lasso's premium providers
+const jobs   = `${base}/profile/public/base`;                 // public providers, uncharged while the account has spending power
+const trades = `${base}/profile/prod-base/fastest/base`;      // your own providers
 ```
 
 ## URL grammar
@@ -38,37 +38,24 @@ const trades = `${url}/profile/prod-base/fastest/base`;  // your own providers
 
 - `<chain>` is a chain name or decimal chain ID from
   [chains and prices](/cloud/reference/chains-and-prices).
-- `<strategy>` is optional; `load-balanced` is the default. See
+- `<strategy>` is optional; `balanced-fast` is the default on Premium and
+  `load-balanced` elsewhere. See
   [routing](/cloud/routing).
 - `<profile>` is `premium`, `public` or one of your Custom profile slugs.
-  Without it, the key's default profile serves the request.
+  A URL without a profile segment is served by `premium`.
 - `<base>[/profile/<profile>]/provider/<name>/<chain>` pins one provider for
   debugging. Managed providers use their public aliases.
 
-Creating or rotating a key returns `rpc_url` and `ws_url` ready to use, with
-nothing to fill in.
+Creating or rotating a key returns `rpc_url` and `ws_url` ending in
+`/profile/premium`. Append a strategy and a chain; to use another profile,
+replace that segment rather than adding a second one.
 
-## Default and allowed profiles
+## Allowed profiles
 
-| Field | What it does | Default |
-|---|---|---|
-| `default_profile` | The profile a URL with no profile segment uses | `premium` |
-| `allowed_profiles` | The profiles the key can name in its URL | `all`: every current and future profile of the account |
-
-Change a key's default, and every URL without a profile segment moves with it,
-with no redeploy:
-
-```http
-PATCH https://lasso.sh/api/v1/keys/{id}
-Authorization: Bearer <management token>
-Content-Type: application/json
-
-{"default_profile": "prod-base"}
-```
-
-Making a Custom profile the default needs Custom access. Open WebSocket
-connections that used the old default close with `default_profile_changed`,
-and your client's reconnect follows the new default.
+`allowed_profiles` sets which profiles the key can name in its URL. It
+defaults to `all`: every current and future profile of the account. The URL,
+not a key setting, decides which profile serves a request, so moving an app to
+another profile means changing its URL.
 
 ## Scope a key
 
@@ -81,17 +68,18 @@ POST https://lasso.sh/api/v1/keys
 Authorization: Bearer <management token>
 Content-Type: application/json
 
-{"name": "jobs", "default_profile": "public", "allowed_profiles": ["public"]}
+{"name": "jobs", "allowed_profiles": ["public"]}
 ```
 
-A scoped key that names another profile gets
-`forbidden`, listing what it can use.
+Its `rpc_url` ends in `/profile/public`. A scoped key that names another
+profile, or uses a URL without a profile segment when `premium` isn't
+allowed, gets `forbidden`, listing what it can use.
 
 ## How a profile segment resolves
 
 | The URL names | Result |
 |---|---|
-| Nothing | The key's default profile |
+| Nothing | `premium` |
 | A profile the key is allowed | That profile |
 | A profile outside a scoped key's allowed set | 403 `forbidden`, naming the allowed profiles |
 | A slug the account has never had | 404 `unknown_profile`, listing the account's profiles |

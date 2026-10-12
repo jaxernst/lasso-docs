@@ -8,7 +8,7 @@ description: Replace a production RPC key's secret with an overlap window so eve
 Rotate a key when its secret may have leaked, when someone leaves, or on a
 schedule. With an overlap, the old and new secrets both route until every
 environment has the new one, so no request fails during the change. The key
-keeps its ID, name, default profile, allowed profiles and usage history.
+keeps its ID, name, allowed profiles and usage history.
 
 ## 1. Rotate with an overlap
 
@@ -25,8 +25,8 @@ Content-Type: application/json
 ```json
 {
   "key": "lasso_…",
-  "rpc_url": "https://lasso.sh/rpc/k/lasso_…",
-  "ws_url": "wss://lasso.sh/ws/rpc/k/lasso_…",
+  "rpc_url": "https://lasso.sh/rpc/k/lasso_…/profile/premium",
+  "ws_url": "wss://lasso.sh/ws/rpc/k/lasso_…/profile/premium",
   "previous_valid_until": "2026-10-01T13:00:00Z"
 }
 ```
