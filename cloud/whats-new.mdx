@@ -9,6 +9,42 @@ explains it. To check what's serving right now, read `source_sha` from
 [`/api/health`](https://lasso.sh/api/health). RPC Core releases have their own
 notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
 
+<Update label="October 12, 2026" description="Release 267" tags={["Agents", "Accounts", "Payments", "Pricing"]}>
+
+- **Agents fund an account with the RPC key alone.** The key reads its account
+  at `GET /api/v1/accounts/current`, and a top-up credits that account's `id`.
+  The management token is only needed to add keys, rotate them, build Custom
+  profiles or hand the account over. [Quickstart](/cloud/quickstart)
+- **Top-ups settle as soon as you check them.** Reading a pending purchase's
+  `status_url` settles it from the chain, so a paid top-up no longer waits for a
+  background pass. [Balance and payment fallback](/cloud/balance-and-fallback)
+- **One account guide and a published error catalog.** `/SKILL.md` and
+  `/llms.txt` describe the account API only, and `openapi.json` publishes every
+  error Lasso originates, with its fix, in `x-error-catalog`.
+  [Signals and errors](/cloud/reference/signals-and-errors)
+- **A clearer claim page and account menu.** Claiming shows exactly what moves,
+  the combined balance when you add it to an account you have, and that a
+  merge can't be undone. The account menu switches between your accounts.
+  [Accounts, people and agents](/cloud/accounts-and-agents)
+- **A new pricing page** shows Free, Pro and Custom side by side, read from the
+  live price sheet. [Pricing](https://lasso.sh/pricing)
+
+### Changes to note
+
+- **Premium URLs without a strategy now use `balanced-fast`**, priced at 1.5×
+  instead of `load-balanced`'s 1×. Name `load-balanced` in the URL to keep the
+  previous routing and price. [Routing](/cloud/routing)
+- **`latency-weighted` is now `balanced-fast`.** The old name keeps working.
+- **The URL selects the profile.** `rpc_url` and `ws_url` end in
+  `/profile/premium`; replace that segment to use another profile. Keys no
+  longer have a default profile, and sending `default_profile` returns 422
+  `unknown_field`. [Keys, URLs and profiles](/cloud/keys-and-profiles)
+- **Pro includes 10,000,000 CU a month** from each subscription's next period.
+  A current period keeps its allowance until it renews.
+  [Serving access and pricing](/cloud/serving-access-and-pricing)
+
+</Update>
+
 <Update label="October 9, 2026" description="Release 266" tags={["Payments", "Custom profiles"]}>
 
 - **Buy Custom access with a stablecoin wallet.** A single purchase can now be
