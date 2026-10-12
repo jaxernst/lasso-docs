@@ -13,7 +13,7 @@ compatibility: >
   for an enabled rail.
 metadata:
   author: Lasso
-  version: "14.0"
+  version: "14.1"
   website: https://lasso.sh
   routing_core: https://github.com/jaxernst/lasso-rpc
 ---
@@ -38,7 +38,7 @@ rotating and customizing that endpoint over plain HTTP.
 - Retries are safe by construction. A profile `PUT` is the whole desired
   state: after a lost response, `GET` the profile and compare its revision, or
   send `If-Match: <revision>`. A repeated unauthenticated key creation makes a
-  second account, so reuse the management token for more keys.
+  second account.
 - Live documents outrank this file:
 
 ```bash
@@ -46,9 +46,9 @@ curl -fsSL https://lasso.sh/agent.json    # chains, strategies, prices, rails, f
 curl -fsSL https://lasso.sh/openapi.json  # exact request/response schemas and errors
 ```
 
-An operation whose flag is off in `features` answers `unavailable`. Enabled
-operations can also answer HTTP 503 `unavailable` temporarily during rollback.
-Honor `Retry-After` and retry the same operation. Keep the original purchase ID,
+An operation whose flag is off in `features` answers `unavailable`. For HTTP 503 `unavailable`,
+follow the response’s `next_action`, honor `Retry-After` and retry the same operation.
+Keep the original purchase ID,
 signed offer/payment and `status_url`; poll that URL and never pay twice.
 
 ## Check readiness
@@ -57,24 +57,18 @@ Lasso serves the account model, and every recipe below works as written once
 `/agent.json` reports `features.native_serving: true`. Check it before
 installing a new endpoint or scoped key:
 
-- **`native_serving: true`:** the node answering you has published the native
-  generation locally. RPC enforces `default_profile` and `allowed_profiles`,
+- **`native_serving: true`:** the answering node accepts account RPC. RPC routes by the URL and enforces `allowed_profiles`,
   and uses the account's access, included usage and balance.
-- **`native_serving: false`:** that node isn't ready yet, for example while it
-  starts up, or serving has rolled back to legacy. Keep the app on its working endpoint;
-  native-born keys have no legacy prepaid CU and may answer 402 during rollback.
-  Saved native profile restrictions are not a security boundary on legacy RPC.
-  Wait for the flag before installing a new native endpoint or scoped key.
+- **`native_serving: false`:** keep the app on its working endpoint. Follow the
+  refusal’s `next_action` and `Retry-After` before retrying RPC with the saved key.
 - **`native_collection: true`:** native HTTP and WebSocket serving captures
   observations. Key `usage` and `recent_errors` include durable committed rows;
   asynchronous persistence means empty diagnostics do not prove no traffic.
-  When false, new native serving is unavailable, including during legacy
-  rollback; pending work and previously committed diagnostics are retained.
+  When false, new native serving is unavailable; pending work and previously
+  committed diagnostics are retained.
 - `features.claim_completion` and `features.connection_approval` confirm the
-  browser steps behind claim links and connections. These capabilities remain
-  present after serving rollback, but claim confirmations and connection
-  approvals temporarily return `unavailable` until the rollback write freeze
-  lifts. Honor Retry-After and retry the same operation.
+  browser steps behind claim links and connections. Use their own response to continue
+  the operation. For `unavailable`, honor `Retry-After` and retry the same operation.
 
 ## Create an endpoint
 
@@ -82,34 +76,44 @@ One request, with no credentials, creates a provisional account, makes you its
 agent and issues the first key:
 
 ```bash
-set -euo pipefail
-umask 077
-S="${XDG_STATE_HOME:-$HOME/.local/state}/lasso"
-mkdir -p "$S"
-curl -fsS https://lasso.sh/api/v1/keys \
-  -H 'content-type: application/json' -d '{"name":"prod"}' > "$S/account.json"
+created="$(curl -fsS https://lasso.sh/api/v1/keys \
+  -H 'content-type: application/json' -d '{"name":"prod"}')"
+jq '{id, account_id, serving_ready}' <<<"$created"
 ```
 
-The response is `{id, key, rpc_url, ws_url, account_id, management_token}`.
-Put `rpc_url` and `ws_url` in the app's secret store, and keep
-`management_token` with you, outside the repository. The token manages the account; it never
-authorizes a wallet payment. The account starts with a small balance, enough to
-verify.
+The response is `{id, key, rpc_url, ws_url, account_id, management_token, serving_ready}`;
+only its non-secret fields are shown. Move `rpc_url` and `ws_url` from it into
+the app's secret store without printing them. The key alone calls,
+reads its account and funds it. `management_token` makes you the account's
+agent: use it to add keys, rotate them, build Custom profiles and hand the
+account over. It never authorizes a wallet payment. The account starts with a
+small balance, enough to verify.
 
-Add more keys to the same account, sharing one balance, with the token:
+HTTP 201 with `serving_ready: true` means the key is ready to use. HTTP 202
+with `serving_ready: false` returns the same committed credentials. Save them,
+wait the response's `Retry-After`, then call RPC with that key. If RPC is not ready yet, honor `Retry-After` and retry RPC with the saved key.
+Do not repeat key creation: the account and key already exist.
+
+Add more keys to the same account, sharing one balance, with the token;
+without it, a create makes a separate account:
 
 ```bash
-curl -fsS https://lasso.sh/api/v1/keys \
-  -H "authorization: Bearer $(jq -er .management_token "$S/account.json")" \
-  -H 'content-type: application/json' -d '{"name":"staging"}'
+staging="$(curl -fsS https://lasso.sh/api/v1/keys \
+  -H "authorization: Bearer <management token>" \
+  -H 'content-type: application/json' -d '{"name":"staging"}')"
+jq '{id, serving_ready}' <<<"$staging"
 ```
 
 ## Call it and read the evidence
 
-Append a chain, and optionally a strategy, to `rpc_url`:
+The returned `rpc_url` and `ws_url` already end in `/profile/premium` when
+premium is allowed. Otherwise they advertise the sole allowed canonical profile,
+or the first canonical slug in lexical order. Append only a chain and optionally
+a strategy; never append another `/profile/`. With `LASSO_RPC_URL` set to
+`rpc_url`:
 
 ```bash
-URL="$(jq -er .rpc_url "$S/account.json")/fastest/base"
+URL="$LASSO_RPC_URL/fastest/base"
 curl -fsS -D - "$URL?include_meta=body" -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
 ```
@@ -123,7 +127,7 @@ The chain is a name or decimal ID from `chains` in `/agent.json`.
   problem), `x-lasso-access` (`premium`, `public` or `custom`), `x-lasso-cu`,
   `x-lasso-usd` (this request's charge) and `x-lasso-balance-usd`.
 - `x-lasso-fallback` appears when a request was served somewhere other than
-  the profile it named: `payment`, `free`, `availability` or `profile`.
+  the profile it named: `payment`, `free`, `availability`, `profile` or `meter`.
 - `eth_chainId` can be answered without an upstream; use `eth_blockNumber` to
   show routing.
 
@@ -143,25 +147,28 @@ groups with `code`, `category`, `provider`, `count`, `last_at` and
 ## Choose a profile and a strategy
 
 An unrestricted key reaches every profile of its account. The URL picks one:
-`<rpc_url>[/profile/<profile>][/<strategy>]/<chain>`.
+`<rpc_url>[/<strategy>]/<chain>`. To switch profiles, replace the profile
+segment in the returned prefix; do not append another one.
 
 | URL | Served by |
 |---|---|
-| `<rpc_url>/<strategy>/<chain>` | The key's default profile, `premium` unless changed |
-| `<rpc_url>/profile/public/<chain>` | Public providers, uncharged, `load-balanced` only, while the balance, included usage, grace window or free allowance would serve the account; otherwise `balance_exhausted` |
-| `<rpc_url>/profile/<slug>/<strategy>/<chain>` | The account's Custom profile |
+| `<rpc_url>/<strategy>/<chain>` | The explicit profile already in the returned prefix |
+| `https://lasso.sh/rpc/k/<key>/profile/public/<chain>` | Public providers, uncharged, `load-balanced` only, while the balance, included usage, grace window or free allowance would serve the account; otherwise `balance_exhausted` |
+| `https://lasso.sh/rpc/k/<key>/profile/<slug>/<strategy>/<chain>` | The account's Custom profile |
 
 | Strategy | Behavior | Use for | Price factor |
 |---|---|---|---|
-| `load-balanced` (default) | Random within the healthiest providers | Backends, indexers | 1x |
-| `latency-weighted` | Favors recently fast providers, keeps spreading | User-facing reads | 1.5x |
+| `load-balanced` | Random within the healthiest providers | Backends, indexers | 1x |
+| `balanced-fast` (default on Premium) | Spreads traffic, favoring recently fast providers | User-facing reads | 1.5x |
 | `fastest` | Lowest recent latency per provider, kind of request and transport; concentrates traffic | Latency-critical paths | 2x |
 | `priority` | Configured order within the healthy providers | Custom profiles with a preferred primary | 1x |
 
 Health and known capability steer candidates first, as a preference rather
 than a guarantee. Premium and Custom serve all four strategies; `public`,
 payment fallback and free access serve `load-balanced`, and
-`lasso_meta.strategy` reports what was used. `agent.json` lists exact USD
+`lasso_meta.strategy` reports what was used. A URL without a strategy uses
+`balanced-fast` on Premium and `load-balanced` on Custom profiles.
+`latency-weighted` is an alias of `balanced-fast`. `agent.json` lists exact USD
 prices per method and strategy.
 
 ## Install into the app
@@ -172,7 +179,7 @@ clients, Foundry or Hardhat config and indexer settings:
 ```ts
 const client = createPublicClient({
   chain: base,
-  transport: http(`${process.env.LASSO_RPC_URL}/latency-weighted/base`),
+  transport: http(`${process.env.LASSO_RPC_URL}/balanced-fast/base`),
 })
 ```
 
@@ -185,7 +192,7 @@ Custom profile isn't safe to expose: when Custom access lapses, it is served
 and charged as `premium`.
 
 ```json
-{"name":"web","default_profile":"public","allowed_profiles":["public"]}
+{"name":"web","allowed_profiles":["public"]}
 ```
 
 ## Fund the account
@@ -193,18 +200,24 @@ and charged as `premium`.
 Check `features.account_purchases` and `account_payments.rails` in
 `/agent.json` for configured rails (`x402`: USDC on Base; `mpp`: USDC.e on
 Tempo) and the per-purchase range. No Lasso credential is
-needed, and anyone may pay for any account.
+needed, and anyone may pay for any account. The RPC key reads the account's
+`id`:
+
+```bash
+curl -fsS https://lasso.sh/api/v1/accounts/current \
+  -H "authorization: Bearer <RPC key>" | jq '{id, balance_usd}'
+```
 
 ```http
-POST https://lasso.sh/api/v1/accounts/<account_id>/credit
+POST https://lasso.sh/api/v1/accounts/<id>/credit
 Content-Type: application/json
 
 {"usd":"5"}
 ```
 
-1. The first request answers 402 with an x402 challenge in `PAYMENT-REQUIRED`
-   and an MPP challenge in `WWW-Authenticate: Payment`. Check the amount
-   against the user's budget.
+1. The first request answers 402. Its `offer.rails` lists the rails that
+   accept this amount, each with a challenge: x402 in `PAYMENT-REQUIRED`, MPP
+   in `WWW-Authenticate: Payment`. Check the amount against the user's budget.
 2. Have an authorized wallet sign one challenge with a standard client
    (`@x402/fetch`, `mppx`), then repeat the same request with
    `PAYMENT-SIGNATURE` (x402) or `Authorization: Payment` (MPP).
@@ -215,9 +228,16 @@ Content-Type: application/json
 
 When the money runs out on an account that has paid, requests keep serving on
 public providers for 30 days (`x-lasso-fallback: payment`, `x-lasso-usd: 0`),
-and `GET /api/v1/accounts/current` shows `fallback.until`. Top up, and the
-next request is premium again. An account that never paid gets
-`balance_exhausted` once its starting balance is spent.
+and `GET /api/v1/accounts/current` shows `fallback.until`. A top-up returning
+`200` confirms the credit. Check `x-lasso-access: premium` on subsequent
+responses to confirm premium serving has resumed. An account that never paid
+gets `balance_exhausted` once its starting balance is spent.
+
+If usage metering is unavailable for an extended period, requests on chains
+that public serves move to public providers with `x-lasso-fallback: meter` and
+`x-lasso-usd: 0`, under your account's managed rate limits; other chains keep
+serving as before. It is not payment fallback: no top-up is needed, and normal
+charging resumes on its own.
 
 Lasso charges only responses a provider delivered, results or JSON-RPC
 errors. Charges settle asynchronously and normally book within seconds, so
@@ -245,17 +265,24 @@ accounts went live no longer work; request a new one.
 ## Rotate, retarget or revoke
 
 - `POST /api/v1/keys/<id>/rotate` with `{"grace_seconds":3600}` returns a new
-  `key`, `rpc_url`, `ws_url` and `serving_ready`. In account mode, 200 confirms
-  replacement publication on connected serving nodes. A bounded publication
-  wait can return 202 with `serving_ready: false` and `Retry-After: 1`: keep the
-  valid grace secret and retry RPC with the replacement, **not rotation**.
-  Its last-known authority is retained until `previous_valid_until` (up to
-  86,400 seconds); older nodes during a rolling deploy fail closed until their
-  authoritative refresh. Deploy the new secret within the overlap.
+  `key`, `rpc_url`, `ws_url` and `serving_ready`. HTTP 200 with
+  `serving_ready: true` means the replacement is ready to use. HTTP 202 with
+  `serving_ready: false` returns the committed replacement and `Retry-After: 1`.
+  Save it, wait `Retry-After`, then call RPC with it. Keep any valid grace secret
+  until `previous_valid_until` (up to 86,400 seconds) and retry RPC with the
+  replacement, **not rotation**. Deploy the new secret within the overlap.
+  Rotation keeps `allowed_profiles`. Mixed live/deleted scopes advertise a live
+  canonical profile; a deleted-only Custom scope can reuse an existing retained
+  slug for its allowed deleted identity, with the same fallback as the old URL.
+  Rotation does not create aliases or authorize Premium directly.
+  If no usable allowed selector exists, `unknown_profile` leaves the secret,
+  overlap and scope unchanged. Update `allowed_profiles` before rotating.
   `grace_seconds: 0` stops the old secret at once.
-- `PATCH /api/v1/keys/<id>` with `{"default_profile":"<slug>"}` moves every
-  URL without a profile segment, with no redeploy, as each region applies the
-  change (usually within a second). `allowed_profiles` scopes the key.
+- `PATCH /api/v1/keys/<id>` with `{"allowed_profiles":["<slug>"]}` narrows
+  authorization; it does not move an existing URL to that profile. Use its
+  explicit profile URL. Bare URLs always select premium and return `forbidden`
+  if premium is excluded, with explicit allowed routes in `next_action`.
+  Submitted `default_profile` returns 422 `unknown_field` with URL guidance.
 - `DELETE /api/v1/keys/<id>` revokes the key; repeating it succeeds.
 - `POST /api/v1/agents/current/rotate` replaces your management token; the
   old one stops at once.
@@ -299,17 +326,25 @@ Start with the provider URLs and omit `limits` unless you know a provider
 policy to enforce; Lasso learns historical depth, refused methods and log-span
 limits from traffic. The dry run checks chain identity only.
 
+Lasso tracks each provider's block height from the head reads routed through
+it and from background checks. A provider with a `ws_url` also holds a
+`newHeads` feed, one notification per block, and a chain needs only one. A
+provider with the same URL and credentials in several profiles is tracked once.
+On providers that bill per request, set `ws_url` to null unless the app
+subscribes through them, and set the chain's `health_checks` to `light` to
+slow the polls and identity checks.
+
 1. `?dry_run=true` returns the changes and each provider's chain check without
    storing anything, and needs no Custom access.
 2. Holding a profile needs Custom access. Buy days with the same 402 exchange
-   as a top-up: `POST /api/v1/accounts/<account_id>/custom-access` with
+   as a top-up: `POST /api/v1/accounts/<id>/custom-access` with
    `{"days":7}`, at `account_payments.custom_access.day_usd` in `/agent.json`.
    A signed offer keeps its price even if the tariff changes.
 3. The same `PUT` without `dry_run` stores it. `provider_check_failed` names a
    wrong provider and nothing changes; a provider that can't answer yet is
    saved as `verifying` and routes once a later check passes.
-4. Route the app over it: `<rpc_url>/profile/prod-base/<strategy>/<chain>`,
-   or `PATCH` the key's `default_profile` to `prod-base`.
+4. Route the app over `https://lasso.sh/rpc/k/<key>/profile/prod-base/<strategy>/<chain>`.
+   Replace the profile segment in an existing prefix rather than appending another.
 5. `GET /api/v1/profiles/prod-base` shows the revision, each provider's status
    and what Lasso has learned (`effect: on` changes routing; `shadow` is
    observed only). Provider URLs and header values are never returned.
@@ -352,13 +387,13 @@ Every error Lasso originates carries `code` and `next_action`; follow it.
 | 401 `key_revoked` | The key was revoked or rotated past its overlap; use the current key |
 | 422 `rpc_route_required` | Add `/<chain>` or `/<strategy>/<chain>` to the URL |
 | 422 `unknown_chain`, `unknown_strategy` | Use a value from `/agent.json` (`ethereum`, not `mainnet`) |
-| 504 `deadline_exhausted`, or `-32005` `log_range_too_large` | Narrow the `eth_getLogs` block range |
+| `-32005` `log_range_limit`, or `timeout` on `eth_getLogs` | Narrow the `eth_getLogs` block range |
 | `custom_access_required` | Buy Custom access or have the owner subscribe |
 | `payment_conflict`, `payment_pending` or payment 202 | Read `GET /api/v1/purchases/<id>` using the returned purchase ID; never pay again |
 | 409 `beneficiary_conflict` | Never pay again; keep the purchase ID and signed payment, report the key with `POST /api/v1/feedback`, then retry the same request |
 | Rotation 202 with `serving_ready: false` | Honor `Retry-After`; retain valid grace authority and retry replacement RPC, not rotation |
 | 429 `rate_limited` | Honor `Retry-After` |
-| 503 `unavailable` | Check disabled capabilities in `/agent.json`; for temporary refusal honor `Retry-After`, retry the same operation and retain its original payment identity. Never pay twice. |
+| 503 `unavailable` | Check disabled capabilities in `/agent.json`; follow the refusal’s `next_action` and `Retry-After`, retry the same operation and retain its original payment identity. Never pay twice. |
 
 ## Report a problem
 
