@@ -11,8 +11,8 @@ the URL in each common client and how to move traffic safely.
 
 ```bash
 # .env
-LASSO_RPC_URL=https://lasso.sh/rpc/k/lasso_…
-LASSO_WS_URL=wss://lasso.sh/ws/rpc/k/lasso_…
+LASSO_RPC_URL=https://lasso.sh/rpc/k/lasso_…/profile/premium
+LASSO_WS_URL=wss://lasso.sh/ws/rpc/k/lasso_…/profile/premium
 ```
 
 Get these values from the [quickstart](/cloud/quickstart). Every URL below is
@@ -79,8 +79,8 @@ Indexers take the same URL wherever they take an RPC endpoint. Use
 | User-facing reads | `$LASSO_RPC_URL/balanced-fast/<chain>` |
 | Trading, quoting, liquidations | `$LASSO_RPC_URL/fastest/<chain>` |
 | Backfills and batch jobs | `$LASSO_RPC_URL/load-balanced/<chain>` |
-| Development, tests and work that doesn't need premium | `$LASSO_RPC_URL/profile/public/<chain>` |
-| Your own providers | `$LASSO_RPC_URL/profile/<slug>/<strategy>/<chain>` |
+| Development, tests and work that doesn't need premium | `https://lasso.sh/rpc/k/<key>/profile/public/<chain>` |
+| Your own providers | `https://lasso.sh/rpc/k/<key>/profile/<slug>/<strategy>/<chain>` |
 | Subscriptions | `$LASSO_WS_URL/<chain>` |
 
 ## Roll out one path at a time

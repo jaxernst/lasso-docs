@@ -59,7 +59,7 @@ per call site:
 | User-facing reads | `/balanced-fast/<chain>` |
 | Trading, quoting, liquidations | `/fastest/<chain>` |
 | Indexers and backfills | `/load-balanced/<chain>` |
-| Development, tests and background jobs that don't need premium | `/profile/public/<chain>` |
+| Development, tests and background jobs that don't need premium | Replace `/profile/premium` with `/profile/public`, then `/<chain>` |
 
 Change only the URL in the app. Clients such as viem and ethers keep their
 existing configuration. See [install Lasso in your app](/cloud/install).

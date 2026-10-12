@@ -62,16 +62,11 @@ has no request price.
 
 ## 4. Save it and route the key over it
 
-Repeat the `PUT` without `dry_run`. Then point the app at it, either by URL or
-by making it the key's default so the app's existing URL moves with no
-redeploy:
+Repeat the `PUT` without `dry_run`. Then point the app at the profile's URL:
+replace the `/profile/premium` segment in `rpc_url` with `/profile/prod-base`.
 
-```http
-PATCH https://lasso.sh/api/v1/keys/{key_id}
-Authorization: Bearer <management token>
-Content-Type: application/json
-
-{"default_profile": "prod-base"}
+```bash
+LASSO_RPC_URL=https://lasso.sh/rpc/k/<key>/profile/prod-base
 ```
 
 ## 5. Verify on real traffic
@@ -88,7 +83,7 @@ historical queries through the profile. Compare latency, errors and head
 freshness with the direct provider URLs.
 
 To see failover, pin each provider once with
-`$LASSO_RPC_URL/profile/prod-base/provider/primary/base`, then watch which
+`$LASSO_RPC_URL/provider/primary/base`, then watch which
 provider serves the unpinned URL while one of them is throttled or down.
 
 ## 6. Hand it over
