@@ -40,7 +40,7 @@ unmeasured channels are shuffled.
 instances a [bounded first pass](/concepts/routing-strategies#load-balanced) for
 replay-safe calls within each health tier. It does not rank by a benchmark score.
 **Priority** uses configured order. All strategies apply
-[health tiering](/concepts/routing-strategies#health-based-tiering) and live admission.
+[health tiering](/concepts/routing-strategies#health-comes-first) and live admission.
 
 The supported latency control is `LW_BETA` (positive number, default `3.0`).
 See [routing strategies](/concepts/routing-strategies) for the full released contract.
