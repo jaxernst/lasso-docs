@@ -92,6 +92,16 @@ Controls probe frequency and the dashboard lag status threshold. Shared upstream
 |-------|------|---------|-------------|
 | `probe_interval_ms` | integer | 12000 | Health check polling interval. Set to ~1x block time for L1, ~2.5x for L2 |
 | `lag_alert_threshold_blocks` | integer | 3 | Dashboard lag status threshold; this setting does not emit lag warning logs |
+| `background_observations` | boolean | true | Enable periodic heads, chain identity and configured head feeds; client requests remain independent |
+| `http_heads_interval_ms` | integer | `probe_interval_ms` | Normal HTTP head interval; `0` disables polling |
+| `http_backup_interval_ms` | integer | 3 × normal interval | HTTP head interval while WebSocket head evidence is fresh; `0` disables backup polling |
+| `chain_identity_interval_ms` | integer | `probe_interval_ms` | HTTP identity probe interval; `0` disables periodic identity checks |
+| `evidence_freshness_ms` | integer | 30,000–60,000 from block time | Retained head evidence freshness |
+| `subscribe_new_heads` | boolean | WebSocket setting | Automatic head observation override |
+
+Intervals accept `0` or at least 1,000 ms. Shared physical upstreams use the
+shortest positive interval requested by an enabled reference. Disabling one
+reference does not disable another profile's observations.
 
 ### Selection
 
@@ -99,7 +109,7 @@ Controls provider eligibility filtering during request routing.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `max_lag_blocks` | integer | unset | Exclude providers lagging more than N blocks. L1: 1-2, L2: 3-10 |
+| `max_lag_blocks` | integer | unset | Filter routes proven more than N blocks behind a qualified profile reference. Missing or ambiguous evidence stays eligible; if every route lags, Core keeps them available |
 | `archival_threshold` | integer | 128 | Blocks before data is considered "archival". Requests for blocks older than `head - threshold` are only routed to archival providers |
 
 ### WebSocket
@@ -110,10 +120,10 @@ Controls upstream WebSocket subscription behavior.
 |-------|------|---------|-------------|
 | `subscribe_new_heads` | boolean | true | Enable `newHeads` block tracking and eligibility for client `newHeads` subscriptions |
 | `new_heads_timeout_ms` | integer | 42000 | Timeout before marking subscription stale (~3x block time) |
-| `failover.max_backfill_blocks` | integer | 100 | Max blocks to fetch via HTTP during subscription failover |
+| `failover.max_backfill_blocks` | integer | 100 | Minimum replay allowance; fast chains can expand it to cover the recovery horizon |
 | `failover.backfill_timeout_ms` | integer | 30000 | Timeout for backfill HTTP requests |
 
-Failover limits are captured from the active profile at the beginning of each recovery, including after YAML reload. An in-progress recovery keeps its captured limits. The backfill timeout is also bounded by the overall 30-second recovery deadline. Gaps beyond `max_backfill_blocks` terminate continuity rather than silently skipping missing blocks.
+Failover limits are captured from the active profile at the beginning of each recovery, including after YAML reload. An in-progress recovery keeps its captured limits. The effective block allowance is the greater of `max_backfill_blocks` and the blocks expected during one backfill-timeout horizon, with time-derived expansion capped at 2,048 blocks. The backfill timeout is also bounded by the overall 30-second recovery deadline. Gaps beyond the effective allowance terminate continuity rather than silently skipping missing blocks.
 
 ### UI Topology
 

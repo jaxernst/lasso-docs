@@ -13,7 +13,7 @@ compatibility: >
   for an enabled rail.
 metadata:
   author: Lasso
-  version: "14.1"
+  version: "14.2"
   website: https://lasso.sh
   routing_core: https://github.com/jaxernst/lasso-rpc
 ---
@@ -233,14 +233,20 @@ and `GET /api/v1/accounts/current` shows `fallback.until`. A top-up returning
 responses to confirm premium serving has resumed. An account that never paid
 gets `balance_exhausted` once its starting balance is spent.
 
+To catch this in an app, watch for `x-lasso-fallback: payment` on responses
+and top up before `fallback.until`. After that date, requests answer 402
+`balance_exhausted` and open WebSocket connections close.
+
 If usage metering is unavailable for an extended period, requests on chains
 that public serves move to public providers with `x-lasso-fallback: meter` and
 `x-lasso-usd: 0`, under your account's managed rate limits; other chains keep
 serving as before. It is not payment fallback: no top-up is needed, and normal
 charging resumes on its own.
 
-Lasso charges only responses a provider delivered, results or JSON-RPC
-errors. Charges settle asynchronously and normally book within seconds, so
+Lasso charges only successful results. Every final JSON-RPC error is free,
+including execution reverts and provider rate-limit errors after failover.
+Subscription notification pricing is unchanged. Charges settle asynchronously
+and normally book within seconds, so
 `x-lasso-balance-usd` can briefly differ between responses and a balance can
 dip a few cents below zero; the next purchase repays it first.
 
@@ -255,8 +261,9 @@ Authorization: Bearer <management token>
 
 Give `claim_url` only to the owner. It works once, expires after 24 hours, and
 a new link invalidates the old one. The owner opens it signed in, previews what moves and
-chooses **Keep as a new account** or **Add to your account**. Issuing the link
-alone does not complete a claim.
+chooses **Keep as a new account**, or **Add to** one of their accounts (the
+button shows its name). Merging can't be undone. Either way every key and URL
+keeps working. Issuing the link alone does not complete a claim.
 
 A key created before agents existed, with no management token, requests its
 account's claim link with the RPC key as Bearer. Claim links issued before
@@ -277,7 +284,11 @@ accounts went live no longer work; request a new one.
   Rotation does not create aliases or authorize Premium directly.
   If no usable allowed selector exists, `unknown_profile` leaves the secret,
   overlap and scope unchanged. Update `allowed_profiles` before rotating.
-  `grace_seconds: 0` stops the old secret at once.
+  Omitting `grace_seconds` gives 3,600 seconds (1 hour); sending 0 stops the old secret at once.
+
+  For no downtime: rotate with a grace longer than your rollout plus a
+  rollback, deploy the new secret everywhere, confirm calls succeed with it,
+  then let the old secret lapse at `previous_valid_until`.
 - `PATCH /api/v1/keys/<id>` with `{"allowed_profiles":["<slug>"]}` narrows
   authorization; it does not move an existing URL to that profile. Use its
   explicit profile URL. Bare URLs always select premium and return `forbidden`
@@ -327,12 +338,17 @@ policy to enforce; Lasso learns historical depth, refused methods and log-span
 limits from traffic. The dry run checks chain identity only.
 
 Lasso tracks each provider's block height from the head reads routed through
-it and from background checks. A provider with a `ws_url` also holds a
-`newHeads` feed, one notification per block, and a chain needs only one. A
-provider with the same URL and credentials in several profiles is tracked once.
-On providers that bill per request, set `ws_url` to null unless the app
-subscribes through them, and set the chain's `health_checks` to `light` to
-slow the polls and identity checks.
+it and from background checks. A `ws_url` provides WebSocket capability;
+`heads: live` selects a per-block `newHeads` feed, and `heads: standby`
+supplies an elected fallback when no live feed is healthy. New providers with
+unset heads are passive; existing providers retain their resolved legacy policy.
+A provider with the same URL and credentials in several profiles is tracked once.
+On providers that bill per request, choose `heads: passive` for poll-based head
+tracking or `heads: off` to disable periodic head collection for that reference,
+retaining `ws_url` for client subscriptions. Off removes this reference’s periodic head demand; shared instances collect
+heads for enabled references. Neither mode disables permitted identity/capability
+checks or client subscription usage; `health_checks: light` slows background
+polls and identity checks.
 
 1. `?dry_run=true` returns the changes and each provider's chain check without
    storing anything, and needs no Custom access.
@@ -350,8 +366,11 @@ slow the polls and identity checks.
    observed only). Provider URLs and header values are never returned.
 
 Omitting a provider removes it; omitting a provider's `url` keeps the stored
-one. `Accept: application/yaml` exports the profile for self-hosted Lasso RPC
-Core. `DELETE` removes it; URLs naming it then serve as `premium`. When Custom
+one. Omitted `heads` in a whole replacement resets that provider to passive.
+`Accept: application/yaml` exports compatible head policies for self-hosted Lasso RPC
+Core. A provider with `heads: standby` returns 422 `invalid_config` with its field
+path because the target Core YAML cannot represent elected fallback; the stored
+profile is unchanged. `DELETE` removes it; URLs naming it then serve as `premium`. When Custom
 access lapses, the profile is kept and its URLs serve from `premium`, charged
 at request prices, until renewed.
 
@@ -425,3 +444,5 @@ management routes answer gone (HTTP 410) with a `next_action` naming the
 - Open-source routing core (Apache-2.0): https://github.com/jaxernst/lasso-rpc
 
 Lasso Cloud is the managed service on lasso.sh; the routing core is open source.
+
+Head observation: Lasso learns provider heads from your traffic and a light poll; set `heads: live` on the provider you want tracked every block. Modes are `live`, `standby`, `passive` (unset), and `off`; background_observations remains the all-background veto. Legacy observation fields compile into the resolved policy and remain honored reference overrides. Existing feed placement is preserved; standby opens only when the chain has no healthy live feed. Head modes do not change client subscription capability or identity/capability recovery permissions.

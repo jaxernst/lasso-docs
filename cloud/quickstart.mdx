@@ -30,6 +30,11 @@ curl -sS https://lasso.sh/api/v1/keys \
 }
 ```
 
+A `201` with `serving_ready: true` means the key is ready. A `202` with
+`serving_ready: false` returns the committed credentials: save them, wait
+`Retry-After`, then call RPC. For `service_initializing`, wait and retry RPC
+with the same key; do not repeat creation.
+
 That one request creates a provisional account with a starting balance
 (`pricing.free_grant_usd` in [`agent.json`](https://lasso.sh/agent.json),
 enough to verify but not to run production) and issues your first key. The

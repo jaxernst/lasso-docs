@@ -26,8 +26,7 @@ const load = async from =>
     : JSON.parse(readFileSync(from, 'utf8'));
 const manifest = await load(source);
 const openapiSource = option('--openapi') ?? 'https://lasso.sh/openapi.json';
-// Until the service publishes x-error-catalog, the error tables come from the
-// release source through scripts/cloud-errors-from-source.exs.
+// The deployed service publishes the authoritative error catalog.
 const catalog = (await load(openapiSource))['x-error-catalog'];
 
 const row = cells => `| ${cells.join(' | ')} |`;

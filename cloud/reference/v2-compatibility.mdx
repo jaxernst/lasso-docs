@@ -55,7 +55,8 @@ curl -sS https://lasso.sh/api/v1/agents/current \
   one USD balance. Payments addressed to a v2 key ID credit that key's
   account.
 - **Keys reach every profile of their account.** A v2 key pinned to one Custom
-  profile keeps that profile as its default and is scoped to it.
+  profile remains scoped to it. Use its explicit `/profile/<slug>` URL; a URL
+  without a profile selects `premium`.
 - **Running out of money doesn't stop a paying app.** Accounts that have paid
   fall back to public providers for 30 days instead of failing.
 - **Usage is counted per method.** Requests are sized in per-method CU and

@@ -57,12 +57,13 @@ These application-level closure cases have explicit meanings:
 | --- | --- | --- |
 | Two missed heartbeat replies | 1002 | `Heartbeat timeout - no pong responses` |
 | Subscription continuity exhausted | 1011 | `Lasso subscription continuity exhausted` |
+| Client cannot keep up with subscription delivery | 1013 | `Lasso subscription client too slow` |
 
 A JSON-RPC rate-limit error can be returned on an open connection. It does not inherently mean the socket closes with code 1008. Deployments, access changes, proxies, and network failures can produce other close events; handle closure regardless of code.
 
-The released Core socket does not promise a dedicated slow-client close code.
-Bound your own processing and subscription volume, reconnect with capped
-backoff, and reconcile missed events after any closure.
+Core closes a slow subscription consumer with code 1013. Bound your processing
+and subscription volume, reconnect with capped backoff, and reconcile missed
+events from your checkpoint after any closure.
 
 ## Reconnection
 

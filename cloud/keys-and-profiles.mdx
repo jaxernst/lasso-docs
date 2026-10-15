@@ -46,8 +46,8 @@ const trades = `${base}/profile/prod-base/fastest/base`;      // your own provid
 - `<base>[/profile/<profile>]/provider/<name>/<chain>` pins one provider for
   debugging. Managed providers use their public aliases.
 
-Creating or rotating a key returns `rpc_url` and `ws_url` ending in
-`/profile/premium`. Append a strategy and a chain; to use another profile,
+Creating or rotating an unrestricted key returns `rpc_url` and `ws_url` ending in
+`/profile/premium`; a scoped key uses an allowed profile. Append a strategy and a chain; to use another profile,
 replace that segment rather than adding a second one.
 
 ## Allowed profiles
@@ -117,7 +117,7 @@ on [upgrading from Agent API v2](/cloud/reference/v2-compatibility).
 - The API returns a key's secret only on create and rotate. If you lose it,
   rotate the key or create another; admins can view active keys' URLs in the
   dashboard.
-- `grace_seconds` defaults to 0, which stops the old secret immediately; the
+- `grace_seconds` defaults to 3,600 (one hour); explicit `0` stops the old secret immediately. The
   maximum is 86,400.
 - An account holds at most 100 active keys.
 - `premium` and `public` are reserved; Custom profile slugs can't use them.

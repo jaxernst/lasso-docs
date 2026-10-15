@@ -26,7 +26,7 @@ to use these signals together, read [routing evidence](/cloud/observability).
 |---|---|
 | `x-lasso-request-id` | Unique per request; quote it when reporting a problem |
 | `x-lasso-access` | What served the request: `premium`, `public` or `custom` |
-| `x-lasso-fallback` | Present only when the request was served somewhere other than the profile it named: `payment`, `free` or `profile` |
+| `x-lasso-fallback` | Present only when the request was served somewhere other than the profile it named: `payment`, `free`, `profile` or `meter` |
 | `x-lasso-cu` | The request's size in compute units |
 | `x-lasso-usd` | The request's charge to the balance in USD; `0` when included usage, free access, Custom access or payment fallback covered it |
 | `x-lasso-balance-usd` | An estimate of the balance after this charge. `GET /api/v1/accounts/{id}` is authoritative |
@@ -37,6 +37,7 @@ to use these signals together, read [routing evidence](/cloud/observability).
 |---|---|
 | `payment` | The account's paid spending ran out within its grace window; served on public providers, uncharged |
 | `free` | Served on public providers under the account's free monthly allowance |
+| `meter` | Extended metering interruption; chains available on public providers use them uncharged under managed rate limits. Charging resumes automatically; no top-up is needed |
 | `profile` | The named Custom profile was deleted or its Custom access lapsed; served as `premium` |
 
 ## `lasso_meta`
@@ -66,7 +67,7 @@ WebSocket callers add `"lasso_meta": "notify"` to a request for a follow-up
 RPC errors stay standard JSON-RPC. Errors Lasso originates carry
 `error.data.code`, `error.data.next_action` and `error.data.retryable`. A
 retryable error with `Retry-After` is safe to repeat as is after the wait.
-These are the requests Lasso answers itself, before routing:
+The catalog covers local refusals and terminal routing outcomes:
 
 <RpcErrors />
 

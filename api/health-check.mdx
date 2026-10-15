@@ -59,7 +59,7 @@ Returns a JSON object containing instance health information:
     </ResponseField>
     
     <ResponseField name="status" type="string" required>
-      Status derived from responding versus connected nodes: `standalone`, `healthy`, `degraded`, or `critical`
+      Status derived from snapshot freshness and responding versus expected nodes: `standalone`, `unavailable`, `stale`, `healthy`, `degraded`, or `critical`
     </ResponseField>
   </Expandable>
 </ResponseField>
@@ -71,9 +71,12 @@ Returns a JSON object containing instance health information:
   "status": "healthy",
   "timestamp": "2026-03-03T21:45:30.123456Z",
   "uptime_seconds": 86400,
-  "version": "0.5.0",
+  "version": "0.5.1",
   "cluster": {
     "enabled": true,
+    "nodes_configured": 3,
+    "snapshot_status": "current",
+    "snapshot_age_ms": 20,
     "nodes_connected": 3,
     "nodes_responding": 3,
     "nodes_total": 3,
@@ -92,20 +95,22 @@ The `cluster.status` field indicates the overall health of your cluster deployme
 </ResponseField>
 
 <ResponseField name="healthy">
-  Every connected node is responding. This does not establish that every expected node is connected.
+  The current snapshot reports at least as many responding nodes as expected.
 </ResponseField>
 
 <ResponseField name="degraded">
-  Fewer nodes are responding than connected, but the responding count is at least `floor(nodes_connected / 2)`.
+  Fewer nodes respond than expected, but at least `ceil(nodes_total / 2)` respond.
 </ResponseField>
 
 <ResponseField name="critical">
-  The responding count is below `floor(nodes_connected / 2)`.
+  The responding count is below `ceil(nodes_total / 2)`.
 </ResponseField>
 
-The status calculation uses `nodes_connected`, not `nodes_total`. Monitor both
-counts to detect missing expected nodes; `cluster.status` alone does not prove
-full cluster coverage. This is the behavior of the released
+`unavailable` means no usable topology snapshot exists; `stale` means its age
+exceeds five seconds. `snapshot_status` and `snapshot_age_ms` expose that
+freshness. `nodes_configured` reports the configured expected count when set;
+`nodes_total` is at least the connected count. These diagnostics do not make a
+live request to every upstream. This is the behavior of the released
 [health controller](https://github.com/jaxernst/lasso-rpc/blob/v0.5.1/lib/lasso_web/controllers/health_controller.ex)
 and [topology status function](https://github.com/jaxernst/lasso-rpc/blob/v0.5.1/lib/lasso/cluster/health_topology.ex).
 

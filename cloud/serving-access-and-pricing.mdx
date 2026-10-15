@@ -50,7 +50,7 @@ segment:
 
 ```ts
 const premium = `${process.env.LASSO_RPC_URL}/fastest/base`;
-const background = `${process.env.LASSO_RPC_URL}/profile/public/base`;
+const background = `https://lasso.sh/rpc/k/${process.env.LASSO_KEY}/profile/public/base`;
 ```
 
 ## What a premium request costs
@@ -77,9 +77,10 @@ and each subscription notification is priced as an `eth_subscription` entry.
 Money is always in USD: prices, balances, purchases and charges. Included
 usage, from free access or a subscription, is counted in CU per month.
 
-Lasso charges only for a response a provider delivered, whether a result or a
-JSON-RPC error. A failure inside Lasso with no provider response, and any
-request refused before routing, is free.
+Lasso charges only successful results. Every final JSON-RPC error is free,
+including execution reverts and provider rate-limit errors after failover.
+Requests refused before routing are free. Subscription notification pricing
+is unchanged.
 
 ### Current tariff
 
