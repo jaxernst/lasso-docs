@@ -157,11 +157,12 @@ Content-Type: application/json
 The first request answers 402. Sign one offered x402 or MPP challenge within
 your budget, then repeat the same request with that payment. `200` confirms
 the credit; `202` means settlement is pending, so poll `status_url` and never
-pay twice. The response that creates the account returns its credentials once
-under `key`, including `rpc_url`, `ws_url`, `key`, `management_token` and
-`account_id`. Save them privately even if that response reports payment failure.
-A replay returns the purchase without credentials. Top up the saved account
-with the account credit route rather than creating another funded key.
+pay twice. Paid responses include credentials under `key`: `rpc_url`, `ws_url`,
+`key`, `management_token` and `account_id`. Save them privately. If a response
+is lost, replay the same signed payment to recover the same credentials,
+while they still authenticate; revoked or rotated credentials are not returned.
+A payment that fails verification creates nothing. Use the account credit route
+for later top-ups.
 See [funded keys](/cloud/balance-and-fallback#buy-a-funded-key).
 
 ## With the dashboard
@@ -178,8 +179,6 @@ See [funded keys](/cloud/balance-and-fallback#buy-a-funded-key).
 
 - Creating accounts without credentials is limited to 10 per hour per client
   IP. Each provisional account gets its starting balance once.
-- A provisional account that never pays and sees no activity for 90 days
-  closes. Accounts that have paid, or that a person has joined, never expire.
 - Paying always needs a wallet signature; no Lasso credential can spend
   money.
 - `public` serves `load-balanced` only. A different strategy in a `public` URL

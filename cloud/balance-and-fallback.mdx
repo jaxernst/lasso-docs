@@ -50,10 +50,9 @@ WebSocket subscriptions keep streaming from the upstreams they're on. Top up,
 and the next request is served by premium providers again, with no reconnect
 and no redeploy.
 
-If metering is unavailable for an extended period, chains available on public
-providers move to them uncharged with `x-lasso-fallback: meter`, under your
-account's managed rate limits. Other chains keep serving as before. Charging
-resumes automatically; this needs no top-up.
+Accounting runs independently of routing. A delay or failure in recording
+usage keeps requests on their selected route and price; it does not move
+them to public providers.
 
 ## Top up
 
@@ -125,13 +124,14 @@ your user authorized, then repeat the same request. Payment creates the
 account and uses the same settlement flow as a top-up: `200` confirms credit,
 and `202` returns a `status_url` to poll.
 
-The response that creates the account includes credentials under `key`, once,
-even if payment then fails. Save `key.rpc_url`, `key.ws_url`, `key.key`,
-`key.management_token` and `key.account_id` privately on that first response.
-A replay of the same signed payment returns its purchase without credentials
-and credits at most once. For a pending payment, keep polling; if it fails,
-fund the saved account through `/api/v1/accounts/{id}/credit`. A signed funded-key
-offer is payable only at `/api/v1/credit`.
+Paid responses include `key.rpc_url`, `key.ws_url`, `key.key`,
+`key.management_token` and `key.account_id`. Save them privately. A lost
+response is recoverable: replay the same signed payment to retrieve the same
+credentials and credit at most once. Credentials that have since been revoked
+or rotated are not returned again. A payment that fails verification or does
+not match its challenge creates nothing. For a pending payment, keep polling
+its `status_url`; never sign a second payment while it is pending. A signed
+funded-key offer is payable only at `/api/v1/credit`.
 
 Use the account credit route for every later top-up. Repeating the funded-key
 flow with a new payment creates a different account. Paid account creation

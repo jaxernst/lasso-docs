@@ -51,7 +51,8 @@ or chain extensions.
 
 Some providers return a valid JSON-RPC error with an HTTP 4xx or 5xx status.
 Lasso preserves a request-correlated upstream `code`, `message`, and `data`
-object. HTML, gateway text, and other transport failures remain routing
+object. Transaction errors also carry
+[submission guidance](/cloud/reference/signals-and-errors#transaction-submission-errors). HTML, gateway text, and other transport failures remain routing
 evidence and may trigger safe failover.
 
 ### Ethereum parameter conventions
@@ -74,8 +75,10 @@ on the routing path.
 Lasso does not treat every method as interchangeable:
 
 - Reads that are safe to repeat fail over within one deadline.
-- `eth_sendRawTransaction` receives one upstream dispatch because a lost
-  response may still mean the transaction was applied.
+- `eth_sendRawTransaction` can resend identical signed bytes sequentially to
+  up to three providers within one deadline; sender faults stop failover.
+  [Transaction behavior](/cloud/rpc-behavior#transactions) defines the hash lookup
+  and unresolved-outcome contract.
 - Unknown and vendor methods pass through, with one dispatch each.
 - HTTP filter methods are rejected, because a filter ID belongs to one
   provider; use `eth_getLogs` or subscriptions.

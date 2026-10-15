@@ -36,6 +36,11 @@ x-lasso-balance-usd: 19.87421
 }
 ```
 
+Keyed RPC execution responses include `x-lasso-cu`, `x-lasso-usd` and
+`x-lasso-balance-usd`, including final errors. They describe the selected
+outcome and local post-charge estimate; they do not wait for the once-per-minute
+settlement on each node.
+
 ## Where evidence lives
 
 | Surface | What it tells you | How to get it |
@@ -52,6 +57,15 @@ Every header, metadata field and error code is listed in
 routing engine's metadata fields are defined once, in
 [request metadata](/observability/request-metadata).
 
+## Read quota and funding state
+
+The Public profile shows a sponsored account's **Free quota** bar even while
+credit or Pro covers the account; the free allowance waits unused during that
+time. Premium shows its Pro quota or balance. If Premium is being served on
+Public, its notice names the cause and any grace expiry or quota reset. Follow
+that date rather than treating every unfunded state as a new grace window.
+See [balance and payment fallback](/cloud/balance-and-fallback).
+
 ## Debug a request
 
 1. Capture `x-lasso-request-id` at your client.
@@ -60,8 +74,9 @@ routing engine's metadata fields are defined once, in
 3. Read `lasso_meta`: which strategy applied, which providers were candidates,
    which one served it, and how many retries it took.
 4. For an error Lasso originates, read `error.data.code` and
-   `error.data.next_action`; they name the fix. A provider's error arrives as
-   the provider sent it.
+   `error.data.next_action`; they name the fix. Ordinary provider errors retain
+   their payload; transaction errors add
+   [submission guidance](/cloud/reference/signals-and-errors#transaction-submission-errors).
 5. Check the key's `recent_errors` and the dashboard's provider health for a
    pattern across requests.
 

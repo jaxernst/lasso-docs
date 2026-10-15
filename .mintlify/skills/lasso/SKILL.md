@@ -61,11 +61,8 @@ installing a new endpoint or scoped key:
   and uses the account's access, included usage and balance.
 - **`native_serving: false`:** keep the app on its working endpoint. Follow the
   refusal’s `next_action` and `Retry-After` before retrying RPC with the saved key.
-- **`native_collection: true`:** native HTTP and WebSocket serving captures
-  observations. Key `usage` and `recent_errors` include durable committed rows;
-  asynchronous persistence means empty diagnostics do not prove no traffic.
-  When false, new native serving is unavailable; pending work and previously
-  committed diagnostics are retained.
+- **`native_collection`** always equals `native_serving`: every request served
+  natively counts toward the key's diagnostics and the account's charges.
 - `features.claim_completion` and `features.connection_approval` confirm the
   browser steps behind claim links and connections. Use their own response to continue
   the operation. For `unavailable`, honor `Retry-After` and retry the same operation.
@@ -123,26 +120,27 @@ The chain is a name or decimal ID from `chains` in `/agent.json`.
 - `include_meta=body` adds `lasso_meta`: strategy used, candidates,
   `selected_provider`, retries, and upstream and overhead latency.
   `include_meta=headers` leaves the body unchanged and adds `x-lasso-meta`.
-- Every response carries `x-lasso-request-id` (quote it when reporting a
-  problem), `x-lasso-access` (`premium`, `public` or `custom`), `x-lasso-cu`,
-  `x-lasso-usd` (this request's charge) and `x-lasso-balance-usd`.
+- Every response carries `x-lasso-request-id`; quote it when reporting a
+  problem. Served requests add `x-lasso-access` (`premium`, `public` or
+  `custom`), `x-lasso-cu`, `x-lasso-usd` (this request's charge),
+  `x-lasso-balance-usd` and standard `RateLimit` headers.
 - `x-lasso-fallback` appears when a request was served somewhere other than
-  the profile it named: `payment`, `free`, `availability`, `profile` or `meter`.
+  the profile it named: `payment`, `free`, `availability` or `profile`.
 - `eth_chainId` can be answered without an upstream; use `eth_blockNumber` to
   show routing.
 
 WebSocket requests with `lasso_meta: "notify"`
 receive the existing metadata frame with `cu`, `usd`, `balance_usd`, `access`
 and any `fallback`. CU/USD reflect the selected outcome; balance is the local
-post-charge estimate, while the account view is authoritative. Delivery does
-not wait for ledger/WAL commit. Generation-0 metadata keeps its existing shape.
+post-charge estimate. Delivery never waits for settlement.
 
 Report the result, serving provider, latency and request ID. For diagnostics,
 `GET /api/v1/keys/<id>` with your management token, or `GET /api/v1/keys/current`
-with the RPC key. `usage` covers committed observations from the rolling last
-24 hours, with linked charges in `charged_usd`; `recent_errors` returns up to 20
+with the RPC key. `usage` counts the key's requests over the rolling last 24
+hours and sums their charges in `charged_usd`; `recent_errors` returns up to 20
 groups with `code`, `category`, `provider`, `count`, `last_at` and
-`next_action`.
+`next_action`. A request shows up as soon as its response is sent. Use them to
+find what failed and where; the account's balance is the record of money.
 
 ## Choose a profile and a strategy
 
@@ -226,6 +224,13 @@ Content-Type: application/json
    Never sign a second payment while one is pending; resubmitting the same
    signed payment returns its result and never credits twice.
 
+To start with a funded key instead of a free one, send the same exchange to
+`POST https://lasso.sh/api/v1/credit` before creating any key. It needs no
+`id`: the paid response creates the account and returns its credentials under
+`key` (`rpc_url`, `ws_url`, `key`, `management_token`, `account_id`). If the
+response is lost, resubmit the same signed payment: it credits once and shows
+the same credentials again.
+
 When the money runs out on an account that has paid, requests keep serving on
 public providers for 30 days (`x-lasso-fallback: payment`, `x-lasso-usd: 0`),
 and `GET /api/v1/accounts/current` shows `fallback.until`. A top-up returning
@@ -237,18 +242,16 @@ To catch this in an app, watch for `x-lasso-fallback: payment` on responses
 and top up before `fallback.until`. After that date, requests answer 402
 `balance_exhausted` and open WebSocket connections close.
 
-If usage metering is unavailable for an extended period, requests on chains
-that public serves move to public providers with `x-lasso-fallback: meter` and
-`x-lasso-usd: 0`, under your account's managed rate limits; other chains keep
-serving as before. It is not payment fallback: no top-up is needed, and normal
-charging resumes on its own.
+Accounting never interrupts serving: requests keep their route and price
+whether or not charges are being recorded.
 
 Lasso charges only successful results. Every final JSON-RPC error is free,
 including execution reverts and provider rate-limit errors after failover.
-Subscription notification pricing is unchanged. Charges settle asynchronously
-and normally book within seconds, so
-`x-lasso-balance-usd` can briefly differ between responses and a balance can
-dip a few cents below zero; the next purchase repays it first.
+Subscription notification pricing is unchanged. Charges settle to the account
+in the background, normally within a minute. `x-lasso-balance-usd` is an
+estimate after this charge, so consecutive responses can differ and a balance
+can dip a few cents below zero; the next purchase repays it first.
+`GET /api/v1/accounts/current` returns the settled balance.
 
 ## Hand the account to its owner
 
@@ -377,10 +380,19 @@ at request prices, until renewed.
 ## What stays with the app
 
 Replay-safe reads fail over within one deadline and a bounded number of
-upstream dispatches. A signed transaction is sent to one provider and is not
-retried after dispatch. A timeout or lost response leaves its outcome unknown:
-look up the transaction hash before resending or replacing it. The app owns
-signing, nonces, replacement, receipts and finality. HTTP filter IDs are
+upstream dispatches.
+
+A signed transaction is resent as the same bytes to the next provider, up to
+three in total within one deadline, when a provider rate-limits it, times out
+or rejects it for a node-local reason. A sender fault such as insufficient
+funds or nonce too low stops submission failover. A strict provider pin also
+disables submission failover. For a final routing error with a derivable hash,
+Lasso attempts one transaction lookup when an available route, the connected
+caller and the remaining deadline permit it. A matching pending or mined
+object returns that hash. A skipped or failed lookup can leave the outcome
+unknown. Resending the same signed bytes is safe.
+
+The app owns signing, nonces, replacement, receipts and finality. HTTP filter IDs are
 provider-local, so use `eth_getLogs` or subscriptions. Historical depth and
 `eth_getLogs` range caps vary by provider, so keep range splitting in
 indexers.

@@ -58,9 +58,9 @@ your app changes:
 ## What stays with your app
 
 - **Transactions.** Signing, nonces, replacement, receipts and finality stay
-  with your app. Lasso sends a signed transaction to one provider and doesn't
-  retry it after dispatch. If the response is lost, look up the transaction
-  hash before resending.
+  with your app. Lasso can resend identical signed bytes to up to three
+  providers within one deadline, unless a sender fault stops failover. An
+  unresolved outcome still needs [hash reconciliation](/cloud/rpc-behavior#transactions).
 - **HTTP filters.** Filter IDs belong to one provider, so use `eth_getLogs` or
   subscriptions instead.
 - **Provider limits.** Historical depth and `eth_getLogs` range limits follow
