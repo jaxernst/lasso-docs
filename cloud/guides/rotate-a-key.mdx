@@ -31,7 +31,11 @@ Content-Type: application/json
 }
 ```
 
-Store the new values in the secret store.
+Store the new values in the secret store. `200` with `serving_ready: true`
+means the replacement is ready. `202` with `serving_ready: false` returns the
+committed replacement: keep it and any still-valid grace secret, wait
+`Retry-After`, then call RPC with the replacement. If RPC answers
+`service_initializing`, honor `Retry-After` and retry RPC. Do not rotate again.
 
 ## 2. Deploy the new secret
 
@@ -71,7 +75,7 @@ Content-Type: application/json
 
 ## Limits
 
-- `grace_seconds` is at most 86,400 (24 hours).
+- `grace_seconds` defaults to 3,600 (one hour) and is at most 86,400 (24 hours).
 - Rotating a key doesn't rotate your management token. An agent rotates its
   own token with `POST /api/v1/agents/current/rotate`, and the old token stops
   at once.

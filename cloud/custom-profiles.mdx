@@ -46,6 +46,7 @@ other field is optional:
 | List order | provider | You use the `priority` strategy; first is preferred |
 | `block_protection` | chain | The app polls the latest block and shouldn't see it go backwards |
 | `max_lag_blocks` | chain | The app tolerates less (or more) staleness than the chain default |
+| `heads`: `live`, `standby`, `passive`, `off` | provider | Choose which provider tracks every block; see [head observation](#head-observation) |
 | `health_checks`: `standard` or `light` | chain | Lasso's checks should spend less of your provider quota |
 | `error_interpretation` | profile | You opt in to Lasso interpreting your providers' error messages |
 | `limits`: `archival`, `logs_span`, `methods_blocked` | provider | You know a limit Lasso hasn't learned, such as your plan's log-span cap |
@@ -75,9 +76,20 @@ changed provider before storing anything:
 | `verifying` | Didn't answer; saved but kept out of routing, and rechecked every five minutes |
 | `failed` | Definitely wrong, such as another chain. The whole `PUT` is rejected with `provider_check_failed`, naming the provider |
 
-The profile is `live` while each chain has at least one `verified` provider;
-a chain with none answers its requests with the JSON-RPC error until one
-verifies.
+A saved profile can report `activating` with `retry_after_seconds`. Wait that
+interval, then read `GET /api/v1/profiles/{slug}` until it reports `live` before
+moving traffic. A profile still checking providers reports `verifying`; a chain
+with no verified provider returns a JSON-RPC error until one verifies.
+
+## Head observation
+
+Lasso learns heads from traffic and a light poll. Set `heads: live` on a
+provider to track every block. `standby` opens a head feed only when the chain
+has no healthy live feed; `passive` (the default) uses traffic and light polling;
+`off` disables background head polling and feeds for that reference.
+`background_observations: false` remains the veto on all background work.
+Head modes do not change client subscription capability or identity checks.
+Omitting `heads` in a whole-document replacement resets it to passive.
 
 ## Lasso learns your providers
 
@@ -123,8 +135,8 @@ instead; it works without protection.
 | Call | Result |
 |---|---|
 | `GET /api/v1/profiles`, `GET /api/v1/profiles/{slug}` | Document, revision, provider status and knowledge; URLs and header values are never returned |
-| `GET /api/v1/profiles/{slug}` with `Accept: application/yaml` | The profile as a Lasso RPC Core YAML file, with secrets replaced by environment references, ready to self-host |
-| `DELETE /api/v1/profiles/{slug}` | Removes the profile; keys that defaulted to it default to `premium`, and URLs naming it serve as `premium` with `x-lasso-fallback: profile` |
+| `GET /api/v1/profiles/{slug}` with `Accept: application/yaml` | A compatible Lasso RPC Core YAML file with secrets replaced by environment references. A provider with `heads: standby` returns 422 `invalid_config` with its field path because Core cannot represent elected fallback; the stored profile stays unchanged |
+| `DELETE /api/v1/profiles/{slug}` | Removes the profile; URLs naming it serve as `premium` with `x-lasso-fallback: profile` |
 
 ## Limits
 
@@ -143,7 +155,7 @@ instead; it works without protection.
 
 - [Trial your own providers](/cloud/bring-your-own-rpc): build and test a
   profile before anyone signs up.
-- [Keys, URLs and profiles](/cloud/keys-and-profiles): make the profile a key's
-  default.
+- [Keys, URLs and profiles](/cloud/keys-and-profiles): select the profile in
+  the URL and scope keys to it.
 - [Profiles in RPC Core](/concepts/profiles): the engine's profile model, for
   self-hosting.

@@ -19,13 +19,14 @@ when multiple profiles refer to it. The worker stores height, observation time,
 and source in the block-sync registry. Profiles sharing that instance also share
 its observations.
 
-HTTP `eth_blockNumber` polling runs while the worker is active. The effective
-interval comes from the shortest configured `monitoring.probe_interval_ms`
-among referencing profiles. When a WebSocket `newHeads` subscription is active,
-HTTP polling continues at three times that interval. The normal interval
-returns if the subscription becomes unavailable. WebSocket updates can arrive
-sooner than the next poll, but neither transport guarantees a fixed observation
-delay.
+HTTP `eth_blockNumber` polling follows the shortest positive head interval
+requested by enabled references. `monitoring.http_heads_interval_ms` and
+`http_backup_interval_ms` separate normal polling from polling while WebSocket
+evidence is fresh; legacy `probe_interval_ms` supplies their fallback defaults.
+`background_observations: false` disables that reference's periodic work, and
+`0` disables an individual interval. Other references to a shared upstream can
+still request observations. Client requests can supply evidence independently.
+See [monitoring settings](/configuration/profiles#monitoring).
 
 The chain-level `websocket.subscribe_new_heads` setting defaults to `true`.
 Providers inherit it unless they set their own `subscribe_new_heads` value.
@@ -57,8 +58,9 @@ verified block.
 The probe coordinator checks upstream HTTP identity and health separately from
 block-height polling. Its 200 ms tick schedules work; it does not probe every
 provider five times per second. The effective provider cadence follows the
-shortest configured probe interval among profiles sharing that instance, with
-failure backoff and jitter. A matching `eth_chainId` probe can restore an HTTP
+shortest positive identity interval requested by enabled references, with
+failure backoff and jitter. `chain_identity_interval_ms` can disable identity
+probing without disabling head observations. A matching `eth_chainId` probe can restore an HTTP
 endpoint previously rejected for an identity mismatch. See [Provider selection](/concepts/provider-selection)
 for the remaining admission checks.
 

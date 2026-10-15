@@ -29,8 +29,12 @@ curl -sS "$LASSO_RPC_URL/fastest/base?include_meta=body" \
 4. **Send, and fail over.** A read that fails in a way that's safe to retry
    moves to the next provider, within one request deadline.
 
-[Provider selection](/concepts/provider-selection) and
-[circuit breakers](/concepts/circuit-breakers) describe each step in detail.
+Within a health group, providers whose fresh head evidence falls short of the
+request wait behind the others. Unknown head evidence remains eligible, and
+this preference never excludes the last route. Cloud's measured strategy and
+head controls can differ from the released
+[Core provider selection](/concepts/provider-selection).
+[Circuit breakers](/concepts/circuit-breakers) explain transport health.
 
 ## Choose a strategy
 

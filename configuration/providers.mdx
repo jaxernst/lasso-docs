@@ -30,6 +30,8 @@ providers:
 | `ws_url` | string | No | WebSocket RPC endpoint URL. Required for subscriptions |
 | `archival` | boolean | No | Whether this provider serves historical data (default: true) |
 | `subscribe_new_heads` | boolean | No | Override chain-level `subscribe_new_heads` for this provider |
+| `background_observations` | boolean | No | Disable this reference's periodic observations without disabling client routing |
+| `observation_overrides` | map | No | Sparse overrides for background observations, automatic head feeds, HTTP head and backup intervals, and chain identity intervals |
 | `capabilities` | map | No | Provider capabilities (see Capabilities below) |
 | `sharing_mode` | string | No | `auto` shares identical upstream runtime; `isolated` separates it by profile |
 | `api_key` | string | No | Sends `Authorization: Bearer <value>` |

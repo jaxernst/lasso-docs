@@ -50,6 +50,11 @@ WebSocket subscriptions keep streaming from the upstreams they're on. Top up,
 and the next request is served by premium providers again, with no reconnect
 and no redeploy.
 
+If metering is unavailable for an extended period, chains available on public
+providers move to them uncharged with `x-lasso-fallback: meter`, under your
+account's managed rate limits. Other chains keep serving as before. Charging
+resumes automatically; this needs no top-up.
+
 ## Top up
 
 Credit the account by its `id` from the account view above. Lasso answers 402;
