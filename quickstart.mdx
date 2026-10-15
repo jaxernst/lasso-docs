@@ -1,57 +1,74 @@
 ---
 title: Quickstart
-description: Start the released RPC Core container and verify HTTP and WebSocket routing.
+description: Start the RPC Core container, send an HTTP request and a WebSocket subscription through it, and pick a routing strategy.
 ---
 
-## Start Lasso RPC Core
+# Quickstart
 
-Follow [Installation](/installation) to start the v0.5.1 container or run from source. The included `public` profile is ready to try without provider keys.
+Run Lasso RPC Core locally and route your first requests. The bundled `public`
+profile uses free public providers, so you need no provider keys. You need
+Docker Compose and OpenSSL.
 
-## Make your first requests
-
-
-Request the latest Ethereum block number:
+## 1. Start the container
 
 ```bash
-curl --fail-with-body --silent --show-error http://localhost:4000/rpc/ethereum \
+mkdir lasso && cd lasso
+curl --fail --location https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.1/compose.yml --output compose.yml
+(umask 077; printf 'SECRET_KEY_BASE=%s\nRELEASE_COOKIE=%s\n' "$(openssl rand -hex 64)" "$(openssl rand -hex 32)" > .env)
+docker compose up -d --wait
+```
+
+The dashboard is at [http://localhost:4000/dashboard](http://localhost:4000/dashboard).
+[Installation](/installation) covers the container's storage, ports and
+source builds.
+
+## 2. Send a request
+
+```bash
+curl --fail-with-body -sS http://localhost:4000/rpc/ethereum \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
 ```
-
-A successful response contains a hexadecimal block number; the value changes:
 
 ```json
 {"jsonrpc":"2.0","id":1,"result":"0x18ba3fb"}
 ```
 
-The health endpoint checks the application. This RPC request also exercises an
-upstream provider. Public providers have their own availability and rate limits.
+Add `?include_meta=headers` to the URL and `-i` to curl to see which provider
+served it. [Request metadata](/observability/request-metadata) defines each
+field.
 
-For WebSocket subscriptions, use the dashboard tester or run
-[`wscat`](https://github.com/websockets/wscat) with Node.js and npm:
+## 3. Subscribe over WebSocket
 
 ```bash
 npx --yes wscat -c ws://localhost:4000/ws/rpc/ethereum
 ```
 
-At its `>` prompt, send:
+At the `>` prompt, send:
 
 ```json
 {"jsonrpc":"2.0","method":"eth_subscribe","params":["newHeads"],"id":1}
 ```
 
-Expect a subscription ID followed by `eth_subscription` notifications as blocks
-arrive. Press Ctrl+C to disconnect.
+You get a subscription ID, then an `eth_subscription` notification per block.
+The dashboard has a WebSocket tester too.
 
-To inspect routing decisions, add `?include_meta=headers` to an HTTP request URL
-and `-i` to curl. See the [API reference](/observability/request-metadata)
-for metadata fields and error responses.
+## 4. Choose a route
 
+| Route | Use it for |
+|---|---|
+| `/rpc/fastest/ethereum` | Latency-critical reads |
+| `/rpc/latency-weighted/ethereum` | Spreading load while favoring fast providers |
+| `/rpc/load-balanced/ethereum` | Backends and indexers |
+| `/rpc/profile/my-app/ethereum` | A profile you configured, named `my-app` |
 
-## Choose a route
+WebSocket routes take the same segments under `/ws/rpc/`.
 
-Use `/rpc/fastest/ethereum`, `/rpc/load-balanced/ethereum`, or `/rpc/latency-weighted/ethereum` for explicit strategies. Use `/rpc/profile/my-app/ethereum` for a configured profile named `my-app`. WebSocket routes use the `/ws/rpc/` prefix.
+## Next
 
-Provider health, method support, and configured limits constrain selection. Routing cannot create upstream capacity or guarantee a provider supports every parameter combination.
-
-See [Configuration](/configuration/overview), [HTTP endpoints](/api/http-endpoints), and [Docker deployment](/deployment/docker).
+- [Route across your own providers](/guides/route-across-providers): put your
+  Ethereum, Base and Arbitrum providers behind Core.
+- [Routing strategies](/concepts/routing-strategies): how each strategy orders
+  providers.
+- [Production checklist](/deployment/production-checklist): protect the
+  endpoint before you expose it.
