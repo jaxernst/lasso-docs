@@ -5,9 +5,9 @@ description: Point viem, ethers, Foundry, Hardhat or an indexer at Lasso by chan
 
 # Install Lasso in your app
 
-Lasso is standard EVM JSON-RPC, so installing it means changing one URL. Keep
-your client library, your contract calls and your secret store. This page shows
-the URL in each common client and how to move traffic safely.
+Lasso is standard EVM JSON-RPC, so installing it means changing one URL. Your
+client library, contract calls and secret store stay as they are. This page
+shows the URL in each common client and how to move traffic over safely.
 
 ```bash
 # .env
@@ -101,16 +101,13 @@ Indexers take the same URL wherever they take an RPC endpoint. Use
 
 - Lasso rejects HTTP filter methods (`eth_newFilter` and friends). Use
   `eth_getLogs` or WebSocket subscriptions.
-- Signed transactions can fail over sequentially with identical bytes, up to
-  three providers within one deadline. Sender faults stop sending; unresolved
-  outcomes need hash reconciliation. See [transactions](/cloud/rpc-behavior#transactions).
-- JSON-RPC batches are routed per item; a batch is not pinned to one provider
-  or one block.
+- JSON-RPC batches are routed per item, so one batch can span providers and
+  blocks. For reads at one block, use [read at one block](/advanced/read-at-one-block).
 
 ## Next
 
-- [Keys, URLs and profiles](/cloud/keys-and-profiles): defaults, scoping and
-  rotation.
+- [Keys, URLs and profiles](/cloud/keys-and-profiles): the URL grammar and
+  scoped keys.
 - [Routing](/cloud/routing): what each strategy does.
 - [Multi-provider failover](/cloud/multi-provider-rpc-failover): test the
   failure you need to survive.

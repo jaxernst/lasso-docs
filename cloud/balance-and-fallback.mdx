@@ -6,11 +6,9 @@ description: One USD balance per account, how to top it up, and why your app kee
 # Balance and payment fallback
 
 Each account has one USD balance that every key draws on. Anyone can top it up
-with USDC through a standard 402 exchange, with no Lasso credential. If your
-account has paid before and the money runs out, your app keeps serving on
-public providers for 30 days while you top up.
-
-Any of the account's RPC keys reads it:
+with USDC through a standard 402 exchange, with no Lasso credential. If an
+account that has paid runs out, its app keeps serving on public providers for
+30 days while you top up. Any of the account's RPC keys reads it:
 
 ```bash
 curl -sS https://lasso.sh/api/v1/accounts/current \
@@ -26,12 +24,12 @@ For a request on `premium`, Lasso takes the first source that applies:
 |---|---|---|
 | Included usage from a subscription remains this month | Premium providers | From included usage |
 | The balance covers the request | Premium providers | From the balance |
-| The money ran out less than 30 days ago (the window restarts whenever the account pays), and the account has paid before | Public providers, `x-lasso-fallback: payment` | No |
+| The account has paid before, and its money ran out less than 30 days ago | Public providers, `x-lasso-fallback: payment` | No |
 | A person sponsors the account, and its free allowance remains this month | Public providers, `x-lasso-fallback: free` | No; counts against the allowance |
 | None of the above | Not served: 402 `balance_exhausted`, naming the credit URL | No |
 
-A provisional account that has never paid has only its starting grant: once
-it's spent, requests return `balance_exhausted` until someone tops it up.
+An account that has never paid has only its starting balance: once it's spent,
+requests return `balance_exhausted` until someone tops it up.
 
 ## Your app keeps serving when the balance runs out
 
@@ -46,13 +44,12 @@ x-lasso-usd: 0
 ```
 
 The account view shows when the grace window ends in `fallback.until`. Open
-WebSocket subscriptions keep streaming from the upstreams they're on. Top up,
-and the next request is served by premium providers again, with no reconnect
-and no redeploy.
+WebSocket subscriptions keep streaming. Top up, and the next request is served
+by premium providers again, with no reconnect and no redeploy. Watch for
+`x-lasso-fallback: payment` to catch this in your app.
 
-Accounting runs independently of routing. A delay or failure in recording
-usage keeps requests on their selected route and price; it does not move
-them to public providers.
+Accounting never interrupts serving: if recording usage is delayed, requests
+keep their route and price.
 
 ## Top up
 
@@ -71,11 +68,9 @@ Content-Type: application/json
    wallet.
 2. Repeat the same request with `PAYMENT-SIGNATURE` (x402) or
    `Authorization: Payment` (MPP).
-3. `200` returns `credited_usd`, `balance_usd` and a receipt. `202` means
-   settlement is pending: poll its `status_url`, and never sign a second
-   payment for the same top-up.
-4. The `200` confirms the credit. `x-lasso-access: premium` on your next RPC
-   response confirms premium serving resumed.
+3. `200` confirms the credit with `credited_usd`, `balance_usd` and a
+   receipt. `202` means settlement is pending: poll its `status_url`, and
+   never sign a second payment for the same top-up.
 
 With [`@x402/fetch`](https://www.npmjs.com/package/@x402/fetch), the whole
 exchange is one call. Run it as an ES module with `@x402/fetch`, `@x402/evm`
@@ -100,11 +95,10 @@ console.log(response.status, await response.json());
 ```
 
 [`mppx`](https://www.npmjs.com/package/mppx) does the same over MPP on
-Tempo. Resubmitting the same signed payment returns that payment's result and
-never credits twice. Rails, networks, assets and the per-purchase range
-(`minimum_usd` to `maximum_usd`) are in `account_payments.rails` in
-[`agent.json`](https://lasso.sh/agent.json). People
-can also subscribe in the dashboard.
+Tempo. Resubmitting the same signed payment returns its result and never
+credits twice. Rails, networks, assets and the per-purchase range are in
+`account_payments.rails` in [`agent.json`](https://lasso.sh/agent.json).
+People can also add balance or subscribe in the dashboard.
 
 ## Buy a funded key
 
@@ -118,30 +112,26 @@ Content-Type: application/json
 {"usd":"5"}
 ```
 
-With no body, it quotes the smallest amount accepted by every enabled rail.
-The initial 402 creates no account. Sign one offered challenge with the wallet
-your user authorized, then repeat the same request. Payment creates the
-account and uses the same settlement flow as a top-up: `200` confirms credit,
-and `202` returns a `status_url` to poll.
+With no body, it quotes the smallest amount every enabled rail accepts. The
+402 creates nothing. Sign one offered challenge with the wallet your user
+authorized, then repeat the same request. Settlement works like a top-up:
+`200` confirms the credit, and `202` returns a `status_url` to poll.
 
-Paid responses include `key.rpc_url`, `key.ws_url`, `key.key`,
-`key.management_token` and `key.account_id`. Save them privately. A lost
-response is recoverable: replay the same signed payment to retrieve the same
-credentials and credit at most once. Credentials that have since been revoked
-or rotated are not returned again. A payment that fails verification or does
-not match its challenge creates nothing. For a pending payment, keep polling
-its `status_url`; never sign a second payment while it is pending. A signed
-funded-key offer is payable only at `/api/v1/credit`.
+The paid response returns `key.rpc_url`, `key.ws_url`, `key.key`,
+`key.management_token` and `key.account_id`; save them privately. If the
+response is lost, replay the same signed payment: it returns the same
+credentials and credits once. Credentials revoked or rotated since aren't
+returned again.
 
-Use the account credit route for every later top-up. Repeating the funded-key
-flow with a new payment creates a different account. Paid account creation
-shares the 10-per-hour, per-IP creation limit with `POST /api/v1/keys`.
+Use the account credit route for every later top-up; a new funded-key payment
+creates a different account. Funded-key purchases share the 10-per-hour,
+per-IP creation limit with `POST /api/v1/keys`.
 
 ## Watching spend
 
 | Signal | What it tells you |
 |---|---|
-| `x-lasso-usd` | This request's charge; `0` when included usage, free access, Custom access or payment fallback covered it |
+| `x-lasso-usd` | This request's charge to the balance; `0` when included usage, free access, Custom access or payment fallback covered it |
 | `x-lasso-balance-usd` | An estimate of the balance after this charge |
 | `x-lasso-access` | `premium`, `public` or `custom` |
 | `x-lasso-fallback` | Why a request was served somewhere other than the profile it named |
@@ -153,13 +143,12 @@ shares the 10-per-hour, per-IP creation limit with `POST /api/v1/keys`.
   restarts every time the account pays.
 - Payment fallback serves public providers at the public rate limit
   (30 RPS, bursts to 60) with `load-balanced` only.
-- Charges and included usage settle asynchronously, normally once a minute.
-  Local estimates can briefly differ across regions.
-- `x-lasso-balance-usd` is an estimate at the region that served you;
-  `GET /api/v1/accounts/{id}` is authoritative. Concurrent traffic can take a
-  balance slightly below zero; the next top-up repays it first.
-- When the grace window ends without a top-up, open WebSocket connections
-  close with `balance_exhausted` and the credit URL.
+- Charges settle to the account within about a minute, so
+  `x-lasso-balance-usd` is an estimate and a busy account can dip a few cents
+  below zero; the next top-up repays it first. `GET /api/v1/accounts/{id}` is
+  authoritative.
+- When the grace window ends without a top-up, requests answer 402
+  `balance_exhausted` and open WebSocket connections close.
 - No Lasso credential can pay. Every purchase needs a wallet signature.
 
 ## Next

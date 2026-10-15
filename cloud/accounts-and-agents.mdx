@@ -37,7 +37,7 @@ who approved it, so it keeps working when that person leaves.
 | Dashboard session | A person | Everything an admin can do, including members, agents, subscriptions and viewing any active key's URLs |
 | Wallet signature | Whoever pays | One payment; no Lasso credential is needed to pay |
 
-An RPC key never grants control of its account, so holding one can't be used
+An RPC key never grants control of its account, so a leaked key can't be used
 to take the account over.
 
 ## How an account starts
@@ -110,8 +110,8 @@ and any admin can revoke any agent.
   within them.
 - Only an unrestricted agent can request a claim link. A link whose agent was
   revoked or restricted before confirmation claims nothing.
-- If an agent loses its token, the account's keys keep serving. The agent can
-  start a new account, and Lasso support can recover the old one.
+- If an agent loses its token, the account's keys keep serving, and Lasso
+  support can recover the account.
 
 ## Next
 

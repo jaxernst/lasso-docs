@@ -19,22 +19,17 @@ curl -sS "$LASSO_RPC_URL/fastest/base?include_meta=body" \
 ## How a provider is chosen
 
 1. **Find candidates.** Providers in the profile that serve the chain and
-   transport. Known method gaps, history limits and range limits steer the
-   request away from providers that can't serve it; a provider is still tried
-   when its support is unknown or every provider is impaired.
-2. **Order by health.** Providers with an open circuit are skipped. Healthy
-   providers come before rate-limited or recovering ones.
+   transport. Known method gaps, history limits and range limits move a
+   provider that can't serve the request to the back; Lasso never drops the
+   last route.
+2. **Order by health.** Providers with an open
+   [circuit](/concepts/circuit-breakers) are skipped. Healthy providers come
+   before rate-limited or recovering ones, and providers behind the requested
+   block wait behind those at the head.
 3. **Order by strategy.** Within each health group, your strategy sets the
    order.
 4. **Send, and fail over.** A read that fails in a way that's safe to retry
    moves to the next provider, within one request deadline.
-
-Within a health group, providers whose fresh head evidence falls short of the
-request wait behind the others. Unknown head evidence remains eligible, and
-this preference never excludes the last route. Cloud's measured strategy and
-head controls can differ from the released
-[Core provider selection](/concepts/provider-selection).
-[Circuit breakers](/concepts/circuit-breakers) explain transport health.
 
 ## Choose a strategy
 
@@ -48,23 +43,19 @@ head controls can differ from the released
 A URL without a strategy uses `balanced-fast` on Premium and `load-balanced` on
 other profiles. `latency-weighted` is an alias of `balanced-fast`.
 
-Latency is measured on the machine serving you, per provider, transport and
-kind of request (a family of related methods). The
-[routing strategies](/concepts/routing-strategies) concept page defines each
-strategy precisely.
-
-On `public`, and on any request served by payment fallback or free access,
-every strategy is served as `load-balanced`. Premium and Custom serve all four.
-Strategies price differently on premium; see
-[serving access and pricing](/cloud/serving-access-and-pricing).
+Latency is measured in the region serving you, per provider, transport and
+kind of request (a family of related methods). Premium and Custom serve all
+four strategies. `public`, payment fallback and free access serve
+`load-balanced`, and `lasso_meta.strategy` reports what was used. On premium,
+strategies [price differently](/cloud/serving-access-and-pricing).
 
 ## Failover on Lasso Cloud
 
 | Situation | What happens |
 |---|---|
 | A provider times out or errors on a read | The next provider in the order is tried, within the request deadline |
-| Every provider in the profile fails | The final JSON-RPC error returns inside an HTTP 200. A profile never borrows providers from another pool |
-| A signed transaction times out or gets a node-local rejection | Identical bytes may go to the next provider, up to three submissions within one deadline; sender faults stop failover. See [transactions](/cloud/rpc-behavior#transactions) |
+| Every provider in the profile fails | The final JSON-RPC error returns inside an HTTP 200; check the body's `error`, not only the status. A profile never borrows providers from another pool |
+| A signed transaction times out or gets a node-local rejection | The same bytes go to the next provider, up to three in total; sender faults stop there. See [transactions](/cloud/rpc-behavior#transactions) |
 | A provider answers 429 | It moves behind healthy providers and returns to normal order when its cooldown ends |
 | A provider keeps failing | Its circuit opens. After a cooldown, a trial request decides whether it returns |
 
@@ -73,19 +64,15 @@ no failover.
 
 ## When Lasso's own systems fail
 
-Each node routes from its last-known keys, profiles and provider state. A
-database, billing or metering outage doesn't refuse requests or fail health
-checks; changes made elsewhere during the outage take effect once the node can
-read them again.
+Each node routes from its last-known keys, profiles and provider state, so a
+database, billing or metering outage doesn't refuse requests. Changes made
+during the outage take effect once the node can read them.
 
 ## Limits
 
-- Routing exhaustion arrives as a JSON-RPC error inside an HTTP 200 response.
-  Check the body's `error`, not only the status.
-- `load-balanced` doesn't promise an even split. If only one provider is
-  healthy, it gets nearly every first attempt.
+- `load-balanced` spreads load across healthy providers, not evenly: if only
+  one is healthy, it takes nearly every first attempt.
 - `fastest` can concentrate traffic on one provider for one kind of request.
-- Each region chooses providers from its own measurements.
 - Failover helps only when providers overlap on the method, history and chain
   you need. Two URLs on the same provider account can fail together.
 

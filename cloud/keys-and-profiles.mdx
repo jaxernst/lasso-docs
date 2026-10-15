@@ -6,10 +6,9 @@ description: One key in .env reaches every profile of its account; the URL picks
 # Keys, URLs and profiles
 
 One RPC key, saved once in `.env`, reaches every profile its account has:
-Lasso's `premium` and `public` pools and each of your Custom profiles. The URL
-picks the profile, the strategy and the chain. Use this page to build URLs,
-move an app between pools without a redeploy, scope keys you have to expose,
-and rotate secrets with no downtime.
+Lasso's `premium` and `public` pools and each of your Custom profiles. The URL,
+not a key setting, picks the profile, the strategy and the chain. Use this page
+to build URLs and scope keys you have to expose.
 
 ```bash
 # .env: the key, which reaches every pool
@@ -19,7 +18,7 @@ LASSO_KEY=lasso_…
 ```ts
 const base   = `https://lasso.sh/rpc/k/${process.env.LASSO_KEY}`;
 const reads  = `${base}/profile/premium/balanced-fast/base`;  // Lasso's premium providers
-const jobs   = `${base}/profile/public/base`;                 // public providers, uncharged while the account has spending power
+const jobs   = `${base}/profile/public/base`;                 // Lasso's public providers, uncharged
 const trades = `${base}/profile/prod-base/fastest/base`;      // your own providers
 ```
 
@@ -46,22 +45,17 @@ const trades = `${base}/profile/prod-base/fastest/base`;      // your own provid
 - `<base>[/profile/<profile>]/provider/<name>/<chain>` pins one provider for
   debugging. Managed providers use their public aliases.
 
-Creating or rotating an unrestricted key returns `rpc_url` and `ws_url` ending in
-`/profile/premium`; a scoped key uses an allowed profile. Append a strategy and a chain; to use another profile,
-replace that segment rather than adding a second one.
-
-## Allowed profiles
-
-`allowed_profiles` sets which profiles the key can name in its URL. It
-defaults to `all`: every current and future profile of the account. The URL,
-not a key setting, decides which profile serves a request, so moving an app to
-another profile means changing its URL.
+Creating or rotating an unrestricted key returns `rpc_url` and `ws_url` ending
+in `/profile/premium`; a scoped key's URLs end in an allowed profile. Append a
+strategy and a chain. To use another profile, replace that segment rather than
+adding a second one.
 
 ## Scope a key
 
-`allowed_profiles` sets which profiles a key may use. A key scoped to a Custom
-profile is served and charged as `premium` if Custom access lapses or the
-profile is deleted.
+`allowed_profiles` sets which profiles a key can name in its URL. It defaults
+to `all`: every current and future profile of the account. Scope any key whose
+URL ships to a browser or mobile app to `public`, so a copied key can't spend
+the balance:
 
 ```http
 POST https://lasso.sh/api/v1/keys
@@ -72,8 +66,10 @@ Content-Type: application/json
 ```
 
 Its `rpc_url` ends in `/profile/public`. A scoped key that names another
-profile, or uses a URL without a profile segment when `premium` isn't
-allowed, gets `forbidden`, listing what it can use.
+profile, or a URL without a profile segment when `premium` isn't allowed, gets
+`forbidden`, listing what it can use. A key scoped to a Custom profile isn't
+safe to expose: if Custom access lapses, it's served and charged as `premium`.
+`PATCH /api/v1/keys/{id}` changes a key's scope.
 
 ## How a profile segment resolves
 
@@ -89,36 +85,19 @@ Whether `premium` is served by premium providers depends on the account's
 payment state, not the URL. See
 [serving access and pricing](/cloud/serving-access-and-pricing).
 
-## Rotate with no downtime
+## Rotate and revoke
 
-Rotate with an overlap, and both secrets work until `previous_valid_until`, so
-your deploys can catch up:
-
-```http
-POST https://lasso.sh/api/v1/keys/{id}/rotate
-Authorization: Bearer <management token>
-Content-Type: application/json
-
-{"grace_seconds": 3600}
-```
-
-The response carries the new `key`, `rpc_url` and `ws_url`. Ship them, then
-let the old secret expire. See
-[rotate a key with no downtime](/cloud/guides/rotate-a-key) for the full
-sequence.
-
-## Existing URLs keep working
-
-Every URL Lasso has issued keeps serving; the older forms and how they map are
-on [upgrading from Agent API v2](/cloud/reference/v2-compatibility).
+`POST /api/v1/keys/{id}/rotate` issues a new secret and keeps the old one
+working for an overlap you choose, so deploys catch up with no downtime; see
+[rotate a key](/cloud/guides/rotate-a-key). `DELETE /api/v1/keys/{id}` revokes
+a key. Every URL Lasso has issued keeps serving; older URL forms are on
+[upgrading from Agent API v2](/cloud/reference/v2-compatibility).
 
 ## Limits
 
 - The API returns a key's secret only on create and rotate. If you lose it,
   rotate the key or create another; admins can view active keys' URLs in the
   dashboard.
-- `grace_seconds` defaults to 3,600 (one hour); explicit `0` stops the old secret immediately. The
-  maximum is 86,400.
 - An account holds at most 100 active keys.
 - `premium` and `public` are reserved; Custom profile slugs can't use them.
 

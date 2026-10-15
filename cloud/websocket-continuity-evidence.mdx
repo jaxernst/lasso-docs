@@ -1,14 +1,15 @@
 ---
 title: WebSocket continuity evidence
-description: Scope and result of Lasso's controlled newHeads provider-replacement soak.
+description: 50 clients on one newHeads subscription rode through 119 forced provider failovers with no gaps or duplicates.
 ---
 
-In a controlled 30-minute soak, a synthetic test rather than production
-traffic, 50 clients sharing one `newHeads` subscription rode
-through 119 forced provider replacements with zero gaps and zero duplicates.
-The test covered one profile, one running process and `newHeads`; clients that
-disconnect resubscribe from their own checkpoint (see
-[WebSocket subscriptions](/advanced/websocket-subscriptions#application-checkpoints-and-reorgs)).
+# WebSocket continuity evidence
+
+In a 30-minute controlled soak, 50 clients sharing one `newHeads`
+subscription rode through 119 forced provider failovers with zero gaps and
+zero duplicates. The test ran one profile on one server. A client that
+disconnects resubscribes from its own checkpoint; see
+[WebSocket subscriptions](/advanced/websocket-subscriptions#application-checkpoints-and-reorgs).
 
 ## How it ran
 
@@ -21,6 +22,5 @@ its state drained after the last client left.
 WS_SOAK_EVIDENCE {"duration_ms":1800000,"failovers":119,"clients":50,"gaps":0,"duplicates":0,"teardown_ms":89008,"final_head":9387,"warm_processes":660,"final_processes":660,"warm_memory_bytes":94445512,"final_memory_bytes":92216898,"peak_coordinators":1,"peak_backfill_owners":0,"peak_event_buffer":0,"peak_dedupe":155}
 ```
 
-The run used implementation commit `89ad1a09ad88a1cf86a1dbc8ac5de6feb526b5f3`
-with Lasso Cloud's test harness, which isn't part of the public RPC Core
-repository.
+The run used Lasso Cloud's test harness at commit
+`89ad1a09ad88a1cf86a1dbc8ac5de6feb526b5f3`.
