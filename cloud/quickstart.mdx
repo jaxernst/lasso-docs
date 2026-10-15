@@ -142,6 +142,29 @@ client signs with the user's wallet, within the per-purchase range
 To add keys per environment or hand the account to its owner, see
 [set up production RPC with an agent](/cloud/guides/production-rpc-with-an-agent).
 
+## Start with a funded key
+
+If you already have an authorized payment wallet, buy the endpoint and its
+starting balance together. Use the fixed URL before creating a free key:
+
+```http
+POST https://lasso.sh/api/v1/credit
+Content-Type: application/json
+
+{"usd":"5"}
+```
+
+The first request answers 402. Sign one offered x402 or MPP challenge within
+your budget, then repeat the same request with that payment. `200` confirms
+the credit; `202` means settlement is pending, so poll `status_url` and never
+pay twice. Paid responses include credentials under `key`: `rpc_url`, `ws_url`,
+`key`, `management_token` and `account_id`. Save them privately. If a response
+is lost, replay the same signed payment to recover the same credentials,
+while they still authenticate; revoked or rotated credentials are not returned.
+A payment that fails verification creates nothing. Use the account credit route
+for later top-ups.
+See [funded keys](/cloud/balance-and-fallback#buy-a-funded-key).
+
 ## With the dashboard
 
 1. Sign in at [lasso.sh](https://lasso.sh).
@@ -156,8 +179,6 @@ To add keys per environment or hand the account to its owner, see
 
 - Creating accounts without credentials is limited to 10 per hour per client
   IP. Each provisional account gets its starting balance once.
-- A provisional account that never pays and sees no activity for 90 days
-  closes. Accounts that have paid, or that a person has joined, never expire.
 - Paying always needs a wallet signature; no Lasso credential can spend
   money.
 - `public` serves `load-balanced` only. A different strategy in a `public` URL

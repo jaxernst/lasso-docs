@@ -26,7 +26,7 @@ to use these signals together, read [routing evidence](/cloud/observability).
 |---|---|
 | `x-lasso-request-id` | Unique per request; quote it when reporting a problem |
 | `x-lasso-access` | What served the request: `premium`, `public` or `custom` |
-| `x-lasso-fallback` | Present only when the request was served somewhere other than the profile it named: `payment`, `free`, `profile` or `meter` |
+| `x-lasso-fallback` | Present only when the request was served somewhere other than the profile it named: `payment`, `free`, `availability` or `profile` |
 | `x-lasso-cu` | The request's size in compute units |
 | `x-lasso-usd` | The request's charge to the balance in USD; `0` when included usage, free access, Custom access or payment fallback covered it |
 | `x-lasso-balance-usd` | An estimate of the balance after this charge. `GET /api/v1/accounts/{id}` is authoritative |
@@ -37,7 +37,6 @@ to use these signals together, read [routing evidence](/cloud/observability).
 |---|---|
 | `payment` | The account's paid spending ran out within its grace window; served on public providers, uncharged |
 | `free` | Served on public providers under the account's free monthly allowance |
-| `meter` | Extended metering interruption; chains available on public providers use them uncharged under managed rate limits. Charging resumes automatically; no top-up is needed |
 | `profile` | The named Custom profile was deleted or its Custom access lapsed; served as `premium` |
 
 ## `lasso_meta`
@@ -71,10 +70,30 @@ The catalog covers local refusals and terminal routing outcomes:
 
 <RpcErrors />
 
-Errors from providers pass through unchanged. When every eligible provider
+Ordinary provider errors retain their code, message and data. Transaction
+submission errors add the [transaction-specific guidance](#transaction-submission-errors)
+below. When every eligible provider
 fails, the final JSON-RPC error arrives in an HTTP 200 response. An
 `eth_getLogs` range a provider refuses as too large returns `-32005` with
 `data.code: "log_range_limit"`; split the range and retry.
+
+## Transaction submission errors
+
+A final routed `eth_sendRawTransaction` error carries these fields in `error.data`:
+
+| Field | Meaning |
+|---|---|
+| `code` | `provider_error` |
+| `error_type` | `transaction_rejection` |
+| `retryable` | Whether the outcome permits retry; sender faults are false, node-local or ambiguous failures are true |
+| `next_action` | Guidance to resend the same signed transaction |
+| `request_id` | Correlation ID to retain with the error |
+
+When an upstream rejection is returned, its code and message remain. Scalar upstream data is preserved
+under `upstream_data`. Honor any available `Retry-After` delay. Resend identical
+signed bytes when retrying; changing fees or nonces creates a replacement that
+your application must manage. A failed hash lookup does not prove the transaction
+was never accepted. See [transaction behavior](/cloud/rpc-behavior#transactions).
 
 ## WebSocket close reasons
 

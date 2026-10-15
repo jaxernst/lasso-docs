@@ -9,6 +9,32 @@ explains it. To check what's serving right now, read `source_sha` from
 [`/api/health`](https://lasso.sh/api/health). RPC Core releases have their own
 notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
 
+<Update label="October 15, 2026" description="Release 273" tags={["Agents", "Payments", "Custom profiles", "Usage"]}>
+
+- **Buy a funded RPC key at one fixed URL.** `POST /api/v1/credit` creates an
+  account and its first key through a standard x402 or MPP payment exchange,
+  with no signup or account ID. Replaying the same signed payment recovers
+  its credentials without crediting twice. [Funded keys](/cloud/balance-and-fallback#buy-a-funded-key)
+- **Signed transactions can fail over.** Lasso resends identical signed bytes
+  sequentially to up to three providers within one deadline, unless a sender
+  fault stops sending. A bounded matching-hash lookup can confirm a transaction
+  after a rejection. [Transaction behavior](/cloud/rpc-behavior#transactions)
+- **Read Lasso as Markdown.** Agents can request the homepage with
+  `Accept: text/markdown`; discovery also includes structured application data
+  and purchase price ranges and protocols.
+  [Agent entry points](/cloud/reference/agent-entry-points)
+- **Custom routing uses learned historical depth and method refusals.**
+  Lasso moves providers known to be unsuitable behind alternatives, while
+  keeping the last route available. Inspect learned evidence by node and
+  transport, reset it, or suspend an individual hint for an hour.
+  [Custom profiles](/cloud/custom-profiles#lasso-learns-your-providers)
+- **See 30 days of usage by key and profile.** The Account page charts requests
+  and CU, shows each key's share of traffic and per-profile breakdown, and
+  brings included usage and balance spend together. Custom traffic is included.
+  [Routing evidence](/cloud/observability)
+
+</Update>
+
 <Update label="October 12, 2026" description="Release 267" tags={["Agents", "Accounts", "Payments", "Pricing"]}>
 
 - **Agents fund an account with the RPC key alone.** The key reads its account

@@ -14,7 +14,7 @@ workload's rollout and recovery; the sections below give the details.
 | Current reads | Retried on another provider when safe | Chain reorgs and provider freshness differences |
 | Historical state and logs | Steered toward providers known to serve that history | Splitting large `eth_getLogs` ranges; checkpoints |
 | Trace and debug methods | Retried when safe; coverage varies by provider | Choosing providers that serve them |
-| `eth_sendRawTransaction` | Sent once, never resent | Nonces, replacement, reconciliation by hash, receipts, finality |
+| `eth_sendRawTransaction` | Identical signed bytes sent sequentially to up to three providers unless a sender fault stops sending | Nonces, replacement, reconciliation by hash, receipts, finality |
 | HTTP filters | Not served | Use `eth_getLogs` or subscriptions |
 | WebSocket `newHeads` and `logs` | Moved to another provider with bounded backfill | Reconnecting and resubscribing; durable checkpoints |
 
@@ -53,10 +53,29 @@ profile's knowledge.
 
 ## Transactions
 
-`eth_sendRawTransaction` goes to one provider under one deadline. Lasso doesn't
-retry or fan it out after dispatch, because a lost response may still mean the
-transaction landed. Your sender owns signing, nonce allocation, reconciliation
-by transaction hash, rebroadcast policy and receipt and finality tracking.
+`eth_sendRawTransaction` sends the same signed bytes sequentially to up to
+three providers within one deadline. Rate limits, timeouts, pool capacity,
+replacement underpricing and unfamiliar rejections can move to the next
+provider. Known-transaction responses and sender faults stop submission
+failover: examples include nonce too low or too high, insufficient funds,
+invalid signatures, malformed transactions and invalid gas or fee limits.
+A strict provider pin disables submission failover.
+
+For a final routing error with a derivable transaction hash, Lasso attempts one
+`eth_getTransactionByHash` lookup while the caller remains connected and the
+original deadline and an available route permit it. A pending or mined object
+returns the local hash only when its `hash` matches, case-insensitively.
+Rejection wording alone never proves success. A failed or skipped lookup leaves
+the error and can leave submission uncertain.
+
+Final transaction errors carry `error.data.error_type: transaction_rejection`,
+`retryable`, `next_action` and `request_id`; retain them and honor any available
+`Retry-After`. Resend the identical signed bytes when retrying. A successful
+response does not prove propagation, inclusion or finality. Your sender owns
+signing, nonce allocation, replacement, hash reconciliation, receipts and finality.
+
+RPC Core v0.5.1 retains its separate
+[single-dispatch transaction contract](/api/supported-methods#signed-transaction-submission).
 
 ## HTTP filters
 

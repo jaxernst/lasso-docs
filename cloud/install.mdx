@@ -101,8 +101,9 @@ Indexers take the same URL wherever they take an RPC endpoint. Use
 
 - Lasso rejects HTTP filter methods (`eth_newFilter` and friends). Use
   `eth_getLogs` or WebSocket subscriptions.
-- A signed transaction is sent to one provider and not retried after dispatch.
-  If the response is lost, look up the transaction hash before resending.
+- Signed transactions can fail over sequentially with identical bytes, up to
+  three providers within one deadline. Sender faults stop sending; unresolved
+  outcomes need hash reconciliation. See [transactions](/cloud/rpc-behavior#transactions).
 - JSON-RPC batches are routed per item; a batch is not pinned to one provider
   or one block.
 

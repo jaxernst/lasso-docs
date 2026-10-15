@@ -33,7 +33,7 @@ provider is tried within the same request deadline. See [routing](/cloud/routing
 |---|---|
 | Reads: balances, calls, receipts, blocks, logs | Retried on the next eligible provider |
 | Historical reads | Retried on the next provider, steered toward those known to serve that history |
-| `eth_sendRawTransaction` | Sent once and never resent; reconcile by transaction hash |
+| `eth_sendRawTransaction` | Identical bytes can go to up to three providers within one deadline; sender faults stop failover. Reconcile unresolved outcomes by hash |
 | WebSocket subscriptions | Moved to another provider, with missed `newHeads` and logs backfilled within a bounded window |
 | HTTP filters (`eth_newFilter`) | Not served; use `eth_getLogs` or subscriptions |
 | A pinned provider (`/provider/<name>/`) | No failover |
