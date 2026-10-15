@@ -31,6 +31,28 @@ Live documents outrank prose. When a recipe and `agent.json` disagree, trust
 `agent.json` and `openapi.json`. This site also publishes `SKILL.md` as an
 installable skill; it's an exact copy of `lasso.sh/SKILL.md`.
 
+## Read the homepage as Markdown
+
+```bash
+curl -fsSL https://lasso.sh/ -H 'accept: text/markdown'
+```
+
+When your `Accept` header ranks `text/markdown` above `text/html`, `GET /`
+returns the agent guide as Markdown. Earlier listing wins a tie, and the
+response varies by `Accept`. Missing paths requested as Markdown return a
+Markdown error with links to the guide, skill, API and sitemap. The HTML
+homepage also publishes Organization and SoftwareApplication JSON-LD for
+discovery.
+
+## Discover paid resources
+
+`openapi.json` advertises price ranges and payment protocols on purchase
+operations. `agent.json` lists the fixed funded-key URL as `endpoints.account_resources.funded_key`.
+A bodyless `POST /api/v1/credit` returns a 402 quote without creating an
+account; complete the signed exchange only within your user's payment budget.
+Use [funded keys](/cloud/balance-and-fallback#buy-a-funded-key) for the response
+and credential-saving contract.
+
 Tool wrappers, such as an MCP server, can be generated from `openapi.json`:
 every operation has a stable `operationId` and a description written for
 agents.

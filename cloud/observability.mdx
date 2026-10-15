@@ -44,6 +44,7 @@ x-lasso-balance-usd: 19.87421
 | `lasso_meta` | Strategy used, candidates, the provider that served it, latency split, retries | `?include_meta=body`, or `?include_meta=headers` for a base64url `x-lasso-meta` header that leaves the body untouched |
 | Key view | Requests and charges over 24 hours, and recent errors grouped by code and provider with a `next_action` | `GET /api/v1/keys/{id}` |
 | Account view | Balance, serving access, fallback, included usage, rate limits | `GET /api/v1/accounts/{id}` |
+| Account page | 30-day request and CU charts by profile, each key's traffic share and per-profile usage, included usage and balance spend | [lasso.sh/account](https://lasso.sh/account) |
 | Dashboard | Chains, providers, health and latency by region, and recent activity | [lasso.sh/dashboard](https://lasso.sh/dashboard) |
 
 Every header, metadata field and error code is listed in
@@ -90,8 +91,14 @@ Reports go to the people who operate Lasso. See
   evidence.
 - `x-lasso-balance-usd` estimates the balance after this charge; the account
   view is authoritative.
-- Key usage and recent errors are 24-hour diagnostics, not a billing ledger. The dashboard's recent activity is a live stream, not a
-  request log.
+- Key `usage` and `recent_errors` summarize recent activity from reachable
+  nodes over 24 hours. A restart or unreachable node can remove its share;
+  empty diagnostics do not prove no traffic.
+- The Account page's 30-day totals are grouped by UTC day and profile, include
+  Custom traffic, and refresh as counts settle, normally once a minute.
+  These totals can undercount interrupted collection; use the account balance
+  for available spending power.
+- The dashboard's recent activity is a live stream, not a request log.
 
 ## Next
 

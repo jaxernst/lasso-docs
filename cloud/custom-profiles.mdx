@@ -100,16 +100,24 @@ for each provider, with its source and effect:
 
 ```json
 {"name": "my-node", "status": "verified", "knowledge": {
-  "methods_refused": [{"method": "debug_traceTransaction", "source": "learned", "effect": "shadow"}],
+  "methods_refused": [{"method": "debug_traceTransaction", "source": "learned", "effect": "on"}],
   "logs_span": {"blocks": 10000, "source": "probe", "effect": "on"}
 }}
 ```
 
 `effect: on` means the knowledge changes routing today; `shadow` means Lasso is
-observing it and doesn't act on it yet. Declare `limits` only for what you know
+observing it and doesn't act on it yet. Learned historical depth and exact method
+refusals are on for Custom profiles. They move unsuitable providers behind
+alternatives within the same health group, while keeping the last route
+available. Historical depth is method- and transport-specific; it does not
+certify universal archive coverage. Declare `limits` only for what you know
 better than Lasso does; declared limits outrank learned ones.
 `DELETE /api/v1/profiles/{slug}/providers/{name}/knowledge` resets what Lasso
-learned about one provider.
+learned about one provider. In the dashboard's **Learned behavior** panel,
+select a node to inspect its HTTP and WebSocket evidence. **Reset knowledge**
+clears learned evidence for the selected transport; **Suspend 1h** temporarily
+stops applying an individual hint. Follow the panel's status after a control
+change while other nodes refresh. Declared limits remain in force.
 
 ## Block protection
 

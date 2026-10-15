@@ -142,6 +142,28 @@ client signs with the user's wallet, within the per-purchase range
 To add keys per environment or hand the account to its owner, see
 [set up production RPC with an agent](/cloud/guides/production-rpc-with-an-agent).
 
+## Start with a funded key
+
+If you already have an authorized payment wallet, buy the endpoint and its
+starting balance together. Use the fixed URL before creating a free key:
+
+```http
+POST https://lasso.sh/api/v1/credit
+Content-Type: application/json
+
+{"usd":"5"}
+```
+
+The first request answers 402. Sign one offered x402 or MPP challenge within
+your budget, then repeat the same request with that payment. `200` confirms
+the credit; `202` means settlement is pending, so poll `status_url` and never
+pay twice. The response that creates the account returns its credentials once
+under `key`, including `rpc_url`, `ws_url`, `key`, `management_token` and
+`account_id`. Save them privately even if that response reports payment failure.
+A replay returns the purchase without credentials. Top up the saved account
+with the account credit route rather than creating another funded key.
+See [funded keys](/cloud/balance-and-fallback#buy-a-funded-key).
+
 ## With the dashboard
 
 1. Sign in at [lasso.sh](https://lasso.sh).

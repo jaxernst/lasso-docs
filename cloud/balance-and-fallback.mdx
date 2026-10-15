@@ -107,6 +107,36 @@ never credits twice. Rails, networks, assets and the per-purchase range
 [`agent.json`](https://lasso.sh/agent.json). People
 can also subscribe in the dashboard.
 
+## Buy a funded key
+
+Use `POST /api/v1/credit` when you want a new account, its first key and paid
+balance together. It needs no account ID or Lasso credential:
+
+```http
+POST https://lasso.sh/api/v1/credit
+Content-Type: application/json
+
+{"usd":"5"}
+```
+
+With no body, it quotes the smallest amount accepted by every enabled rail.
+The initial 402 creates no account. Sign one offered challenge with the wallet
+your user authorized, then repeat the same request. Payment creates the
+account and uses the same settlement flow as a top-up: `200` confirms credit,
+and `202` returns a `status_url` to poll.
+
+The response that creates the account includes credentials under `key`, once,
+even if payment then fails. Save `key.rpc_url`, `key.ws_url`, `key.key`,
+`key.management_token` and `key.account_id` privately on that first response.
+A replay of the same signed payment returns its purchase without credentials
+and credits at most once. For a pending payment, keep polling; if it fails,
+fund the saved account through `/api/v1/accounts/{id}/credit`. A signed funded-key
+offer is payable only at `/api/v1/credit`.
+
+Use the account credit route for every later top-up. Repeating the funded-key
+flow with a new payment creates a different account. Paid account creation
+shares the 10-per-hour, per-IP creation limit with `POST /api/v1/keys`.
+
 ## Watching spend
 
 | Signal | What it tells you |
@@ -123,6 +153,8 @@ can also subscribe in the dashboard.
   restarts every time the account pays.
 - Payment fallback serves public providers at the public rate limit
   (30 RPS, bursts to 60) with `load-balanced` only.
+- Charges and included usage settle asynchronously, normally once a minute.
+  Local estimates can briefly differ across regions.
 - `x-lasso-balance-usd` is an estimate at the region that served you;
   `GET /api/v1/accounts/{id}` is authoritative. Concurrent traffic can take a
   balance slightly below zero; the next top-up repays it first.
