@@ -133,6 +133,7 @@ WebSocket requests with `lasso_meta: "notify"`
 receive the existing metadata frame with `cu`, `usd`, `balance_usd`, `access`
 and any `fallback`. CU/USD reflect the selected outcome; balance is the local
 post-charge estimate. Delivery never waits for settlement.
+Generation-0 metadata keeps its existing shape.
 
 Report the result, serving provider, latency and request ID. For diagnostics,
 `GET /api/v1/keys/<id>` with your management token, or `GET /api/v1/keys/current`
@@ -385,12 +386,9 @@ upstream dispatches.
 A signed transaction is resent as the same bytes to the next provider, up to
 three in total within one deadline, when a provider rate-limits it, times out
 or rejects it for a node-local reason. A sender fault such as insufficient
-funds or nonce too low stops submission failover. A strict provider pin also
-disables submission failover. For a final routing error with a derivable hash,
-Lasso attempts one transaction lookup when an available route, the connected
-caller and the remaining deadline permit it. A matching pending or mined
-object returns that hash. A skipped or failed lookup can leave the outcome
-unknown. Resending the same signed bytes is safe.
+funds or nonce too low stops at the first provider. Before returning any error,
+Lasso looks up the transaction hash and returns it if the transaction is pending
+or mined. Resending the same signed bytes is always safe.
 
 The app owns signing, nonces, replacement, receipts and finality. HTTP filter IDs are
 provider-local, so use `eth_getLogs` or subscriptions. Historical depth and
