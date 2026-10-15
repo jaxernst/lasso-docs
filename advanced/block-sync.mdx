@@ -3,11 +3,9 @@ title: Block height monitoring
 description: How RPC Core observes upstream heads and uses them in routing.
 ---
 
-RPC Core v0.5.1 observes provider block heights so routing can account for lag.
-It polls each configured upstream over HTTP and, when enabled and connected,
-also receives `newHeads` over WebSocket. These observations help select a route;
-they do not establish chain consensus or guarantee that a provider can serve
-every historical request.
+RPC Core tracks each provider's block height so routing can steer around
+lagging providers. It polls each upstream over HTTP and, when enabled and
+connected, also receives `newHeads` over WebSocket.
 
 For request-level monotonicity, use [Block regression protection](/advanced/block-continuity).
 For related state reads at one block, use [Read at one block](/advanced/read-at-one-block).

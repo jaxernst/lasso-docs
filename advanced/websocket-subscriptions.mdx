@@ -1,13 +1,12 @@
 ---
 title: WebSocket subscriptions
-description: Operate and qualify bounded subscription recovery in RPC Core v0.5.1.
+description: How RPC Core shares newHeads and logs subscriptions across clients and recovers them when a provider fails.
 ---
 
-Lasso RPC Core v0.5.1 multiplexes matching `newHeads` and `logs` streams and
-attempts bounded recovery when an upstream fails. An open socket or a successful
-subscription response does not prove that your application received every event.
-Use [WebSocket endpoints](/api/websocket-endpoints) for connection examples and
-[Supported methods](/api/supported-methods) for the released method contract.
+RPC Core shares matching `newHeads` and `logs` streams across clients. When an
+upstream fails, it resubscribes on another provider and backfills the missed
+range, within a bounded replay window and deadline. See [WebSocket endpoints](/api/websocket-endpoints) for connection examples and
+[supported methods](/api/supported-methods) for the method contract.
 
 ## Configure the provider pool
 
@@ -17,10 +16,9 @@ which defaults to `true`; set a provider override to `false` if it must not
 serve `newHeads`. A usable WebSocket connection is still required. See
 [Provider configuration](/configuration/providers).
 
-Identical subscriptions can share upstream work. Different log filters can
-create distinct streams, and HTTP replay consumes upstream requests. A high
-client-to-upstream sharing ratio does not establish capacity for many distinct
-filters or dense logs. Shared resources do not create quota isolation.
+Identical subscriptions share one upstream stream; each distinct log filter
+opens its own, and HTTP replay spends upstream requests. Plan provider quota
+for the number of distinct filters, not the number of clients.
 
 ## Recovery behavior
 

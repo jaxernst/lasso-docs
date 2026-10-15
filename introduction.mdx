@@ -12,12 +12,12 @@ over on retryable errors and shows its work.
 
 ## What it does
 
-- **Routes by measurement.** `fastest`, `latency-weighted` and
-  `load-balanced` order providers from live latency and health, per chain,
-  kind of request and transport. A provider route pins one upstream for debugging.
+- **Routes by measurement.** Health checks and circuit breakers decide which
+  providers are eligible. `fastest` and `latency-weighted` then order them by
+  recent latency, per chain, kind of request and transport; `load-balanced`
+  spreads load across them. A provider route pins one upstream for debugging.
 - **Fails over safely.** Retries are bounded by the original deadline and by
-  whether a method is safe to repeat. Circuit breakers keep failing providers
-  out of rotation until they recover.
+  whether a method is safe to repeat.
 - **Keeps subscriptions alive.** Matching `newHeads` and `logs` subscriptions
   share one upstream stream and move to another provider with missed blocks
   backfilled.

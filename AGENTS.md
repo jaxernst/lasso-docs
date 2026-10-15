@@ -18,9 +18,9 @@
   engine. The product switcher labels are **Lasso Cloud** and **RPC Core**.
 - Use **managed pool** for Lasso's providers, offered as the `premium` and
   `public` profiles, and **Custom profile** for an account-owned provider pool.
-  One key reaches every profile of its account; its **default profile** serves
-  URLs that name none, and **allowed profiles** scope it. Avoid "routing
-  target".
+  One key reaches every profile of its account; the URL picks the profile, a
+  URL that names none is served by `premium`, and **allowed profiles** scope
+  the key. Keys have no default profile. Avoid "routing target".
 - Use **account**, **provisional account**, **person**, **agent**, **balance**,
   **subscription**, **serving access**, **free access**, **payment fallback**
   and **grace window** as defined in the Lasso Cloud glossary. Money is in

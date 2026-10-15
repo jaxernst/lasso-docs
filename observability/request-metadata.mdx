@@ -1,12 +1,10 @@
 ---
 title: 'Request metadata'
-description: 'Released Core v0.5.1 routing fields and reproducible response examples'
+description: 'Opt-in routing metadata on RPC Core responses: which provider served a request, its latency, and every attempt, with examples'
 ---
 
-This page describes **Lasso RPC Core v0.5.1** metadata. It is opt-in and describes
-request execution, not an upstream-capacity or availability guarantee.
-[Cloud RPC behavior](/cloud/rpc-behavior) and [versions and evidence](/releases-and-availability)
-separate managed-service fields and deployment state from this Core contract.
+Add `include_meta` to a request, and RPC Core reports how it was routed. Lasso
+Cloud's fields are in [response signals and errors](/cloud/reference/signals-and-errors).
 
 ## Request metadata
 

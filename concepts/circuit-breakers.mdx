@@ -1,6 +1,6 @@
 ---
 title: Circuit breakers
-description: Understand transport health, temporary backoff, and shared provider state.
+description: How RPC Core takes a failing provider transport out of rotation and tests it before returning it.
 ---
 
 Circuit breakers temporarily exclude failing upstream transports and admit recovery attempts before returning them to ordinary routing. HTTP and WebSocket health are tracked separately.
@@ -11,7 +11,7 @@ Circuit breakers temporarily exclude failing upstream transports and admit recov
 | Open | Ordinary traffic is excluded until recovery is permitted. |
 | Half-open | Limited recovery traffic determines whether service has recovered. |
 
-A closed circuit alone does not prove that a provider is currently eligible. Connection state, rate-limit cooldowns, lag, method restrictions, and request parameters can still exclude it.
+Connection state, rate-limit cooldowns, lag, method restrictions and request parameters can exclude a provider even when its circuit is closed.
 
 ## Rate limits and shared providers
 

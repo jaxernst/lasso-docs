@@ -1,158 +1,91 @@
 ---
 title: Versions, availability, and evidence
-description: Choose between released RPC Core and managed Cloud, with versioned proof and workload limits.
+description: Which RPC Core release and Cloud deployment these docs describe, how the two differ by workload, and the published release and benchmark evidence.
 ---
 
-Use **Lasso RPC Core** when you want to operate the routing engine and its
-network boundary. Use **Lasso Cloud** when you want managed routing, accounts,
-keys, billing, and provider operations. A shared engine does not mean that a
-Core release and the hosted service have identical behavior.
+# Versions and evidence
 
-## Version reference
+**Lasso RPC Core** is the routing engine you run and protect yourself.
+**Lasso Cloud** runs the same engine as a managed service, with accounts, keys,
+billing and managed providers. Cloud deploys on its own schedule, so its
+behavior can be ahead of the latest Core release; this page shows where.
+
+## Versions
 
 Checked October 15, 2026:
 
-| Surface | Version or observation | What it establishes |
+| Surface | Version | Evidence |
 | --- | --- | --- |
-| RPC Core source | [v0.5.1](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.5.1), source `bd028b0870afc714e4d85fa94fe0bc2af94df628` | The released source described by the Core API guides. [Exact-commit CI](https://github.com/jaxernst/lasso-rpc/actions/runs/37555600096) passed; container publication is a separate gate. |
-| RPC Core container | v0.5.1, image index `sha256:6861712eef30dc29850e6259cba55402202092768e4e82b294dbaca53857f307` | The [release manifest](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.1/container-release.json) binds source and image digests. Native AMD64 and ARM64 installation checks passed before [publication completed](https://github.com/jaxernst/lasso-rpc/actions/runs/37556196437). |
-| Managed Cloud | The source each region serves, in `source_sha` from [`/api/health`](https://lasso.sh/api/health) | What changed in each production release is in [What's new](/cloud/whats-new). Process health does not qualify your workload. |
-| Cloud APIs and payment availability | Live [OpenAPI](https://lasso.sh/openapi.json), [manifest](https://lasso.sh/agent.json), and [agent guide](https://lasso.sh/SKILL.md) | Available routes, credential classes, and enabled payment rails on that deployment. An implemented API can still be disabled. |
+| RPC Core source | [v0.5.1](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.5.1), commit `bd028b0870afc714e4d85fa94fe0bc2af94df628` | [Exact-commit CI](https://github.com/jaxernst/lasso-rpc/actions/runs/37555600096) |
+| RPC Core container | v0.5.1, image index `sha256:6861712eef30dc29850e6259cba55402202092768e4e82b294dbaca53857f307` | The [release manifest](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.1/container-release.json) binds source to image; [publication run](https://github.com/jaxernst/lasso-rpc/actions/runs/37556196437) |
+| Lasso Cloud | `source_sha` from [`/api/health`](https://lasso.sh/api/health) in each region | [What's new](/cloud/whats-new) lists each production release |
+| Cloud APIs and payment rails | Live [OpenAPI](https://lasso.sh/openapi.json), [`agent.json`](https://lasso.sh/agent.json) and [`SKILL.md`](https://lasso.sh/SKILL.md) | What the deployed service serves and which features are on |
 
-## Workload and ownership matrix
+## Core and Cloud by workload
 
-“Supported” here identifies an interface and its documented boundary. It does
-not certify every provider pool, chain, request parameter, or sustained load.
+| Capability | RPC Core v0.5.1 | Lasso Cloud |
+| --- | --- | --- |
+| HTTP reads and batches | Routed over the upstreams you configure | Routed over managed pools or your Custom profiles |
+| Signed transactions | One upstream dispatch | The same bytes to up to three providers in turn; sender faults stop at the first ([details](/cloud/rpc-behavior#transactions)) |
+| WebSocket `newHeads` and `logs` | Shared upstream streams with bounded failover and backfill | The same, on every account |
+| Historical state and logs | Routed by declared provider capabilities | Steered toward providers known to serve that history |
+| HTTP filters | Forwarded to one provider, without failover | Rejected with `-32601`; use `eth_getLogs` or subscriptions |
+| Block regression protection | Opt-in per profile, with optional fleet coordination | On or off per Custom profile chain |
+| Client authentication and quotas | Bring your own, at your network or reverse proxy | Keys, rate limits, balances and usage |
+| Funding | Not applicable | USDC top-ups over x402 or MPP, and Custom access by the day |
 
-| Capability | RPC Core v0.5.1 source | Managed Cloud | Qualification boundary |
-| --- | --- | --- | --- |
-| HTTP reads and batches | Supported; you configure and operate upstreams. | Managed or account-owned provider pools. | History, method support, quotas, and parameters depend on eligible upstreams. Batches route items independently and do not pin a snapshot. |
-| Signed transactions | One upstream dispatch for `eth_sendRawTransaction`. | Sequential identical-byte failover, bounded by one deadline and up to three submissions; sender faults stop sending. | An acknowledgment is not inclusion or finality. Reconcile an indeterminate result by transaction hash. |
-| WebSocket unary requests, `newHeads`, and `logs` | Supported; enable intended providers and protect your endpoint. | Every account can open WebSocket connections, provisional accounts included. | Recovery is bounded. Reconnect and reconcile application checkpoints after termination. Pending-transaction subscriptions are outside the released subset. |
-| Historical state and log ranges | Forwarded subject to provider capabilities. | Provider capability and availability constrain routing. | No universal archive depth or log-range guarantee. Qualify your exact historical witnesses. |
-| Stateful filters | Can forward when capability policy permits, without cross-request upstream affinity. | Rejects the documented [HTTP filter lifecycle](/cloud/rpc-behavior#http-filters) locally with `-32601`. | Use `eth_getLogs` or supported subscriptions; filter IDs are provider-local. |
-| Block regression protection | Opt-in `local` policy with best-effort peer recovery; optional coordinated policy requires its own operating setup. | Custom-profile On/Off control for local protection. | Local protection covers sequential choices within one running application generation. A server switch or restart can return a lower block. |
-| Hash-selected state reads | Explicit selectors are retained through routing and retries. | Same documented application pattern. | Choose and carry one hash through every read; upstream state and selector support are required. This is not finality or execution proof. |
-| Identity, billing, incoming customer quotas | Outside Core. Protect exposed endpoints through your network or reverse proxy. | Accounts, keys, subscriptions, balances and usage. | Profiles do not multiply an upstream account's quota. Cloud prices each premium request per method in USD; see [serving access and pricing](/cloud/serving-access-and-pricing). |
-| Prepaid funding | Outside Core. | Anyone can add to an account's balance through an enabled Tempo MPP or Base x402 402 exchange. Any account, provisional accounts included, can buy time-limited Custom access. | Check live rail flags, price and bounds in the [manifest](https://lasso.sh/agent.json); wallet authority is separate from Lasso credentials. See [balance and payment fallback](/cloud/balance-and-fallback). |
-| Sustained workload capacity | Depends on your deployment and providers. | Depends on workload, profile, providers, and service policy. | The linked evidence does not establish a general 24-hour, seven-day, or 30-day operating envelope across these workloads. |
+Whichever you run, provider plans set the ceiling on history, methods and
+quota, so qualify your real application flow before moving traffic; the
+[trial guide](/cloud/bring-your-own-rpc) shows how. The method contracts are
+in [Core supported methods](/api/supported-methods) and
+[Cloud RPC method behavior](/cloud/rpc-behavior).
 
-Use the detailed [Core method contract](/api/supported-methods),
-[Cloud workload behavior](/cloud/rpc-behavior), and
-[Cloud compatibility contract](/cloud/json-rpc-compatibility) for execution and
-failure semantics. Before adoption, evaluate one real application flow using
-[the two-provider guide](/cloud/bring-your-own-rpc), including its recovery path.
+## Core releases
 
-## Public release evidence
+Full notes are on [GitHub releases](https://github.com/jaxernst/lasso-rpc/releases).
 
-The [v0.5.1 source release](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.5.1)
-expands `/metrics` into a bounded operator contract with exact per-route request
-totals, bounded sampled latency histograms, non-success attempt diagnostics,
-circuit and WebSocket continuity series, and BEAM runtime pressure, plus a
-refreshed Grafana dashboard. It adds opt-in OpenTelemetry tracing
-(`LASSO_OTEL_ENABLED`, disabled by default and never affecting routing results)
-with W3C propagation and JSON-log correlation. It fixes a bug that could leave
-a rate-limited provider ineligible until restart after its first 429 response,
-and it records successful upstream execution before a terminal head-policy
-rejection so provider health and attempt diagnostics stay accurate. Upgrade if
-your providers return 429s; restarting only masks the issue. No profile
-schema or publication-journal migration is required; Prometheus consumers
-should review the new metric families and the added `transport`, `profile`,
-and `origin` labels.
+| Release | Highlights | Upgrade notes |
+| --- | --- | --- |
+| [v0.5.1](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.5.1) | A full Prometheus `/metrics` contract with per-route totals, latency histograms, attempt diagnostics, circuit, WebSocket and BEAM series, and a refreshed Grafana dashboard. Opt-in OpenTelemetry tracing (`LASSO_OTEL_ENABLED`) with W3C propagation and log correlation. Fixes a provider staying ineligible after its first 429 until restart | Upgrade if your providers return 429s. Prometheus consumers should review the new metric families and the `transport`, `profile` and `origin` labels |
+| [v0.5.0](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.5.0) | Route readiness, node-local Prometheus metrics, JSON console logs, profile validation and reload commands, standalone provider discovery and routing evidence. Tighter HTTP and WebSocket resource limits | Stricter request and discovery validation can reject malformed input that earlier versions accepted |
+| [v0.4.5](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.4.5) | Phoenix, Cowboy, Cowlib and Ranch upgrades (Cowlib 2.20.0 resolves `CVE-2026-43971`). Correct Public Arbitrum archive routing. Requests no provider can serve fail at admission with a structured [`reason`](/api/error-codes#core-routing-exhaustion) | Review local archival declarations against your historical state reads |
+| [v0.4.4](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.4.4) | `load-balanced` tries distinct physical providers before a second transport of the same one ([details](/concepts/routing-strategies#load-balanced)) | None |
+| [v0.4.3](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.4.3) | Rejects an HTTP endpoint whose chain-ID probe mismatches, orders orphan-log events correctly, and strips URL credentials and paths from provider diagnostics | None |
 
-The [v0.5.0 source release](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.5.0)
-adds route readiness, node-local Prometheus metrics, JSON console logging,
-profile validation and reload commands, standalone provider discovery, and
-bounded routing evidence. It tightens HTTP/WebSocket resource limits, preserves
-send certainty across timed-out Finch checkouts, and moves stale subscription
-recovery through the continuity coordinator. Mint 1.11.0 and HPAX 1.1.0 include
-published HTTP framing and HTTP/2 fixes. Existing profiles and the optional
-publication journal require no schema migration; stricter request and discovery
-validation can reject malformed inputs accepted earlier. The source CI is not
-container installation proof; the native artifact has separate evidence below.
+None of these releases needs a profile or journal migration.
 
-The [v0.4.5 source release](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.4.5)
-upgrades Phoenix, Cowboy, Cowlib and Ranch (Cowlib 2.20.0 resolves
-`CVE-2026-43971`) and corrects Public Arbitrum archive routing: thirdweb and
-Blast serve historical state, while dRPC, PublicNode, Tenderly and Nodies no
-longer claim it. Block-hash state reads now require a declared archival
-provider, and requests that no configured provider can serve fail at admission
-with a structured, non-retriable [`reason`](/api/error-codes#core-routing-exhaustion)
-instead of contacting an upstream. No configuration or journal migration is
-required; operators with local profile overrides should review their archival
-declarations against historical state reads.
+## Container verification
 
-The [v0.4.4 source release](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.4.4)
-gives distinct physical provider instances a first pass within each health tier
-for load-balanced, replay-safe unary fallback. Alternate transports remain
-available; health tiers and explicit recovered-head preference retain precedence.
-The dispatch budget, original deadline and candidate admission limits are unchanged.
-No configuration or journal migration is required. Trying another instance first
-can delay a working alternate transport. This does not certify archive coverage,
-operator independence or provider capacity; see the
-[full routing boundary](/concepts/routing-strategies#load-balanced).
+Each release's container is verified on native Linux AMD64 and ARM64 runners
+after an anonymous pull and signed-attestation check. The v0.5.1
+[verification summary](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.1/container-verification.md)
+records 23 checks per image
+([AMD64](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.1/verification-amd64.json),
+[ARM64](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.1/verification-arm64.json))
+covering upstream requests, HTTP failover, WebSocket RPC and `newHeads`
+delivery, configuration reload, history across container replacement and
+read-only profile mounts, plus a
+[live-provider smoke check](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.1/live-provider-verification-arm64.json)
+against a real Ethereum upstream. An
+[upgrade and rollback check](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.1/optional-upgrade-verification-arm64.json)
+between v0.5.0 and v0.5.1 preserved profiles, routing and benchmark history;
+its final proxy smoke step stopped on a macOS shell bug.
 
-The [v0.4.3 source release](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.4.3)
-rejects an HTTP endpoint after a malformed or mismatched chain-ID probe, orders
-buffered orphan-log events before replacement-block additions, and removes URL
-user information, paths, queries, and fragments from provider diagnostics.
-It requires no configuration or journal migration. These fixes do not qualify archive depth or arbitrary reorg recovery.
-See the [HTTP identity boundary](/api/supported-methods#reads-and-execution-safety)
-and [subscription recovery limits](/advanced/websocket-subscriptions#application-checkpoints-and-reorgs).
-
-The v0.5.1 [container verification summary](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.1/container-verification.md)
-records 23 controlled checks on each native
-[AMD64](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.1/verification-amd64.json)
-and [ARM64](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.1/verification-arm64.json)
-image, plus an [additional live-provider ARM64 smoke check](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.1/live-provider-verification-arm64.json)
-against a real Ethereum upstream. Both required native Linux suites passed
-after anonymous pulls and signed-attestation verification; the
-[manifest](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.1/container-release.json)
-records the immutable image digest. An [optional macOS ARM64 upgrade check](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.1/optional-upgrade-verification-arm64.json)
-confirmed v0.5.0 → v0.5.1 → v0.5.0 → v0.5.1 replacement preserved profiles,
-routing, and benchmark history, though its later proxy smoke step failed on a
-macOS Bash 3.2 variable-expansion bug and did not complete; this optional
-local evidence does not apply after enrolling a global publication guarantee.
-
-The v0.5.0 [container verification summary](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.0/container-verification.md)
-records 23 controlled checks on each native
-[AMD64](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.0/verification-amd64.json)
-and [ARM64](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.0/verification-arm64.json)
-image. Both runners pulled the multi-platform index anonymously and checked
-installation, operator endpoints, authenticated proxy HTTP and WebSocket
-traffic, reload, container replacement, and optional journal continuity. The
-[manifest](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.0/container-release.json)
-records the immutable image digest. These controlled checks do not measure
-sustained capacity or qualify every provider workload.
-
-The v0.4.5 [container verification summary](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.5/container-verification.md)
-records 19 installation and recovery checks on each native
-[AMD64](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.5/verification-amd64.json)
-and [ARM64](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.5/verification-arm64.json)
-image. It covers installation, custom profiles, HTTP/WebSocket routing,
-container replacement, saved benchmark history, and optional journal recovery.
-The preceding [v0.4.4](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.4/container-verification.md),
-[v0.4.3](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.3/container-verification.md)
-and [v0.4.2 container reports](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.2/container-verification.md)
-remain historical evidence for those earlier images.
-
-The v0.4.2 [feature validation report](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.2/feature-validation.md)
-records controlled and managed-service block-choice and hash-read checks. It
-preserves failed quota and latency populations, cold-channel limitations, and
-cross-server backsteps alongside the final warmed-channel pass. Those bounded
-checks do not establish a customer-capacity estimate, a fleet-wide monotonicity
-guarantee, or an SLA. They do not separately qualify arbitrary log reorg recovery
-or your transaction lifecycle.
+Earlier reports:
+[v0.5.0](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.0/container-verification.md),
+[v0.4.5](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.5/container-verification.md),
+[v0.4.4](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.4/container-verification.md),
+[v0.4.3](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.3/container-verification.md),
+[v0.4.2](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.2/container-verification.md)
+and the v0.4.2
+[feature validation report](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.2/feature-validation.md)
+for block choice and hash reads.
 
 ## Routing benchmark
 
-The published [routing-overhead report](https://lasso.sh/benchmarks/routing-overhead.html)
-measures added p95 latency of 0.70–1.08 ms across five short synthetic-provider
-trials at 10,000 requests per second. A separate 60-second instrumented run
-measured 2.29 ms. The [raw evidence ledger](https://lasso.sh/benchmarks/lasso-routing-overhead-ledger-2026-08-24.tar.gz)
-preserves accepted, rejected, and sustained runs.
-
-This is a routing-engine measurement. It excludes hosted authentication,
-database metering, Internet/provider latency, multiple regions, and WebSockets.
-Use client-observed latency, correctness, recovery, and upstream volume from
-your own workload when deciding whether to adopt Lasso.
+Lasso's routing engine adds 0.70 to 1.08 ms at p95 across five trials at
+10,000 requests per second against a synthetic provider, and 2.29 ms in a
+separate 60-second instrumented run. See the
+[routing overhead benchmark](/cloud/routing-overhead), the
+[full report](https://lasso.sh/benchmarks/routing-overhead.html) and the
+[raw evidence](https://lasso.sh/benchmarks/lasso-routing-overhead-ledger-2026-08-24.tar.gz).
