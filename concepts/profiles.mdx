@@ -1,6 +1,6 @@
 ---
 title: Profiles and reload
-description: Separate routing configurations with explicit shared-upstream behavior.
+description: Give each app or environment its own providers and routing settings, and control whether profiles share upstream connections.
 ---
 
 Profiles define chains, providers, and routing policy. They are configuration scopes, not client authentication boundaries. RPC Core has no built-in incoming client quotas; `rps_limit` controls the dashboard tester maximum and `burst_limit` is metadata.

@@ -1,29 +1,42 @@
 ---
 title: Introduction
-description: Self-hosted Ethereum RPC routing with provider controls and observability.
+description: Lasso RPC Core is the open-source engine that routes EVM JSON-RPC across your nodes and providers by live latency and health, with failover and per-request evidence.
 ---
 
-Lasso RPC Core routes Ethereum JSON-RPC across your nodes and providers over HTTP and WebSocket. Configure a provider pool, choose a routing strategy, and inspect performance in the dashboard.
+# Lasso RPC Core
 
-Use **RPC Core** to run the open-source engine on your infrastructure. Use [Lasso Cloud](/cloud/overview) for managed endpoints, accounts, API keys, and billing. These sections describe RPC Core v0.5.1; Cloud has a separate [compatibility contract](/cloud/json-rpc-compatibility).
+Lasso RPC Core is the open-source routing engine behind Lasso. Run it in front
+of your nodes and providers, and your apps get one JSON-RPC endpoint per chain
+over HTTP and WebSocket that picks the best upstream for each request, fails
+over on retryable errors and shows its work.
 
-See [Versions, availability, and evidence](/releases-and-availability) to compare the
-released Core artifact with the separately deployed Cloud service.
-[Support, security, incidents, and lifecycle](/support-security-lifecycle) explains
-the public help path, supported-version policy, and repository boundaries.
+## What it does
 
-## Routing and resilience
+- **Routes by measurement.** Health checks and circuit breakers decide which
+  providers are eligible. `fastest` and `latency-weighted` then order them by
+  recent latency, per chain, kind of request and transport; `load-balanced`
+  spreads load across them. A provider route pins one upstream for debugging.
+- **Fails over safely.** Retries are bounded by the original deadline and by
+  whether a method is safe to repeat.
+- **Keeps subscriptions alive.** Matching `newHeads` and `logs` subscriptions
+  share one upstream stream and move to another provider with missed blocks
+  backfilled.
+- **Separates workloads.** Profiles give each app or environment its own
+  provider pool and routing settings, sharing upstream connections where the
+  URL and credentials match.
+- **Shows its work.** Opt-in request metadata names the provider, latency and
+  retries behind each response. A live dashboard, Prometheus metrics and
+  OpenTelemetry traces cover the rest. Regional nodes route from their own
+  measurements and can cluster for a combined view.
 
-- Select providers using measured latency, load balancing, configured priority, or a direct provider route.
-- Apply transport health, circuit state, declared method restrictions, and request limits when selecting candidates.
-- Bound retries by execution safety and the original request deadline. Signed transaction submission gets one upstream dispatch.
-- Share matching `newHeads` and `logs` subscriptions and recover within explicit replay and time limits.
-- Inspect local and aggregated observations with optional clustering. Each node makes its own routing decisions.
-
-Provider plans, quotas, history, and parameter support still constrain what Lasso can serve. More profiles or Lasso nodes do not multiply an upstream account's quota.
+These docs describe [RPC Core v0.5.1](/releases-and-availability). For a hosted
+endpoint with keys, billing and managed providers, use
+[Lasso Cloud](/cloud/overview).
 
 ## Get started
 
-[Install the public container](/installation), [make your first request](/quickstart), then [configure your own providers](/configuration/providers). The included `public.yml` profile lets you try public upstreams without provider keys.
-
-RPC Core has no built-in client authentication or incoming customer quotas. Protect exposed RPC, metrics, and dashboard endpoints at your network or reverse proxy. See [Production checklist](/deployment/production-checklist).
+[Start the container](/quickstart) and route your first request, then
+[configure your own providers](/configuration/providers). Core has no built-in
+client authentication, so put exposed RPC, metrics and dashboard endpoints
+behind your network or reverse proxy; the
+[production checklist](/deployment/production-checklist) covers it.

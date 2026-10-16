@@ -1,6 +1,6 @@
 ---
 title: Configuration overview
-description: Configure routing profiles without confusing them with access or quota boundaries.
+description: How RPC Core profile files are laid out and loaded, with a complete example.
 ---
 
 Lasso is configured via YAML profile files in `config/profiles/`. Each profile defines chains, providers, routing policy, and dashboard tester settings. Multiple profiles provide separate routing configurations for different environments. Identical upstreams can share connections, health, and observations; profiles are not authentication boundaries.

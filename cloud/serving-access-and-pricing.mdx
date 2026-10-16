@@ -9,10 +9,8 @@ import CloudTariff from '/snippets/cloud-tariff.mdx';
 
 Every request Lasso serves has one **serving access**: `premium`, `public` or
 `custom`. It decides which providers answer, what the request costs, which
-strategies apply and which rate limit counts it, and every response tells you
-which one served it. Read this page to choose a pool and predict your bill;
-read [balance and payment fallback](/cloud/balance-and-fallback) for what
-happens when money runs out.
+strategies apply and which rate limit counts it. Every response names it in
+`x-lasso-access`. Use this page to choose a pool and predict your bill.
 
 ```bash
 curl -sS -D - -o /dev/null "$LASSO_RPC_URL/fastest/base" \
@@ -40,13 +38,12 @@ served:
 
 | The URL names | Served as |
 |---|---|
-| `premium`, or no profile with a `premium` default | `premium` while included usage or balance covers it; otherwise `public`, marked with `x-lasso-fallback` (see [balance and payment fallback](/cloud/balance-and-fallback)) |
-| `public` | `public`, uncharged. It serves while the account has any spending power: balance, included usage, a payment grace window or a free allowance. An account with none gets 402 `balance_exhausted` on every profile, `public` included |
+| `premium`, or no profile segment | `premium` while included usage or balance covers it; otherwise `public`, marked with `x-lasso-fallback` (see [balance and payment fallback](/cloud/balance-and-fallback)) |
+| `public` | `public`, uncharged, while the account has any spending power: balance, included usage, a payment grace window or a free allowance. An account with none gets 402 `balance_exhausted` on every profile |
 | A Custom profile | `custom` while your account has Custom access; otherwise `premium`, marked `x-lasso-fallback: profile` |
 
-Choose `public` explicitly for traffic that doesn't need premium providers:
-background jobs or development. Same key, different path
-segment:
+Name `public` for traffic that doesn't need premium providers, such as
+background jobs or development. Same key, different profile segment:
 
 ```ts
 const premium = `${process.env.LASSO_RPC_URL}/fastest/base`;
@@ -68,29 +65,25 @@ more. The strategy factor is the trade you make between latency and cost:
 | `priority` | 1x |
 
 Every method's weight and price is in
-[chains and prices](/cloud/reference/chains-and-prices), generated from the
-live [`agent.json`](https://lasso.sh/agent.json). Every response states its
-size in `x-lasso-cu` and its charge in `x-lasso-usd`, so nothing is a surprise.
-A batch is priced per item, a WebSocket request costs the same as over HTTP,
-and each subscription notification is priced as an `eth_subscription` entry.
+[chains and prices](/cloud/reference/chains-and-prices). Every response states
+its size in `x-lasso-cu` and its charge in `x-lasso-usd`. A batch is priced
+per item, a WebSocket request costs the same as over HTTP, and each
+subscription notification is priced as an `eth_subscription` entry.
+
+Lasso charges only successful results. Every final JSON-RPC error is free,
+including execution reverts and provider rate-limit errors after failover, and
+so is any request refused before routing.
 
 Money is always in USD: prices, balances, purchases and charges. Included
 usage, from free access or a subscription, is counted in CU per month.
-
-Lasso charges only successful results. Every final JSON-RPC error is free,
-including execution reverts and provider rate-limit errors after failover.
-Requests refused before routing are free. Subscription notification pricing
-is unchanged.
 
 ### Current tariff
 
 <CloudTariff />
 
-A Pro period that started on the earlier 65,000,000 CU allowance keeps it until
-the period renews.
-
-Subscription prices are on [lasso.sh/pricing](https://lasso.sh/pricing).
-`agent.json` publishes the live values agents act on.
+Subscription prices are on [lasso.sh/pricing](https://lasso.sh/pricing), and
+[`agent.json`](https://lasso.sh/agent.json) publishes the live values agents
+act on.
 
 ## Subscriptions and free access
 
@@ -100,13 +93,10 @@ Subscription prices are on [lasso.sh/pricing](https://lasso.sh/pricing).
 | **Pro** | A monthly CU allowance on premium providers; beyond it, requests draw on the balance | Subscribe in the dashboard |
 | **Custom** | Routing over your own providers on up to five Custom profiles, unmetered | Subscribe in the dashboard, or buy days with a wallet, even before anyone signs up |
 
-Free access belongs to accounts that a person has joined. When you sign in
-and create or claim your first account, you sponsor it, and you can sponsor
-two more. A provisional account an agent created has no free access until a
-person claims it.
-
-Current subscription prices and allowances are on
-[lasso.sh/pricing](https://lasso.sh/pricing) and in `agent.json`.
+Free access belongs to accounts a person has joined. Your first account is
+sponsored when you create or claim it, and you can sponsor two more. A
+provisional account an agent created gets free access once a person claims
+it.
 
 ## Rate limits
 
@@ -123,17 +113,16 @@ Limits apply per account, not per key:
 
 Every response carries the IETF `RateLimit-Policy` and `RateLimit` headers,
 named after the bucket that bound the request: `managed`, `public` or the
-Custom profile's slug. `"public";q=60;w=2` means 60 requests per two seconds. Over the
-limit, Lasso answers 429 `rate_limit_exceeded` with `Retry-After`. Need more? Ask
+Custom profile's slug. `"public";q=60;w=2` means 60 requests per two seconds.
+Over the limit, Lasso answers 429 with `Retry-After`. For higher limits, ask
 Lasso support for an account override.
 
 ## Limits
 
-- `public` serves `load-balanced` only. A request for another strategy is
-  served as `load-balanced`, and `lasso_meta.strategy` reports what was used.
-  The same holds for any request served by payment fallback or free access.
-- Public providers' method coverage and historical depth can be narrower than
-  the premium pool's.
+- `public`, payment fallback and free access serve `load-balanced` only;
+  `lasso_meta.strategy` reports the strategy used.
+- Public providers can cover fewer methods and less history than the premium
+  pool.
 - Custom traffic has no request price; your providers bill you as usual.
 
 ## Next

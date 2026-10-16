@@ -5,10 +5,9 @@ description: Create a Lasso endpoint in one request, call it, and install it in 
 
 # Quickstart
 
-Create a working Lasso endpoint, call it, and put it in your app. Agents can do
-all of it over HTTP with no signup; people can do the same in the dashboard.
-Both paths end in the same place: an account with one key whose URL your app
-keeps in `.env`.
+Create a Lasso endpoint, call it and put it in your app. Agents do it over HTTP
+with no signup; people use the dashboard. Either way you end with an account
+and a key whose URL your app keeps in `.env`.
 
 ## With an agent, through the API
 
@@ -30,17 +29,14 @@ curl -sS https://lasso.sh/api/v1/keys \
 }
 ```
 
-A `201` with `serving_ready: true` means the key is ready. A `202` with
-`serving_ready: false` returns the committed credentials: save them, wait
-`Retry-After`, then call RPC. For `service_initializing`, wait and retry RPC
-with the same key; do not repeat creation.
-
-That one request creates a provisional account with a starting balance
-(`pricing.free_grant_usd` in [`agent.json`](https://lasso.sh/agent.json),
-enough to verify but not to run production) and issues your first key. The
-key is all you need to call, read the account and top it up.
-`management_token` makes you the account's agent, for when you later add keys,
+That request creates a provisional account with a small starting balance,
+enough to verify, and issues your first key. The key calls, reads the account
+and tops it up. `management_token` makes you the account's agent, to add keys,
 build Custom profiles or hand the account to a person.
+
+Save `rpc_url` as `LASSO_RPC_URL`. A `202` with `serving_ready: false` returns
+the same credentials: wait `Retry-After`, then call with the saved key. Don't
+create another.
 
 ### 2. Call it
 
@@ -63,23 +59,22 @@ curl -fsS --retry 5 "$LASSO_RPC_URL/fastest/base?include_meta=body" \
 }
 ```
 
-`--retry` repeats the errors Lasso marks retryable (HTTP 503 or 429); fix
-anything else. Every response also carries `x-lasso-request-id`,
-`x-lasso-access` (`premium`, `public` or `custom`), `x-lasso-usd` (what it
-cost) and `x-lasso-balance-usd` (an estimate of the balance after it). Use
-`eth_blockNumber` rather than `eth_chainId` to see routing, since the chain ID
-can be answered without an upstream.
+`lasso_meta` names the strategy, the provider that served the call and the
+time spent upstream and in Lasso. Every response also carries
+`x-lasso-request-id`, `x-lasso-access` (`premium`, `public` or `custom`),
+`x-lasso-usd` (what it cost) and `x-lasso-balance-usd`. `--retry` repeats the
+429 and 503 responses Lasso marks retryable.
 
 ### 3. Pick a pool and a strategy per call site
 
 The same key reaches every profile of its account, and the URL picks one.
-`rpc_url` ends in `/profile/premium`; to switch pools, replace that segment
-rather than adding another:
+`rpc_url` ends in `/profile/premium`; to switch, replace that segment rather
+than adding another:
 
 | URL | Served by |
 |---|---|
 | `$LASSO_RPC_URL/fastest/base` | `premium` |
-| `https://lasso.sh/rpc/k/<key>/profile/public/base` | Lasso's public providers, uncharged while the account has spending power, `load-balanced` |
+| `https://lasso.sh/rpc/k/<key>/profile/public/base` | Lasso's public providers, uncharged, `load-balanced` only |
 | `https://lasso.sh/rpc/k/<key>/profile/prod-base/fastest/base` | Your `prod-base` Custom profile |
 
 | Strategy | What it does | Use it for |
@@ -89,8 +84,8 @@ rather than adding another:
 | `fastest` | Tries the provider with the lowest recent latency for this kind of request first | Trading and other latency-critical paths |
 | `priority` | Tries providers in your Custom profile's configured order | A preferred primary with backups |
 
-Strategies price differently on premium; the live table is in
-[chains and prices](/cloud/reference/chains-and-prices).
+On premium, `balanced-fast` costs 1.5x and `fastest` 2x the `load-balanced`
+price; see [chains and prices](/cloud/reference/chains-and-prices).
 
 ### 4. Install it
 
@@ -112,14 +107,14 @@ const client = createPublicClient({
 });
 ```
 
-The same URL works in ethers, Foundry (`--rpc-url`), Hardhat and indexers. For
-subscriptions, use `${LASSO_WS_URL}/base` with a WebSocket transport. Run your
-app's real methods and block ranges through the new URL before moving traffic.
+The same URL works in ethers, Foundry (`--rpc-url`), Hardhat and indexers; use
+`${LASSO_WS_URL}/base` for subscriptions. Run your app's real methods and
+block ranges through it before moving traffic.
 [Install Lasso in your app](/cloud/install) covers each client.
 
 ### 5. Fund it
 
-When the starting balance isn't enough, look up the account with the key, then
+To go beyond the starting balance, look up the account with the key, then
 credit it within the budget your user approved:
 
 ```bash
@@ -134,18 +129,17 @@ Content-Type: application/json
 {"usd":"1"}
 ```
 
-The credit answers 402 with a standard x402 or MPP challenge that a stock
-client signs with the user's wallet, within the per-purchase range
-(`minimum_usd` to `maximum_usd` in `account_payments.rails`)
-([example](/cloud/balance-and-fallback#top-up)).
+It answers 402 with a standard x402 or MPP challenge that a stock client signs
+with the user's wallet. [Top up](/cloud/balance-and-fallback#top-up) has a
+full example.
 
 To add keys per environment or hand the account to its owner, see
 [set up production RPC with an agent](/cloud/guides/production-rpc-with-an-agent).
 
 ## Start with a funded key
 
-If you already have an authorized payment wallet, buy the endpoint and its
-starting balance together. Use the fixed URL before creating a free key:
+With an authorized wallet, you can buy the account, its first key and a
+balance in one paid request instead:
 
 ```http
 POST https://lasso.sh/api/v1/credit
@@ -154,16 +148,9 @@ Content-Type: application/json
 {"usd":"5"}
 ```
 
-The first request answers 402. Sign one offered x402 or MPP challenge within
-your budget, then repeat the same request with that payment. `200` confirms
-the credit; `202` means settlement is pending, so poll `status_url` and never
-pay twice. Paid responses include credentials under `key`: `rpc_url`, `ws_url`,
-`key`, `management_token` and `account_id`. Save them privately. If a response
-is lost, replay the same signed payment to recover the same credentials,
-while they still authenticate; revoked or rotated credentials are not returned.
-A payment that fails verification creates nothing. Use the account credit route
-for later top-ups.
-See [funded keys](/cloud/balance-and-fallback#buy-a-funded-key).
+Sign the 402 challenge and repeat the request. The paid response returns the
+credentials under `key`; replaying the same signed payment returns them again
+without charging twice. See [buy a funded key](/cloud/balance-and-fallback#buy-a-funded-key).
 
 ## With the dashboard
 
@@ -171,18 +158,16 @@ See [funded keys](/cloud/balance-and-fallback#buy-a-funded-key).
 2. Create an endpoint. Your first endpoint creates your account, and you're
    its admin.
 3. Copy its RPC URL into your app's `.env`. Requests are served on public
-   providers under your free monthly allowance, and the dashboard says so.
+   providers under your free monthly allowance.
 4. Add balance, or subscribe to Pro, and the next request is served by premium
    providers. Subscribe to Custom to route over your own providers.
 
 ## Limits
 
 - Creating accounts without credentials is limited to 10 per hour per client
-  IP. Each provisional account gets its starting balance once.
+  IP.
 - Paying always needs a wallet signature; no Lasso credential can spend
   money.
-- `public` serves `load-balanced` only. A different strategy in a `public` URL
-  is served as `load-balanced`, and `lasso_meta.strategy` says so.
 
 ## Next
 

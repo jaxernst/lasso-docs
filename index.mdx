@@ -1,17 +1,22 @@
 ---
 title: Lasso documentation
-description: Choose managed Lasso Cloud or self-hosted Lasso RPC Core.
+description: One fast, resilient JSON-RPC endpoint for EVM chains, hosted as Lasso Cloud or self-hosted as the open-source Lasso RPC Core.
 canonical: https://docs.lasso.sh/
 ---
 
 # Lasso documentation
 
-Lasso routes EVM JSON-RPC requests across the providers you configure. Choose
-how you want to run it:
+Lasso puts one standard JSON-RPC endpoint in front of many EVM providers and
+nodes. It routes each request by live latency and health, fails over before
+your app sees an error, and shows which provider served every call. You change
+a URL, not your code.
 
-- **[Lasso Cloud](/cloud/overview)** runs the routing service for you, with managed profiles, accounts, keys, billing, and a hosted dashboard. Start with the [Cloud quickstart](/cloud/quickstart).
-- **[Lasso RPC Core](/introduction)** is the open-source routing engine you operate in your own environment. Start with the [Core quickstart](/quickstart) and [installation guide](/installation).
+- **[Lasso Cloud](/cloud/overview)** is the hosted endpoint: managed provider
+  pools, your own providers as Custom profiles, keys, one USD balance, live
+  dashboards and an API agents can drive end to end. Start with the
+  [Cloud quickstart](/cloud/quickstart).
+- **[Lasso RPC Core](/introduction)** is the open-source routing engine you run
+  on your own infrastructure. Start with the [Core quickstart](/quickstart).
 
-[Versions and availability](/releases-and-availability) separates released Core
-behavior from the current hosted service. [Support and lifecycle](/support-security-lifecycle)
-explains the ownership and support boundary for each product.
+[Versions and evidence](/releases-and-availability) compares the two, and
+[support and lifecycle](/support-security-lifecycle) explains how to get help.

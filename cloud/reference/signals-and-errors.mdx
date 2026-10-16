@@ -26,7 +26,7 @@ to use these signals together, read [routing evidence](/cloud/observability).
 |---|---|
 | `x-lasso-request-id` | Unique per request; quote it when reporting a problem |
 | `x-lasso-access` | What served the request: `premium`, `public` or `custom` |
-| `x-lasso-fallback` | Present only when the request was served somewhere other than the profile it named: `payment`, `free`, `availability` or `profile` |
+| `x-lasso-fallback` | Present only when the request was served somewhere other than the profile it named: `payment`, `free` or `profile` |
 | `x-lasso-cu` | The request's size in compute units |
 | `x-lasso-usd` | The request's charge to the balance in USD; `0` when included usage, free access, Custom access or payment fallback covered it |
 | `x-lasso-balance-usd` | An estimate of the balance after this charge. `GET /api/v1/accounts/{id}` is authoritative |
@@ -70,10 +70,8 @@ The catalog covers local refusals and terminal routing outcomes:
 
 <RpcErrors />
 
-Ordinary provider errors retain their code, message and data. Transaction
-submission errors add the [transaction-specific guidance](#transaction-submission-errors)
-below. When every eligible provider
-fails, the final JSON-RPC error arrives in an HTTP 200 response. An
+Provider errors keep their code, message and data. When every eligible
+provider fails, the final JSON-RPC error arrives in an HTTP 200 response. An
 `eth_getLogs` range a provider refuses as too large returns `-32005` with
 `data.code: "log_range_limit"`; split the range and retry.
 
@@ -89,11 +87,10 @@ A final routed `eth_sendRawTransaction` error carries these fields in `error.dat
 | `next_action` | Guidance to resend the same signed transaction |
 | `request_id` | Correlation ID to retain with the error |
 
-When an upstream rejection is returned, its code and message remain. Scalar upstream data is preserved
-under `upstream_data`. Honor any available `Retry-After` delay. Resend identical
-signed bytes when retrying; changing fees or nonces creates a replacement that
-your application must manage. A failed hash lookup does not prove the transaction
-was never accepted. See [transaction behavior](/cloud/rpc-behavior#transactions).
+The upstream rejection's code and message stay, with scalar upstream data
+under `upstream_data`. Honor any `Retry-After`, and resend identical signed
+bytes when retrying; changing fees or nonces creates a replacement your app
+must manage. See [transaction behavior](/cloud/rpc-behavior#transactions).
 
 ## WebSocket close reasons
 

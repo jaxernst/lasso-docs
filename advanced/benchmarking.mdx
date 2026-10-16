@@ -1,9 +1,9 @@
 ---
 title: 'Performance benchmarking'
-description: 'Distinguish recent routing evidence from operational performance summaries'
+description: 'How RPC Core measures provider performance from live traffic, and how routing evidence differs from dashboard summaries'
 ---
 
-In **Lasso RPC Core v0.5.1**, request execution supplies performance observations
+In RPC Core, request execution supplies performance observations
 without requiring a separate benchmark request for every user call. Background
 health and head probes are separate upstream traffic. Measure their cost alongside
 your workload when qualifying a deployment.
@@ -40,7 +40,7 @@ unmeasured channels are shuffled.
 instances a [bounded first pass](/concepts/routing-strategies#load-balanced) for
 replay-safe calls within each health tier. It does not rank by a benchmark score.
 **Priority** uses configured order. All strategies apply
-[health tiering](/concepts/routing-strategies#health-based-tiering) and live admission.
+[health tiering](/concepts/routing-strategies#health-comes-first) and live admission.
 
 The supported latency control is `LW_BETA` (positive number, default `3.0`).
 See [routing strategies](/concepts/routing-strategies) for the full released contract.

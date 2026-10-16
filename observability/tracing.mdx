@@ -3,7 +3,7 @@ title: OpenTelemetry tracing
 description: Optional OTLP traces for HTTP requests, routed RPC items, and upstream attempts in RPC Core.
 ---
 
-RPC Core v0.5.1 can export OpenTelemetry traces over OTLP. Tracing is off by default. When it is off, Lasso does no tracing work on the request path, and JSON logs and Prometheus metrics work without a trace backend. Export runs outside request workers, so a slow or failed collector never delays or changes an RPC result.
+RPC Core can export OpenTelemetry traces over OTLP. Tracing is off by default. When it is off, Lasso does no tracing work on the request path, and JSON logs and Prometheus metrics work without a trace backend. Export runs outside request workers, so a slow or failed collector never delays or changes an RPC result.
 
 ## Enable tracing
 

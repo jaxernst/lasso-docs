@@ -31,11 +31,9 @@ Content-Type: application/json
 }
 ```
 
-Store the new values in the secret store. `200` with `serving_ready: true`
-means the replacement is ready. `202` with `serving_ready: false` returns the
-committed replacement: keep it and any still-valid grace secret, wait
-`Retry-After`, then call RPC with the replacement. If RPC answers
-`service_initializing`, honor `Retry-After` and retry RPC. Do not rotate again.
+Store the new values in the secret store. A `202` with `serving_ready: false`
+returns the same replacement: keep it, wait `Retry-After`, then call RPC with
+it. Don't rotate again.
 
 ## 2. Deploy the new secret
 
@@ -51,8 +49,8 @@ curl -sS -o /dev/null -w '%{http_code}\n' "$LASSO_RPC_URL/base" \
   -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
 ```
 
-Check that each environment sends traffic with the new secret, for example by
-confirming its deployed configuration, before `previous_valid_until`.
+Confirm every environment that uses this key runs with the new secret before
+`previous_valid_until`.
 
 ## 4. Let the old secret expire
 

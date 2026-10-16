@@ -61,7 +61,7 @@
     "products": [
       {
         "product": "Lasso Cloud",
-        "description": "Managed EVM RPC: one edge-routed endpoint in front of your nodes and providers",
+        "description": "One routed, observable JSON-RPC endpoint across managed providers and your own nodes",
         "icon": "cloud",
         "groups": [
           {
@@ -75,13 +75,13 @@
           {
             "group": "Concepts",
             "pages": [
-              "cloud/accounts-and-agents",
               "cloud/keys-and-profiles",
               "cloud/routing",
-              "cloud/custom-profiles",
+              "cloud/observability",
               "cloud/serving-access-and-pricing",
               "cloud/balance-and-fallback",
-              "cloud/observability"
+              "cloud/custom-profiles",
+              "cloud/accounts-and-agents"
             ]
           },
           {
@@ -89,26 +89,26 @@
             "pages": [
               "cloud/guides/production-rpc-with-an-agent",
               "cloud/bring-your-own-rpc",
-              "cloud/guides/rotate-a-key",
               "cloud/multi-provider-rpc-failover",
               "cloud/latency-sensitive-rpc-reads",
-              "cloud/indexer-backfills"
+              "cloud/indexer-backfills",
+              "cloud/guides/rotate-a-key"
             ]
           },
           {
             "group": "Reference",
             "pages": [
-              "cloud/reference/agent-entry-points",
+              "cloud/rpc-behavior",
               "cloud/reference/signals-and-errors",
               "cloud/reference/chains-and-prices",
-              "cloud/rpc-behavior",
+              "cloud/json-rpc-compatibility",
+              "cloud/reference/agent-entry-points",
               "cloud/reference/v2-compatibility",
               {
                 "group": "Reliability evidence",
                 "pages": [
                   "cloud/websocket-continuity-evidence",
                   "cloud/historical-workloads",
-                  "cloud/json-rpc-compatibility",
                   "cloud/routing-overhead"
                 ]
               }
@@ -124,7 +124,7 @@
       },
       {
         "product": "RPC Core",
-        "description": "Open-source routing engine and self-hosting reference",
+        "description": "The open-source routing engine, for self-hosting",
         "icon": "server",
         "tabs": [
           {
@@ -135,8 +135,8 @@
                 "pages": [
                   "introduction",
                   "quickstart",
-                  "guides/route-across-providers",
-                  "installation"
+                  "installation",
+                  "guides/route-across-providers"
                 ]
               },
               {
@@ -188,6 +188,14 @@
                   "advanced/block-sync",
                   "advanced/error-classification"
                 ]
+              },
+              {
+                "group": "Releases and support",
+                "pages": [
+                  "releases-and-availability",
+                  "support-security-lifecycle",
+                  "advanced/benchmarking"
+                ]
               }
             ]
           },
@@ -224,14 +232,6 @@
                   "api/supported-methods",
                   "api/error-codes",
                   "api/response-formats"
-                ]
-              },
-              {
-                "group": "Releases and evidence",
-                "pages": [
-                  "releases-and-availability",
-                  "support-security-lifecycle",
-                  "advanced/benchmarking"
                 ]
               }
             ]

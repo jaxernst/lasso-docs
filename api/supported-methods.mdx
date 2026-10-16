@@ -1,30 +1,24 @@
 ---
 title: Supported methods
-description: The released RPC Core method, transaction, subscription, and affinity contract.
+description: Which methods RPC Core routes, retries and subscribes to, how it sends signed transactions, and which methods stay on one provider.
 ---
 
-This page describes the self-hosted **v0.5.1** runtime. Lasso Cloud has a separate
-[compatibility contract](https://docs.lasso.sh/cloud/json-rpc-compatibility).
-Do not infer parity from a shared method name or product version.
+This is the self-hosted RPC Core contract. Lasso Cloud's is in
+[RPC method behavior](/cloud/rpc-behavior).
 
 ## Reads and execution safety
 
 Common Ethereum reads such as `eth_blockNumber`, `eth_getBalance`, `eth_call`,
-`eth_getTransactionReceipt`, and `eth_getLogs` are routable, subject to provider
-capability, transport availability, history, and request parameters. A routable
-method is not a guarantee that every provider supports it.
+`eth_getTransactionReceipt` and `eth_getLogs` route to any provider whose
+capability, transport, history and parameters fit the request.
 
-Methods classified as replay-safe by the released `ExecutionEnvelope` can use
-bounded further attempts within the original deadline. Unknown methods receive
-one upstream dispatch. Provider error classification does not override execution
-safety. The registry classifies methods; it does not certify upstream semantics
-or full compliance with every Ethereum specification.
+Replay-safe methods can fail over to further providers within the original
+deadline. Unknown methods get one upstream dispatch, whatever the provider
+error says.
 
-An HTTP endpoint is rejected after a malformed or mismatched `eth_chainId`
-probe. A later matching probe can restore eligibility; an ordinary successful
-request cannot clear the rejection. Endpoints with no identity evidence remain
-subject to normal admission. This check does not establish WebSocket identity
-or attest the contents of arbitrary RPC responses.
+Core rejects an HTTP endpoint whose `eth_chainId` probe is malformed or names
+another chain, until a later probe matches. Endpoints not yet probed stay
+eligible. The check covers HTTP endpoints only.
 
 ## Signed transaction submission
 

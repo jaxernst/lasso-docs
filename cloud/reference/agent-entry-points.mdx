@@ -27,9 +27,9 @@ curl -fsSL https://lasso.sh/agent.json | jq '{chains: (.chains | length), strate
 | [`docs.lasso.sh/llms.txt`](https://docs.lasso.sh/llms.txt) | An index of these docs |
 | [`docs.lasso.sh/llms-full.txt`](https://docs.lasso.sh/llms-full.txt) | These docs as one text file |
 
-Live documents outrank prose. When a recipe and `agent.json` disagree, trust
+Live documents outrank prose: when a recipe and `agent.json` disagree, trust
 `agent.json` and `openapi.json`. This site also publishes `SKILL.md` as an
-installable skill, reconciled with the deployed behavior.
+installable skill.
 
 ## Read the homepage as Markdown
 
@@ -37,25 +37,21 @@ installable skill, reconciled with the deployed behavior.
 curl -fsSL https://lasso.sh/ -H 'accept: text/markdown'
 ```
 
-When your `Accept` header ranks `text/markdown` above `text/html`, `GET /`
-returns the agent guide as Markdown. Earlier listing wins a tie, and the
-response varies by `Accept`. Missing paths requested as Markdown return a
-Markdown error with links to the guide, skill, API and sitemap. The HTML
-homepage also publishes Organization and SoftwareApplication JSON-LD for
-discovery.
+When `Accept` ranks `text/markdown` above `text/html`, `GET /` returns
+`llms.txt`, and a missing path returns a Markdown error with links to the
+guide, skill, API and sitemap.
 
 ## Discover paid resources
 
-`openapi.json` advertises price ranges and payment protocols on purchase
-operations. `agent.json` lists the fixed funded-key URL as `endpoints.account_resources.funded_key`.
-A bodyless `POST /api/v1/credit` returns a 402 quote without creating an
-account; complete the signed exchange only within your user's payment budget.
-Use [funded keys](/cloud/balance-and-fallback#buy-a-funded-key) for the response
-and credential-saving contract.
+`openapi.json` lists the price range and payment protocols on each purchase
+operation, and `agent.json` names the funded-key URL in
+`endpoints.account_resources.funded_key`. A bodyless `POST /api/v1/credit`
+returns a 402 quote and creates nothing; see
+[buy a funded key](/cloud/balance-and-fallback#buy-a-funded-key).
 
-Tool wrappers, such as an MCP server, can be generated from `openapi.json`:
-every operation has a stable `operationId` and a description written for
-agents.
+Every operation in `openapi.json` has a stable `operationId` and a description
+written for agents, so tool wrappers such as an MCP server can be generated
+from it.
 
 ## Rules for agents
 
@@ -88,9 +84,9 @@ Content-Type: application/json
 | `request_id` | No | An `x-lasso-request-id` |
 | `operation` | No | An OpenAPI `operationId` |
 
-Lasso answers `202 {id}`. Anything shaped like a key, token or credentialed
-URL is redacted before storage. Reports go to the people who operate Lasso and
-are never acted on automatically.
+Lasso answers `202 {id}` and redacts anything shaped like a key, token or
+credentialed URL before storing it. People who operate Lasso read every
+report.
 
 ## Limits
 

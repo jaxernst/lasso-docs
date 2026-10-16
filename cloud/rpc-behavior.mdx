@@ -5,16 +5,16 @@ description: How Lasso Cloud handles reads, historical state and logs, traces, t
 
 # RPC method behavior
 
-Lasso treats methods differently depending on whether they're safe to retry,
-depend on history, or hold state on one provider. Use this table to plan each
-workload's rollout and recovery; the sections below give the details.
+Lasso handles each method by whether it's safe to retry, depends on history,
+or holds state on one provider. Use this table to plan each workload's rollout;
+the sections below give the details.
 
 | Workload | Failover | What your app owns |
 |---|---|---|
 | Current reads | Retried on another provider when safe | Chain reorgs and provider freshness differences |
 | Historical state and logs | Steered toward providers known to serve that history | Splitting large `eth_getLogs` ranges; checkpoints |
 | Trace and debug methods | Retried when safe; coverage varies by provider | Choosing providers that serve them |
-| `eth_sendRawTransaction` | Identical signed bytes sent sequentially to up to three providers unless a sender fault stops sending | Nonces, replacement, reconciliation by hash, receipts, finality |
+| `eth_sendRawTransaction` | The same signed bytes go to up to three providers in turn; a sender fault stops at the first | Nonces, replacement, receipts, finality |
 | HTTP filters | Not served | Use `eth_getLogs` or subscriptions |
 | WebSocket `newHeads` and `logs` | Moved to another provider with bounded backfill | Reconnecting and resubscribing; durable checkpoints |
 
@@ -35,13 +35,11 @@ a request's age from its block selector and steers it toward providers known to
 serve that depth. State reads by block hash go only to archival providers,
 because a hash's age is unknown before dispatch.
 
-`eth_getLogs` also has provider-specific range and result-size limits. When
-Lasso recognizes that limit, it returns `-32005` with
-`data.code: "log_range_limit"` and a `next_action` to narrow the range.
-Split the range; Lasso doesn't split it or repeat the same query on another
-provider. Some providers report a plan restriction on `eth_getLogs` as a
-generic `-32600`; Lasso recognizes that and tries the unchanged query on
-another eligible provider instead. Qualify your exact queries with
+`eth_getLogs` also has provider-specific range and result-size limits. When a
+provider refuses a range as too large, Lasso returns `-32005` with
+`data.code: "log_range_limit"` and a `next_action` to narrow the range; split
+it in your app. When a provider refuses `eth_getLogs` for plan reasons, Lasso
+tries the same query on another provider. Qualify your exact queries with
 [indexer backfills](/cloud/indexer-backfills).
 
 ## Trace and debug methods
@@ -53,29 +51,25 @@ profile's knowledge.
 
 ## Transactions
 
-`eth_sendRawTransaction` sends the same signed bytes sequentially to up to
-three providers within one deadline. Rate limits, timeouts, pool capacity,
-replacement underpricing and unfamiliar rejections can move to the next
-provider. Known-transaction responses and sender faults stop submission
-failover: examples include nonce too low or too high, insufficient funds,
-invalid signatures, malformed transactions and invalid gas or fee limits.
-A strict provider pin disables submission failover.
+`eth_sendRawTransaction` sends the same signed bytes to up to three providers
+in turn, within one deadline. A rate limit, timeout, full pool, underpriced
+replacement or unfamiliar rejection moves it to the next provider. A sender
+fault stops at the first: nonce too low or too high, insufficient funds, an
+invalid signature, a malformed transaction or invalid gas or fee limits. So
+does a response saying the node already knows the transaction. A provider pin
+sends to that provider only.
 
-For a final routing error with a derivable transaction hash, Lasso attempts one
-`eth_getTransactionByHash` lookup while the caller remains connected and the
-original deadline and an available route permit it. A pending or mined object
-returns the local hash only when its `hash` matches, case-insensitively.
-Rejection wording alone never proves success. A failed or skipped lookup leaves
-the error and can leave submission uncertain.
+Before returning an error, Lasso looks the transaction up by hash once, and
+returns the hash if the transaction is pending or mined. If the lookup can't
+run in time, the error stands and the outcome is uncertain: resend the same
+signed bytes, which is always safe, and reconcile by hash.
 
 Final transaction errors carry `error.data.error_type: transaction_rejection`,
-`retryable`, `next_action` and `request_id`; retain them and honor any available
-`Retry-After`. Resend the identical signed bytes when retrying. A successful
-response does not prove propagation, inclusion or finality. Your sender owns
-signing, nonce allocation, replacement, hash reconciliation, receipts and finality.
-
-RPC Core v0.5.1 retains its separate
-[single-dispatch transaction contract](/api/supported-methods#signed-transaction-submission).
+`retryable`, `next_action` and `request_id`; honor any `Retry-After`. A
+successful response means a provider accepted the transaction, not that it was
+included. Your app owns signing, nonces, replacement, receipts and finality.
+Self-hosted RPC Core sends a transaction to
+[one provider only](/api/supported-methods#signed-transaction-submission).
 
 ## HTTP filters
 
@@ -97,13 +91,11 @@ subscriptions aren't served. The engine's behavior is documented in
 ## Limits
 
 - Subscription recovery is bounded by a replay window and a deadline. When it
-  can't complete, the socket closes with code 1011, and the client reconnects
-  and resubscribes. Lasso never continues after a partial backfill.
-- Subscriptions don't move between profiles. Payment changes and Custom
-  access lapses follow the rules in
-  [balance and payment fallback](/cloud/balance-and-fallback).
-- Clients must handle network disconnects, duplicates around a reconnect, and
-  their own checkpoints for indexer-grade processing.
+  can't complete, the socket closes with code 1011 rather than skip events;
+  the client reconnects and resubscribes.
+- Subscriptions don't move between profiles.
+- Clients handle network disconnects, duplicates around a reconnect, and their
+  own checkpoints for indexer-grade processing.
 
 ## Next
 

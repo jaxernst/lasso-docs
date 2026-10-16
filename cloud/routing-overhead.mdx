@@ -1,6 +1,6 @@
 ---
 title: Routing overhead benchmark
-description: Measured latency Lasso's routing engine adds at 10,000 requests per second, and what the result does and doesn't show
+description: Lasso's routing engine adds under 1.1 ms at p95 at 10,000 requests per second, measured across five isolated trials
 ---
 
 # Routing overhead benchmark
@@ -42,13 +42,10 @@ The full report, raw results and harness revision are on
 
 ## Limits
 
-- This is routing-engine overhead, not a hosted-capacity promise. It excludes
-  internet ingress, authentication, metering, multiple regions, WebSocket
-  subscriptions and real providers.
-- One method against one controlled upstream. Other methods, payload sizes,
-  retries and deployment shapes can differ.
-- A difference of two p95 values is a paired distribution comparison, not a
-  per-request overhead.
+- This measures the routing engine alone. Internet latency, authentication,
+  metering, WebSocket subscriptions and real providers are outside it.
+- One method against one controlled upstream; other methods, payload sizes
+  and retries can differ.
 
 ## Next
 

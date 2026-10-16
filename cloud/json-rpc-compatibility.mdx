@@ -1,16 +1,14 @@
 ---
 title: Ethereum JSON-RPC compatibility
-description: The standards, provider differences, and claim boundaries behind Lasso's unified RPC interface
+description: The JSON-RPC and Ethereum standards Lasso follows, and how it handles provider differences in envelopes, errors, parameters and methods
 ---
 
 # Ethereum JSON-RPC compatibility
 
-Lasso is a standards-led compatibility and routing layer for EVM RPC.
-Applications use ordinary JSON-RPC while Lasso handles provider differences in
-transport behavior, error delivery, method coverage, history, limits, and
-chain-specific extensions.
-
-The goal is one predictable interface over providers that differ.
+Lasso gives apps one predictable JSON-RPC interface over providers that differ
+in transport behavior, error delivery, method coverage, history, limits and
+chain-specific extensions. This page lists the standards it follows and what
+it does with each difference.
 
 ## Compatibility target
 
@@ -75,20 +73,17 @@ on the routing path.
 Lasso does not treat every method as interchangeable:
 
 - Reads that are safe to repeat fail over within one deadline.
-- `eth_sendRawTransaction` can resend identical signed bytes sequentially to
-  up to three providers within one deadline; sender faults stop failover.
-  [Transaction behavior](/cloud/rpc-behavior#transactions) defines the hash lookup
-  and unresolved-outcome contract.
+- `eth_sendRawTransaction` resends the same signed bytes to up to three
+  providers in turn; sender faults stop at the first. See
+  [transaction behavior](/cloud/rpc-behavior#transactions).
 - Unknown and vendor methods pass through, with one dispatch each.
 - HTTP filter methods are rejected, because a filter ID belongs to one
   provider; use `eth_getLogs` or subscriptions.
 - WebSocket subscriptions support `newHeads` and `logs`, with failover and
   backfill.
 
-Profiles can include chain extensions, bundler methods, or client-specific
-namespaces. Their transport, replay safety, affinity, capability, cost, and
-access policy must be explicit before Lasso advertises stronger behavior than
-single dispatch.
+Chain extensions, bundler methods and client-specific namespaces route like
+any unknown method: one dispatch each, with no failover.
 
 ## Compatibility terms
 
@@ -103,7 +98,7 @@ single dispatch.
 
 ## Next
 
-Read [Cloud RPC workload behavior](/cloud/rpc-behavior) for the managed method,
-execution-safety and continuity boundaries, including rejected filter lifecycle
-methods. [Core supported methods](/api/supported-methods) is the separate
-self-hosted contract; Core forwards provider-local filters without affinity.
+- [RPC method behavior](/cloud/rpc-behavior): how Lasso Cloud handles each
+  kind of method.
+- [Supported methods](/api/supported-methods): the self-hosted RPC Core
+  contract.

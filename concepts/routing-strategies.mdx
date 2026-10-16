@@ -1,10 +1,11 @@
 ---
 title: 'Routing strategies'
-description: 'How released Core v0.5.1 ranks eligible upstream channels'
+description: 'How each RPC Core routing strategy orders eligible providers: load-balanced, fastest, latency-weighted, priority and provider pins'
 ---
 
-This page describes **Lasso RPC Core v0.5.1**. See [versions and evidence](/releases-and-availability)
-for release identity and [Cloud routing](/cloud/routing) for the managed service.
+Pick a strategy per request in the URL. Each orders the providers that passed
+eligibility and health checks; [provider selection](/concepts/provider-selection)
+covers those checks. For the hosted service, see [Cloud routing](/cloud/routing).
 
 ## Strategy selection
 

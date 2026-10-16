@@ -1,10 +1,9 @@
 ---
 title: 'Provider selection and failover'
-description: 'Eligibility, ranking and live admission in Core v0.5.1'
+description: 'How RPC Core narrows a profile to eligible providers, ranks them, and fails over within a request'
 ---
 
-**Lasso RPC Core v0.5.1** selects upstream channels from the requested file profile
-and chain. A configured provider and an executing channel are different: one
+RPC Core selects upstream channels from the requested profile and chain. A configured provider and an executing channel are different: one
 provider can offer HTTP and WebSocket transports, and multiple configuration
 entries can refer to the same physical upstream.
 
@@ -97,10 +96,9 @@ channels within the three-dispatch limit and absolute deadline. Unsafe and
 unknown methods do not inherit that replay behavior. See the
 [method contract](/api/supported-methods).
 
-A successful candidate list does not guarantee a successful request. More
-eligible channels may exist than the dispatch budget can reach. Routing
-exhaustion is a JSON-RPC error over HTTP 200; candidate or internal provider
-errors are not a promised public error-detail schema.
+The dispatch budget can run out before every eligible channel is tried. When
+it does, Core returns a JSON-RPC error over HTTP 200; see
+[error codes](/api/error-codes#core-routing-exhaustion).
 
 ## Inspect an actual request
 

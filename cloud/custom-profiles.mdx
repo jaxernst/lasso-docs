@@ -5,9 +5,9 @@ description: Route over your own nodes and provider accounts behind a profile sl
 
 # Custom profiles
 
-A Custom profile is an account-owned pool of your own nodes and provider
-accounts, routed by the same engine as Lasso's managed pool. Every key of the
-account reaches it at `/profile/<slug>/…`. Create one when you already pay for providers or run
+A Custom profile is a pool of your own nodes and provider accounts, routed by
+the same engine as Lasso's managed pools. Every key of the account reaches it
+at `/profile/<slug>/…`. Create one when you already pay for providers or run
 nodes and want failover, latency routing and evidence over them.
 
 ```http
@@ -46,7 +46,7 @@ other field is optional:
 | List order | provider | You use the `priority` strategy; first is preferred |
 | `block_protection` | chain | The app polls the latest block and shouldn't see it go backwards |
 | `max_lag_blocks` | chain | The app tolerates less (or more) staleness than the chain default |
-| `heads`: `live`, `standby`, `passive`, `off` | provider | Choose which provider tracks every block; see [head observation](#head-observation) |
+| `heads`: `live`, `standby`, `passive`, `off` | provider | You want to choose how Lasso tracks a provider's head; see [head tracking](#head-tracking) |
 | `health_checks`: `standard` or `light` | chain | Lasso's checks should spend less of your provider quota |
 | `error_interpretation` | profile | You opt in to Lasso interpreting your providers' error messages |
 | `limits`: `archival`, `logs_span`, `methods_blocked` | provider | You know a limit Lasso hasn't learned, such as your plan's log-span cap |
@@ -76,20 +76,24 @@ changed provider before storing anything:
 | `verifying` | Didn't answer; saved but kept out of routing, and rechecked every five minutes |
 | `failed` | Definitely wrong, such as another chain. The whole `PUT` is rejected with `provider_check_failed`, naming the provider |
 
-A saved profile can report `activating` with `retry_after_seconds`. Wait that
-interval, then read `GET /api/v1/profiles/{slug}` until it reports `live` before
-moving traffic. A profile still checking providers reports `verifying`; a chain
-with no verified provider returns a JSON-RPC error until one verifies.
+A newly saved profile can report `activating` with `retry_after_seconds`. Read
+`GET /api/v1/profiles/{slug}` until it reports `live` before moving traffic. A
+chain with no verified provider returns a JSON-RPC error until one verifies.
 
-## Head observation
+## Head tracking
 
-Lasso learns heads from traffic and a light poll. Set `heads: live` on a
-provider to track every block. `standby` opens a head feed only when the chain
-has no healthy live feed; `passive` (the default) uses traffic and light polling;
-`off` disables background head polling and feeds for that reference.
-`background_observations: false` remains the veto on all background work.
-Head modes do not change client subscription capability or identity checks.
-Omitting `heads` in a whole-document replacement resets it to passive.
+Lasso tracks each provider's block height from the requests routed through it
+and a light background poll. Choose a mode per provider:
+
+| `heads` | Behavior | Use it for |
+|---|---|---|
+| `passive` (default) | Traffic plus a light poll | Most providers |
+| `live` | A `newHeads` feed, updated every block | The provider you most want tracked closely |
+| `standby` | Opens a feed only when the chain has no healthy `live` feed | A backup for `live` |
+| `off` | No periodic head checks | Providers that bill per request |
+
+Head modes don't change which providers serve client subscriptions. Omitting
+`heads` when you replace the document resets it to `passive`.
 
 ## Lasso learns your providers
 
@@ -105,19 +109,17 @@ for each provider, with its source and effect:
 }}
 ```
 
-`effect: on` means the knowledge changes routing today; `shadow` means Lasso is
-observing it and doesn't act on it yet. Learned historical depth and exact method
-refusals are on for Custom profiles. They move unsuitable providers behind
-alternatives within the same health group, while keeping the last route
-available. Historical depth is method- and transport-specific; it does not
-certify universal archive coverage. Declare `limits` only for what you know
-better than Lasso does; declared limits outrank learned ones.
-`DELETE /api/v1/profiles/{slug}/providers/{name}/knowledge` resets what Lasso
-learned about one provider. In the dashboard's **Learned behavior** panel,
-select a node to inspect its HTTP and WebSocket evidence. **Reset knowledge**
-clears learned evidence for the selected transport; **Suspend 1h** temporarily
-stops applying an individual hint. Follow the panel's status after a control
-change while other nodes refresh. Declared limits remain in force.
+`effect: on` means the knowledge changes routing; `shadow` means Lasso observes
+it without acting on it. Learned historical depth and method refusals are on
+for Custom profiles: they move a provider that can't serve a request behind
+the alternatives, never dropping the last route. Declare `limits` only for what
+you know better than Lasso; declared limits outrank learned ones.
+
+To correct what Lasso learned, call
+`DELETE /api/v1/profiles/{slug}/providers/{name}/knowledge`, or use the
+dashboard's **Learned behavior** panel: select a node to see its HTTP and
+WebSocket evidence, **Reset knowledge** for one transport, or **Suspend 1h**
+to pause one hint.
 
 ## Block protection
 
@@ -143,7 +145,7 @@ instead; it works without protection.
 | Call | Result |
 |---|---|
 | `GET /api/v1/profiles`, `GET /api/v1/profiles/{slug}` | Document, revision, provider status and knowledge; URLs and header values are never returned |
-| `GET /api/v1/profiles/{slug}` with `Accept: application/yaml` | A compatible Lasso RPC Core YAML file with secrets replaced by environment references. A provider with `heads: standby` returns 422 `invalid_config` with its field path because Core cannot represent elected fallback; the stored profile stays unchanged |
+| `GET /api/v1/profiles/{slug}` with `Accept: application/yaml` | A Lasso RPC Core YAML file with secrets replaced by environment references. Core has no `standby` mode, so a profile using it returns 422 `invalid_config` |
 | `DELETE /api/v1/profiles/{slug}` | Removes the profile; URLs naming it serve as `premium` with `x-lasso-fallback: profile` |
 
 ## Limits
@@ -156,8 +158,8 @@ instead; it works without protection.
   `premium` until you renew. Open WebSocket connections on it close with
   `custom_access_expired`.
 - `block_protection` holds per Lasso server.
-- Chain identity is the only onboarding gate. Historical depth and method
-  coverage are learned from behavior, so test your exact archive queries.
+- Onboarding checks chain identity only. Test your exact archive queries
+  through the profile.
 
 ## Next
 

@@ -1,18 +1,19 @@
 ---
 title: Installation
-description: Install Lasso RPC Core from the verified container release or source.
+description: Install Lasso RPC Core from the verified container release or from source, and configure its storage, ports and secrets.
 ---
 
-Lasso RPC Core v0.5.1 runs on your infrastructure. For a managed endpoint, use the [Lasso Cloud quickstart](/cloud/quickstart).
+# Installation
 
-## Container installation
+Run Lasso RPC Core from the released container, or build it from source. For a
+hosted endpoint instead, use the [Lasso Cloud quickstart](/cloud/quickstart).
 
-See [release evidence](/releases-and-availability) for the verified v0.5.1 image digest
-and native installation checks.
+## Container
 
-The primary distribution is `ghcr.io/jaxernst/lasso-rpc`, with native Linux AMD64
-and ARM64 images. Use the Compose attachment from the release you select. It
-requires Docker Compose and OpenSSL for generating local secrets:
+`ghcr.io/jaxernst/lasso-rpc` publishes native Linux AMD64 and ARM64 images;
+[versions and evidence](/releases-and-availability) lists the v0.5.1 image
+digest. The release's Compose file needs Docker Compose, plus OpenSSL to
+generate local secrets:
 
 ```bash
 mkdir lasso && cd lasso
@@ -38,7 +39,7 @@ profiles and benchmark history. `docker compose down` retains that volume;
 another local port and `LASSO_NODE_ID` to give the instance a stable identity.
 
 
-## Source installation
+## From source
 
 ### Prerequisites
 
@@ -60,7 +61,8 @@ mix phx.server
 
 Available at `http://localhost:4000`. Dashboard at `http://localhost:4000/dashboard`.
 
-The included `public` profile includes free public providers — no API keys required.
+The included `public` profile uses free public providers, so no API keys are
+needed.
 
 ### `.env` File
 
@@ -75,6 +77,11 @@ ALCHEMY_API_KEY=your-key-here
 
 ## Configure and verify
 
-Keep `config/profiles/public.yml`; routes without a profile use `public`. Public upstreams require no provider key, but have their own availability and quotas. A successful health response proves the application is running; make an upstream-backed RPC request as well.
+Keep `config/profiles/public.yml`: routes without a profile use `public`. The
+health endpoint shows the application is up; an RPC request like the one above
+shows an upstream answers.
 
-For custom profiles, persistent storage, image verification, upgrades, and rollback, see [Docker deployment](/deployment/docker). RPC Core has no built-in client authentication or incoming RPC quotas. Protect externally accessible RPC, metrics, and dashboard endpoints at your network or reverse proxy.
+For your own profiles, image verification, upgrades and rollback, see
+[Docker deployment](/deployment/docker). Core has no built-in client
+authentication, so protect exposed RPC, metrics and dashboard endpoints at
+your network or reverse proxy.

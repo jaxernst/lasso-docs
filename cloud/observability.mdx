@@ -6,9 +6,8 @@ description: See where each request went, why, what it cost and what served it, 
 # Routing evidence
 
 Every Lasso response tells you what served it and what it cost, and one query
-parameter adds where it went and why. Use this page to debug a slow or failed
-request, explain a bill, or prove a routing change worked. Responses stay
-standard JSON-RPC unless you ask for more.
+parameter adds which provider answered and why. Use this page to debug a slow
+or failed request, explain a bill, or prove a routing change worked.
 
 ```bash
 curl -sS -D - "$LASSO_RPC_URL/fastest/base?include_meta=body" \
@@ -36,18 +35,13 @@ x-lasso-balance-usd: 19.87421
 }
 ```
 
-Keyed RPC execution responses include `x-lasso-cu`, `x-lasso-usd` and
-`x-lasso-balance-usd`, including final errors. They describe the selected
-outcome and local post-charge estimate; they do not wait for the once-per-minute
-settlement on each node.
-
 ## Where evidence lives
 
 | Surface | What it tells you | How to get it |
 |---|---|---|
 | Response headers | Request ID, serving access, fallback, size, charge, balance, rate limit | On every response |
 | `lasso_meta` | Strategy used, candidates, the provider that served it, latency split, retries | `?include_meta=body`, or `?include_meta=headers` for a base64url `x-lasso-meta` header that leaves the body untouched |
-| Key view | Requests and charges over 24 hours, and recent errors grouped by code and provider with a `next_action` | `GET /api/v1/keys/{id}` |
+| Key view | Requests and charges over the last 24 hours, and recent errors grouped by code and provider with a `next_action` | `GET /api/v1/keys/{id}`, or `/api/v1/keys/current` with the RPC key |
 | Account view | Balance, serving access, fallback, included usage, rate limits | `GET /api/v1/accounts/{id}` |
 | Account page | 30-day request and CU charts by profile, each key's traffic share and per-profile usage, included usage and balance spend | [lasso.sh/account](https://lasso.sh/account) |
 | Dashboard | Chains, providers, health and latency by region, and recent activity | [lasso.sh/dashboard](https://lasso.sh/dashboard) |
@@ -57,15 +51,6 @@ Every header, metadata field and error code is listed in
 routing engine's metadata fields are defined once, in
 [request metadata](/observability/request-metadata).
 
-## Read quota and funding state
-
-The Public profile shows a sponsored account's **Free quota** bar even while
-credit or Pro covers the account; the free allowance waits unused during that
-time. Premium shows its Pro quota or balance. If Premium is being served on
-Public, its notice names the cause and any grace expiry or quota reset. Follow
-that date rather than treating every unfunded state as a new grace window.
-See [balance and payment fallback](/cloud/balance-and-fallback).
-
 ## Debug a request
 
 1. Capture `x-lasso-request-id` at your client.
@@ -74,9 +59,8 @@ See [balance and payment fallback](/cloud/balance-and-fallback).
 3. Read `lasso_meta`: which strategy applied, which providers were candidates,
    which one served it, and how many retries it took.
 4. For an error Lasso originates, read `error.data.code` and
-   `error.data.next_action`; they name the fix. Ordinary provider errors retain
-   their payload; transaction errors add
-   [submission guidance](/cloud/reference/signals-and-errors#transaction-submission-errors).
+   `error.data.next_action`; they name the fix. Provider errors keep their
+   code and message.
 5. Check the key's `recent_errors` and the dashboard's provider health for a
    pattern across requests.
 
@@ -90,29 +74,19 @@ Content-Type: application/json
 {"message": "eth_getLogs on base returned -32005 for a 500-block range", "category": "rpc", "request_id": "01J9Z…"}
 ```
 
-Reports go to the people who operate Lasso. See
-[agent entry points](/cloud/reference/agent-entry-points#feedback).
+See [agent entry points](/cloud/reference/agent-entry-points#feedback) for
+the fields.
 
 ## Limits
 
-- `lasso_meta` shows which provider served a request, not that its answer was
-  correct.
 - Managed providers appear under public aliases such as `premium_base_2`;
   Custom profiles show your own provider names.
-- A candidate list isn't a list of attempts. Use `selected_provider` and
-  `retries`.
+- `candidate_providers` lists the order considered, not the attempts. Use
+  `selected_provider` and `retries`.
 - An HTTP batch's `x-lasso-meta` header describes one item. Use
-  `include_meta=body` or individual requests when you need every item's
-  evidence.
-- `x-lasso-balance-usd` estimates the balance after this charge; the account
-  view is authoritative.
-- Key `usage` and `recent_errors` summarize recent activity from reachable
-  nodes over 24 hours. A restart or unreachable node can remove its share;
-  empty diagnostics do not prove no traffic.
-- The Account page's 30-day totals are grouped by UTC day and profile, include
-  Custom traffic, and refresh as counts settle, normally once a minute.
-  These totals can undercount interrupted collection; use the account balance
-  for available spending power.
+  `include_meta=body` to see every item's evidence.
+- Usage views summarize activity for insight; the account balance is the
+  record of money.
 - The dashboard's recent activity is a live stream, not a request log.
 
 ## Next
