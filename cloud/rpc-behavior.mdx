@@ -1,6 +1,6 @@
 ---
 title: RPC method behavior
-description: How Lasso Cloud handles reads, historical state and logs, traces, transactions, filters and WebSocket subscriptions
+description: How Lasso Cloud handles reads, historical state and logs, traces, transactions, filters and WebSocket subscriptions, and the JSON-RPC standards it follows
 ---
 
 # RPC method behavior
@@ -88,6 +88,33 @@ another provider in the same profile when one fails, backfilling missed
 subscriptions aren't served. The engine's behavior is documented in
 [WebSocket subscriptions](/advanced/websocket-subscriptions).
 
+## Standards and provider differences
+
+Lasso follows [JSON-RPC 2.0](https://www.jsonrpc.org/specification) for
+envelopes and batches, Final Ethereum interface EIPs for specific wire
+contracts, and the
+[`ethereum/execution-apis`](https://github.com/ethereum/execution-apis) schemas
+at commit
+[`739f9e0`](https://github.com/ethereum/execution-apis/commit/739f9e00806003d2204adca7595f704849b9be30),
+then each chain's activated fork.
+
+- **Envelopes.** `jsonrpc` must be `"2.0"`, `method` a string, and `params` an
+  array or object when present. IDs keep their JSON type. Notifications get no
+  response; a request with no usable ID gets `id: null`.
+- **Batches.** Every valid item is answered and notification responses are
+  omitted. Use unique IDs; duplicates are preserved but ambiguous.
+- **Results pass through.** Lasso doesn't rebuild blocks, transactions,
+  receipts or logs, so new fork fields and chain extensions reach your app
+  unchanged.
+- **Upstream errors keep their `code`, `message` and `data`**, even when the
+  provider sent them with an HTTP 4xx or 5xx. HTML, gateway text and other
+  transport failures are treated as provider failures and can fail over.
+- **Parameters.** EIP-1898 block selectors need exactly one of `blockNumber` or
+  `blockHash`, and `requireCanonical` only with `blockHash`. An EIP-234
+  `eth_getLogs` filter can't mix `blockHash` with `fromBlock` or `toBlock`.
+- **Unknown, vendor and chain-specific methods** pass through with one
+  dispatch each and no failover.
+
 ## Limits
 
 - Subscription recovery is bounded by a replay window and a deadline. When it
@@ -100,7 +127,5 @@ subscriptions aren't served. The engine's behavior is documented in
 ## Next
 
 - [Routing](/cloud/routing): how failover chooses the next provider.
-- [Ethereum JSON-RPC compatibility](/cloud/json-rpc-compatibility): the
-  standards Lasso follows.
 - [Response signals and errors](/cloud/reference/signals-and-errors): every
   error code.

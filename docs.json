@@ -39,7 +39,7 @@
         ]
       },
       {
-        "header": "Trust",
+        "header": "Resources",
         "items": [
           {
             "label": "Support and lifecycle",
@@ -50,7 +50,7 @@
             "href": "/releases-and-availability"
           },
           {
-            "label": "Reliability evidence",
+            "label": "Benchmarks",
             "href": "/cloud/websocket-continuity-evidence"
           }
         ]
@@ -65,7 +65,7 @@
         "icon": "cloud",
         "groups": [
           {
-            "group": "Start here",
+            "group": "Get started",
             "pages": [
               "cloud/overview",
               "cloud/quickstart",
@@ -89,8 +89,6 @@
             "pages": [
               "cloud/guides/production-rpc-with-an-agent",
               "cloud/bring-your-own-rpc",
-              "cloud/multi-provider-rpc-failover",
-              "cloud/latency-sensitive-rpc-reads",
               "cloud/indexer-backfills",
               "cloud/guides/rotate-a-key"
             ]
@@ -101,11 +99,9 @@
               "cloud/rpc-behavior",
               "cloud/reference/signals-and-errors",
               "cloud/reference/chains-and-prices",
-              "cloud/json-rpc-compatibility",
               "cloud/reference/agent-entry-points",
-              "cloud/reference/v2-compatibility",
               {
-                "group": "Reliability evidence",
+                "group": "Benchmarks",
                 "pages": [
                   "cloud/websocket-continuity-evidence",
                   "cloud/historical-workloads",
@@ -131,7 +127,7 @@
             "tab": "Documentation",
             "groups": [
               {
-                "group": "Get Started",
+                "group": "Get started",
                 "pages": [
                   "introduction",
                   "quickstart",
@@ -140,7 +136,7 @@
                 ]
               },
               {
-                "group": "Core Concepts",
+                "group": "Concepts",
                 "pages": [
                   "concepts/architecture",
                   "concepts/routing-strategies",
@@ -272,6 +268,22 @@
     {
       "source": "/agents/errors",
       "destination": "/cloud/reference/signals-and-errors"
+    },
+    {
+      "source": "/cloud/multi-provider-rpc-failover",
+      "destination": "/cloud/routing"
+    },
+    {
+      "source": "/cloud/latency-sensitive-rpc-reads",
+      "destination": "/cloud/routing"
+    },
+    {
+      "source": "/cloud/json-rpc-compatibility",
+      "destination": "/cloud/rpc-behavior"
+    },
+    {
+      "source": "/cloud/reference/v2-compatibility",
+      "destination": "/cloud/accounts-and-agents"
     }
   ]
 }

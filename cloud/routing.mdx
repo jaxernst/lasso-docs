@@ -49,18 +49,35 @@ four strategies. `public`, payment fallback and free access serve
 `load-balanced`, and `lasso_meta.strategy` reports what was used. On premium,
 strategies [price differently](/cloud/serving-access-and-pricing).
 
-## Failover on Lasso Cloud
+## What failover covers
 
-| Situation | What happens |
+| Work | On a provider failure |
 |---|---|
-| A provider times out or errors on a read | The next provider in the order is tried, within the request deadline |
-| Every provider in the profile fails | The final JSON-RPC error returns inside an HTTP 200; check the body's `error`, not only the status. A profile never borrows providers from another pool |
-| A signed transaction times out or gets a node-local rejection | The same bytes go to the next provider, up to three in total; sender faults stop there. See [transactions](/cloud/rpc-behavior#transactions) |
-| A provider answers 429 | It moves behind healthy providers and returns to normal order when its cooldown ends |
-| A provider keeps failing | Its circuit opens. After a cooldown, a trial request decides whether it returns |
+| Reads: balances, calls, receipts, blocks, logs | Retried on the next provider in the order, within the request deadline |
+| Historical reads | Retried on the next provider, steered toward those known to serve that history |
+| `eth_sendRawTransaction` | The same signed bytes go to the next provider, up to three in total; sender faults stop there. See [transactions](/cloud/rpc-behavior#transactions) |
+| WebSocket `newHeads` and `logs` | Moved to another provider, with missed blocks backfilled |
+| A provider answering 429 | Moved behind healthy providers until its cooldown ends |
+| A provider that keeps failing | Its [circuit](/concepts/circuit-breakers) opens; after a cooldown, a trial request decides whether it returns |
+| Every provider in the profile | The final JSON-RPC error returns inside an HTTP 200; check the body's `error`, not only the status |
 
-Pin one provider with `<base>/provider/<name>/<chain>` to debug it. A pin has
-no failover.
+A profile never borrows providers from another pool. Pin one provider with
+`<base>/provider/<name>/<chain>` to debug it; a pin has no failover.
+
+## Trial it against your current endpoint
+
+1. Send the same mix of your app's real methods through your current endpoint
+   and through Lasso, from the regions you deploy in.
+2. Compare success rate, p50, p95 and p99 latency, and head freshness. A lower
+   mean alone doesn't show the tail improved.
+3. Add `?include_meta=body` to see `selected_provider`, `retries`,
+   `upstream_latency_ms` and `lasso_overhead_ms` for each request. See
+   [routing evidence](/cloud/observability).
+4. Force the failure you need to survive, such as throttling or stopping one of
+   your own nodes, and confirm your requests keep succeeding.
+
+Lasso's routing engine adds under 1.1 ms at p95 at 10,000 requests per second;
+see the [routing overhead benchmark](/cloud/routing-overhead).
 
 ## When Lasso's own systems fail
 
@@ -73,6 +90,8 @@ during the outage take effect once the node can read them.
 - `load-balanced` spreads load across healthy providers, not evenly: if only
   one is healthy, it takes nearly every first attempt.
 - `fastest` can concentrate traffic on one provider for one kind of request.
+- A provider without recent measurements isn't assumed fast or slow; it's
+  tried after measured ones.
 - Failover helps only when providers overlap on the method, history and chain
   you need. Two URLs on the same provider account can fail together.
 
@@ -82,5 +101,5 @@ during the outage take effect once the node can read them.
   filters and subscriptions.
 - [Routing evidence](/cloud/observability): see which provider served a
   request and why.
-- [Multi-provider failover](/cloud/multi-provider-rpc-failover): test the
-  failure you need to survive.
+- [Bring your own providers](/cloud/bring-your-own-rpc): route over the
+  provider accounts and nodes you already have.
