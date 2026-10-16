@@ -1,22 +1,55 @@
 ---
 title: Lasso documentation
-description: One fast, resilient JSON-RPC endpoint for EVM chains, hosted as Lasso Cloud or self-hosted as the open-source Lasso RPC Core.
+description: Lasso is one fast, resilient JSON-RPC endpoint for EVM chains. It routes every request across many providers by live latency and health, fails over before your app sees an error, and shows what served each call.
 canonical: https://docs.lasso.sh/
 ---
 
-# Lasso documentation
+# Lasso
 
-Lasso puts one standard JSON-RPC endpoint in front of many EVM providers and
-nodes. It routes each request by live latency and health, fails over before
-your app sees an error, and shows which provider served every call. You change
-a URL, not your code.
+Lasso is one JSON-RPC endpoint for EVM chains that routes every request across
+many providers. It measures each provider's latency and health per kind of
+request, sends each call to the right one, and fails over before your app sees
+an error. Your app keeps standard JSON-RPC; only the URL changes.
 
-- **[Lasso Cloud](/cloud/overview)** is the hosted endpoint: managed provider
-  pools, your own providers as Custom profiles, keys, one USD balance, live
-  dashboards and an API agents can drive end to end. Start with the
-  [Cloud quickstart](/cloud/quickstart).
-- **[Lasso RPC Core](/introduction)** is the open-source routing engine you run
-  on your own infrastructure. Start with the [Core quickstart](/quickstart).
+## Why not a single provider URL
 
-[Versions and evidence](/releases-and-availability) compares the two, and
-[support and lifecycle](/support-security-lifecycle) explains how to get help.
+| With one provider URL | With Lasso |
+|---|---|
+| The provider's outage or rate limit is your app's error | A retryable failure moves to the next provider within the same request |
+| You get whatever latency that provider has today | `fastest` picks the provider measured fastest for that kind of request, in the region serving you |
+| A dropped WebSocket drops your subscription | Subscriptions move to another provider, with missed blocks backfilled |
+| You can't see why a call was slow or failed | Each response can name the provider, its latency and any retries |
+
+## Try it
+
+Create an endpoint with one request and no signup, then call Base through it:
+
+```bash
+LASSO_RPC_URL=$(curl -fsS https://lasso.sh/api/v1/keys \
+  -H 'content-type: application/json' -d '{"name":"try"}' | jq -r .rpc_url)
+
+curl -fsS --retry 5 "$LASSO_RPC_URL/base?include_meta=body" \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}' \
+  | jq '{result, provider: .lasso_meta.selected_provider.id, ms: .lasso_meta.upstream_latency_ms}'
+```
+
+The [Cloud quickstart](/cloud/quickstart) takes it from here to your app's
+`.env`.
+
+## Choose how to run it
+
+- **[Lasso Cloud](/cloud/overview)** is the hosted endpoint at lasso.sh:
+  managed provider pools, your own providers as Custom profiles, one USD
+  balance, live dashboards, and an API agents can drive end to end.
+- **[Lasso RPC Core](/introduction)** is the open-source routing engine. Run
+  it in front of your own nodes and providers; start with the
+  [Core quickstart](/quickstart).
+
+## For agents
+
+Lasso Cloud describes itself to agents at
+[`lasso.sh/llms.txt`](https://lasso.sh/llms.txt), with the full API in
+[`openapi.json`](https://lasso.sh/openapi.json) and live chains, prices and
+limits in [`agent.json`](https://lasso.sh/agent.json). Every error Lasso
+originates carries a `next_action`.

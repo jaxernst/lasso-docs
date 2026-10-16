@@ -90,8 +90,9 @@ payment state, not the URL. See
 `POST /api/v1/keys/{id}/rotate` issues a new secret and keeps the old one
 working for an overlap you choose, so deploys catch up with no downtime; see
 [rotate a key](/cloud/guides/rotate-a-key). `DELETE /api/v1/keys/{id}` revokes
-a key. Every URL Lasso has issued keeps serving; older URL forms are on
-[upgrading from Agent API v2](/cloud/reference/v2-compatibility).
+a key. Every URL Lasso has issued keeps serving, including the older
+`round-robin` strategy segment, `/rpc/<chain>/<provider>` pins and `?key=`
+query parameter, until a form goes 30 days without traffic.
 
 ## Limits
 
