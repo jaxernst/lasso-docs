@@ -11,13 +11,13 @@ hosted endpoint instead, use the [Lasso Cloud quickstart](/cloud/quickstart).
 ## Container
 
 `ghcr.io/jaxernst/lasso-rpc` publishes native Linux AMD64 and ARM64 images;
-[versions and evidence](/releases-and-availability) lists the v0.5.1 image
+[versions and evidence](/releases-and-availability) lists the v0.6.0 image
 digest. The release's Compose file needs Docker Compose, plus OpenSSL to
 generate local secrets:
 
 ```bash
 mkdir lasso && cd lasso
-curl --fail --location https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.1/compose.yml --output compose.yml
+curl --fail --location https://github.com/jaxernst/lasso-rpc/releases/download/v0.6.0/compose.yml --output compose.yml
 (umask 077; printf 'SECRET_KEY_BASE=%s\nRELEASE_COOKIE=%s\n' "$(openssl rand -hex 64)" "$(openssl rand -hex 32)" > .env)
 docker compose up -d --wait
 curl --fail http://localhost:4000/api/health
@@ -52,7 +52,7 @@ another local port and `LASSO_NODE_ID` to give the instance a stable identity.
 ```bash
 git clone https://github.com/jaxernst/lasso-rpc
 cd lasso-rpc
-git checkout v0.5.1
+git checkout v0.6.0
 mix deps.get
 mix assets.setup
 mix assets.build

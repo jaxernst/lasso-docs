@@ -72,18 +72,33 @@ curl -X POST http://localhost:4000/rpc/load-balanced/ethereum \
   -d '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0x0000000000000000000000000000000000000000","latest"],"id":1}'
 ```
 
-### Latency Weighted
+### Balanced Fast
 
 ```
+POST /rpc/balanced-fast/:chain
 POST /rpc/latency-weighted/:chain
 ```
 
-Probabilistically routes requests with bias toward lower-latency providers.
+Routes in random order weighted toward lower-latency providers. `latency-weighted` is a permanent alias.
 
 ```bash
-curl -X POST http://localhost:4000/rpc/latency-weighted/ethereum \
+curl -X POST http://localhost:4000/rpc/balanced-fast/ethereum \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","method":"eth_call","params":[{"to":"0x0000000000000000000000000000000000000000","data":"0x"},"latest"],"id":1}'
+```
+
+### Priority
+
+```
+POST /rpc/priority/:chain
+```
+
+Tries providers in the order of their configured `priority` field, lowest first.
+
+```bash
+curl -X POST http://localhost:4000/rpc/priority/ethereum \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
 ```
 
 ## Provider Override Endpoints
@@ -125,7 +140,9 @@ POST /rpc/profile/:profile/:chain
 POST /rpc/profile/:profile/fastest/:chain
 POST /rpc/profile/:profile/load-balanced/:chain
 POST /rpc/profile/:profile/round-robin/:chain
+POST /rpc/profile/:profile/balanced-fast/:chain
 POST /rpc/profile/:profile/latency-weighted/:chain
+POST /rpc/profile/:profile/priority/:chain
 POST /rpc/profile/:profile/provider/:provider_id/:chain
 POST /rpc/profile/:profile/:chain/:provider_id
 ```

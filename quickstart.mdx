@@ -13,7 +13,7 @@ Docker Compose and OpenSSL.
 
 ```bash
 mkdir lasso && cd lasso
-curl --fail --location https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.1/compose.yml --output compose.yml
+curl --fail --location https://github.com/jaxernst/lasso-rpc/releases/download/v0.6.0/compose.yml --output compose.yml
 (umask 077; printf 'SECRET_KEY_BASE=%s\nRELEASE_COOKIE=%s\n' "$(openssl rand -hex 64)" "$(openssl rand -hex 32)" > .env)
 docker compose up -d --wait
 ```
@@ -58,7 +58,7 @@ The dashboard has a WebSocket tester too.
 | Route | Use it for |
 |---|---|
 | `/rpc/fastest/ethereum` | Latency-critical reads |
-| `/rpc/latency-weighted/ethereum` | Spreading load while favoring fast providers |
+| `/rpc/balanced-fast/ethereum` | Spreading load while favoring fast providers |
 | `/rpc/load-balanced/ethereum` | Backends and indexers |
 | `/rpc/profile/my-app/ethereum` | A profile you configured, named `my-app` |
 
