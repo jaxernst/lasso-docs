@@ -65,9 +65,12 @@ run in time, the error stands and the outcome is uncertain: resend the same
 signed bytes, which is always safe, and reconcile by hash.
 
 Final transaction errors carry `error.data.error_type: transaction_rejection`,
-`retryable`, `next_action` and `request_id`; honor any `Retry-After`. A
-successful response means a provider accepted the transaction, not that it was
-included. Your app owns signing, nonces, replacement, receipts and finality.
+`retryable`, `next_action` and `request_id`; honor any `Retry-After`. When
+`retryable` is `true`, `next_action` says it's safe to resend the same signed
+transaction; when `false`, it says to check the transaction's hash for a
+receipt before signing a new one, then address the cause in the error message.
+A successful response means a provider accepted the transaction, not that it
+was included. Your app owns signing, nonces, replacement, receipts and finality.
 Self-hosted RPC Core sends a transaction to
 [one provider only](/api/supported-methods#signed-transaction-submission).
 

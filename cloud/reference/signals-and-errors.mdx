@@ -84,13 +84,15 @@ A final routed `eth_sendRawTransaction` error carries these fields in `error.dat
 | `code` | `provider_error` |
 | `error_type` | `transaction_rejection` |
 | `retryable` | Whether the outcome permits retry; sender faults are false, node-local or ambiguous failures are true |
-| `next_action` | Guidance to resend the same signed transaction |
+| `next_action` | When `retryable` is `true`: it's safe to resend the same signed transaction. When `false`: check the transaction's hash for a receipt before signing a new one, then address the cause in the error message |
 | `request_id` | Correlation ID to retain with the error |
 
 The upstream rejection's code and message stay, with scalar upstream data
-under `upstream_data`. Honor any `Retry-After`, and resend identical signed
-bytes when retrying; changing fees or nonces creates a replacement your app
-must manage. See [transaction behavior](/cloud/rpc-behavior#transactions).
+under `upstream_data`. Honor any `Retry-After`. When `retryable` is `true`,
+resend identical signed bytes; changing fees or nonces creates a replacement
+your app must manage. When `retryable` is `false`, check the hash for a
+receipt before signing a new one. See
+[transaction behavior](/cloud/rpc-behavior#transactions).
 
 ## WebSocket close reasons
 
