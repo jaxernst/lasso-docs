@@ -13,7 +13,7 @@ over on retryable errors and shows its work.
 ## What it does
 
 - **Routes by measurement.** Health checks and circuit breakers decide which
-  providers are eligible. `fastest` and `latency-weighted` then order them by
+  providers are eligible. `fastest` and `balanced-fast` then order them by
   recent latency, per chain, kind of request and transport; `load-balanced`
   spreads load across them. A provider route pins one upstream for debugging.
 - **Fails over safely.** Retries are bounded by the original deadline and by
@@ -29,7 +29,7 @@ over on retryable errors and shows its work.
   OpenTelemetry traces cover the rest. Regional nodes route from their own
   measurements and can cluster for a combined view.
 
-These docs describe [RPC Core v0.5.1](/releases-and-availability). For a hosted
+These docs describe [RPC Core v0.6.0](/releases-and-availability). For a hosted
 endpoint with keys, billing and managed providers, use
 [Lasso Cloud](/cloud/overview).
 

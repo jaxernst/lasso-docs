@@ -3,7 +3,7 @@ title: Docker deployment
 description: Run, verify, configure, upgrade, and roll back the public RPC Core image.
 ---
 
-The example below installs the v0.5.1 container. Its image digest and
+The example below installs the v0.6.0 container. Its image digest and
 verification reports are on [versions and evidence](/releases-and-availability).
 
 The primary distribution is `ghcr.io/jaxernst/lasso-rpc`, with native Linux AMD64
@@ -12,7 +12,7 @@ requires Docker Compose and OpenSSL for generating local secrets:
 
 ```bash
 mkdir lasso && cd lasso
-curl --fail --location https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.1/compose.yml --output compose.yml
+curl --fail --location https://github.com/jaxernst/lasso-rpc/releases/download/v0.6.0/compose.yml --output compose.yml
 (umask 077; printf 'SECRET_KEY_BASE=%s\nRELEASE_COOKIE=%s\n' "$(openssl rand -hex 64)" "$(openssl rand -hex 32)" > .env)
 docker compose up -d --wait
 curl --fail http://localhost:4000/api/health
@@ -56,7 +56,7 @@ gh attestation verify oci://ghcr.io/jaxernst/lasso-rpc@sha256:DIGEST \
 The signed attestation identifies the publication workflow. Platform BuildKit
 provenance records the pinned public source used for the build; the index also
 contains SBOMs. Source and publication-tooling revisions are recorded separately
-in `container-release.json`. See [Releasing](https://github.com/jaxernst/lasso-rpc/blob/v0.5.1/docs/RELEASING.md) for the verification
+in `container-release.json`. See [Releasing](https://github.com/jaxernst/lasso-rpc/blob/v0.6.0/docs/RELEASING.md) for the verification
 scope, first-publication access setup, and retry behavior.
 
 #### Custom profiles and credentials
@@ -88,7 +88,7 @@ services:
 ```
 
 Edit the YAML in `profiles/`, retaining a valid `public.yml`. Additional profiles
-need matching filenames and frontmatter slugs. See [Configuration](https://github.com/jaxernst/lasso-rpc/blob/v0.5.1/docs/CONFIGURATION.md)
+need matching filenames and frontmatter slugs. See [Configuration](https://github.com/jaxernst/lasso-rpc/blob/v0.6.0/docs/CONFIGURATION.md)
 for supported settings. Files must be readable by UID 10001 and directories
 traversable by that UID; host directories used for writable history must also be
 writable by UID 10001. Keep credential values in `.env` and reference them as
@@ -100,14 +100,16 @@ Apply mount changes or environment changes:
 docker compose up -d --force-recreate --wait
 ```
 
-In v0.5.1, new profiles can reuse connected WebSocket upstreams after reload.
-If you remain on v0.3.4, recreate the container after adding profiles to avoid
-unavailable subscriptions. For new profiles and YAML-only edits in v0.5.1, reload
-the running node:
+For new profiles and YAML-only edits, validate and reload the running node
+instead. New profiles reuse connected WebSocket upstreams:
 
 ```bash
-docker compose exec -T lasso /app/bin/lasso rpc 'IO.inspect(Lasso.Config.ConfigStore.reload())'
+docker compose exec -T lasso /app/bin/lasso check-config
+docker compose exec -T lasso /app/bin/lasso reload
 ```
+
+Both commands exit nonzero on an invalid file, and a rejected reload keeps the
+active configuration.
 
 A successful reload prints `:ok`. A rejected reload reports its error and keeps
 the active configuration. Fix the file before restarting: a cold start cannot
@@ -138,11 +140,18 @@ and reloading; application-side configuration saves need a writable mount.
 
 Do not run `down --volumes` as an upgrade step.
 
-When migrating the v0.3.3 example profiles to v0.3.4, remove the ignored provider
-fields `type` and `api_key_required`. Replace the old
-`adapter_config.max_block_range` with `capabilities.limits.max_block_range`.
-Preserve your own provider URLs, credentials, and supported settings. The target
-release's bundled profiles show the supported shape.
+Upgrading from v0.5.1 to v0.6.0 needs no profile, journal or history
+migration; secrets and data carry over. Before you switch:
+
+- Rename `LW_BETA` to `BALANCED_FAST_BETA` if you set it. v0.6.0 doesn't read
+  the old name.
+- Bare `/api/ready` now reports replica readiness only. Point load balancers
+  that need upstream-backed readiness at
+  `/api/ready?profile=PROFILE&chain=CHAIN`.
+- `latency-weighted` URLs and `strategy` values keep working as aliases of
+  `balanced-fast`; metadata and logs report `balanced_fast`.
+- If you enrolled `global` block publication, rolling back needs a compatible
+  binary or the [coordinated disable procedure](/deployment/block-continuity#changing-or-disabling-the-policy).
 
 Images built before the persistent `/data` layout used `/app/config/profiles`
 and `/app/priv/benchmark_snapshots`. Copy customized configuration and history

@@ -11,7 +11,7 @@ original `code`, `message`, and optional `data` in the caller response.
 
 ## Decision order
 
-The released [classifier](https://github.com/jaxernst/lasso-rpc/blob/v0.5.1/lib/lasso/core/support/error_classification.ex)
+The released [classifier](https://github.com/jaxernst/lasso-rpc/blob/v0.6.0/lib/lasso/core/support/error_classification.ex)
 checks structural revert evidence and definitive codes before message patterns.
 For ambiguous codes, it uses bounded message evidence for execution errors,
 provider limits, authentication, and capabilities, then falls back to the code.

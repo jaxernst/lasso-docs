@@ -4,8 +4,8 @@
     "observedDeployedSha": "2f561b679916cba972d19a8da0760f73a0261296"
   },
   "core": {
-    "release": "v0.5.1",
-    "sourceSha": "bd028b0870afc714e4d85fa94fe0bc2af94df628"
+    "release": "v0.6.0",
+    "sourceSha": "c78a782d33aea8c12286f09a1af2151a3747ea89"
   },
   "lastFullAuditAt": "2026-10-15T02:19:48Z"
 }

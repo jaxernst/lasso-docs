@@ -24,6 +24,7 @@ description: Runtime variables for RPC Core containers and source deployments.
 | `LASSO_HTTP_RESPONSE_HEAP_TUNING_ENABLED` | No | Use a larger short-lived heap while validating completed HTTP upstream responses; benchmark before enabling for latency-bound traffic | `false` |
 | `LASSO_HTTP_POOL_SIZE` | No | Maximum HTTP/1 connections per upstream host and pool | `256` |
 | `LASSO_HTTP_POOL_COUNT` | No | Independent Finch pools per upstream host | `1` |
+| `BALANCED_FAST_BETA` | No | Latency exponent for [`balanced-fast`](/concepts/routing-strategies#balanced-fast); a positive number, where higher values favor low latency more strongly | `3.0` |
 
 ### Clustering
 

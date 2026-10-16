@@ -60,15 +60,15 @@ chains:
 
 `selection` belongs under the chain. The profile body accepts only the `chains`
 mapping. A `routing.method_overrides` block is not supported. See the released
-[file schema](https://github.com/jaxernst/lasso-rpc/blob/v0.5.1/lib/lasso/config/file_schema.ex)
-and [configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.5.1/docs/CONFIGURATION.md#provider-capabilities).
+[file schema](https://github.com/jaxernst/lasso-rpc/blob/v0.6.0/lib/lasso/config/file_schema.ex)
+and [configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.6.0/docs/CONFIGURATION.md#provider-capabilities).
 
 ## Strategy ranking
 
 [Routing strategies](/concepts/routing-strategies) define channel order:
 randomized load balancing with a bounded distinct-instance first pass for
 replay-safe calls, recent reliability-qualified latency, relative latency weights,
-or configured priority. Fastest and latency-weighted use recent local routing
+or configured priority. Fastest and balanced-fast use recent local routing
 evidence, not lifetime dashboard averages or an implicit exploration floor.
 
 ## Health tiering

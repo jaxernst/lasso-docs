@@ -1,6 +1,6 @@
 ---
 title: 'Routing strategies'
-description: 'How each RPC Core routing strategy orders eligible providers: load-balanced, fastest, latency-weighted, priority and provider pins'
+description: 'How each RPC Core routing strategy orders eligible providers: load-balanced, fastest, balanced-fast, priority and provider pins'
 ---
 
 Pick a strategy per request in the URL. Each orders the providers that passed
@@ -16,7 +16,8 @@ Select a strategy in the request URL:
 | `/rpc/:chain` | Application default; shipped as `load_balanced` |
 | `/rpc/load-balanced/:chain` | Randomized order with distinct-instance first pass for replay-safe calls |
 | `/rpc/fastest/:chain` | Recent reliability-qualified latency |
-| `/rpc/latency-weighted/:chain` | Weighted random order |
+| `/rpc/balanced-fast/:chain` | Random order weighted toward lower recent latency; `latency-weighted` is a permanent alias |
+| `/rpc/priority/:chain` | Configured provider `priority` order |
 | `/rpc/round-robin/:chain` | Alias for `load-balanced`; not deterministic round-robin rotation |
 | `/rpc/profile/:profile/fastest/:chain` | Explicit file profile and strategy |
 | `/rpc/provider/:provider_id/:chain` | One configured provider; see [provider override](#provider-override) |
@@ -30,8 +31,8 @@ The application default can be set to `:priority` in an Elixir configuration:
 config :lasso, :provider_selection_strategy, :priority
 ```
 
-Use the base route for that default. Core does not expose a `/rpc/priority/:chain`
-strategy route. Strategy names in metadata use underscores, such as `load_balanced`.
+Strategy names in metadata use underscores, such as `load_balanced` and
+`balanced_fast`.
 
 ## Load balanced
 
@@ -69,9 +70,10 @@ priors and deterministic identity order. Missing or stale evidence does not
 become proof that a provider is fast or reliable. Lifetime dashboard averages
 are not the routing score.
 
-## Latency weighted
+## Balanced fast
 
-Latency weighted also places reliability-qualified channels first. Within a
+Balanced fast sits between load-balanced and fastest: load stays spread while
+the quickest providers receive more of it. It also places reliability-qualified channels first. Within a
 measured group, it calculates relative weights:
 
 ```text
@@ -85,10 +87,11 @@ implicit exploration share. Unmeasured channels are shuffled after measured
 channels. If nothing qualifies, available recent latency priors still order the
 fallback group; a wholly unmeasured group is shuffled uniformly.
 
-The released latency control is `LW_BETA`, a positive number with default `3.0`:
+The latency exponent is `BALANCED_FAST_BETA`, a positive number with default
+`3.0`; higher values favor low latency more strongly:
 
 ```bash
-export LW_BETA=3.0
+export BALANCED_FAST_BETA=3.0
 ```
 
 ## Priority
@@ -145,7 +148,7 @@ may fail over are defined in
 [provider selection](/concepts/provider-selection#execution-and-failover) and
 the [method contract](/api/supported-methods).
 
-This contract is grounded in the released [routing guide](https://github.com/jaxernst/lasso-rpc/blob/v0.5.1/docs/ROUTING.md),
-[Fastest](https://github.com/jaxernst/lasso-rpc/blob/v0.5.1/lib/lasso/core/selection/strategies/fastest.ex),
-[LatencyWeighted](https://github.com/jaxernst/lasso-rpc/blob/v0.5.1/lib/lasso/core/selection/strategies/latency_weighted.ex)
-and [execution envelope](https://github.com/jaxernst/lasso-rpc/blob/v0.5.1/lib/lasso/core/request/execution_envelope.ex).
+This contract is grounded in the released [routing guide](https://github.com/jaxernst/lasso-rpc/blob/v0.6.0/docs/ROUTING.md),
+[Fastest](https://github.com/jaxernst/lasso-rpc/blob/v0.6.0/lib/lasso/core/selection/strategies/fastest.ex),
+[BalancedFast](https://github.com/jaxernst/lasso-rpc/blob/v0.6.0/lib/lasso/core/selection/strategies/balanced_fast.ex)
+and [execution envelope](https://github.com/jaxernst/lasso-rpc/blob/v0.6.0/lib/lasso/core/request/execution_envelope.ex).

@@ -40,7 +40,7 @@ permits, with one dispatch and no cross-request affinity. Cloud rejects its
 
 ## Core routing exhaustion
 
-When no eligible attempt can serve a request, Core v0.5.1 returns a JSON-RPC
+When no eligible attempt can serve a request, Core v0.6.0 returns a JSON-RPC
 `-32000` error over **HTTP 200**, preserving the request ID. `data` has
 `reason`, `retry_after_ms`, and `upstream_attempts`. `retry_after_ms` can be
 non-null only for `no_eligible_providers`.
@@ -74,14 +74,19 @@ on current circuit state:
 ```
 
 The shape comes from the released
-[controller regression](https://github.com/jaxernst/lasso-rpc/blob/v0.5.1/test/lasso_web/controllers/rpc_controller_test.exs)
-and [request pipeline](https://github.com/jaxernst/lasso-rpc/blob/v0.5.1/lib/lasso/core/request/request_pipeline.ex).
+[controller regression](https://github.com/jaxernst/lasso-rpc/blob/v0.6.0/test/lasso_web/controllers/rpc_controller_test.exs)
+and [request pipeline](https://github.com/jaxernst/lasso-rpc/blob/v0.6.0/lib/lasso/core/request/request_pipeline.ex).
+When every upstream a request reached rejected the method, Core returns that
+upstream's `-32601` with its message and data instead. If another outcome
+occurred, such as a provider failure, quota exhaustion or timeout, you get that
+outcome's error or the availability error above.
+
 Request [metadata](/observability/request-metadata) can show recorded attempts
 when available. It does not promise an exhaustive provider diagnostic schema.
 
 ## Large `eth_getLogs` queries
 
-Core v0.5.1 turns a recognized provider block-range or result-size limit, or
+Core v0.6.0 turns a recognized provider block-range or result-size limit, or
 its own bounded response-size rejection, into one JSON-RPC error:
 
 ```json

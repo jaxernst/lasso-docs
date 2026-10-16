@@ -12,18 +12,18 @@ behavior can be ahead of the latest Core release; this page shows where.
 
 ## Versions
 
-Checked October 15, 2026:
+Checked October 16, 2026:
 
 | Surface | Version | Evidence |
 | --- | --- | --- |
-| RPC Core source | [v0.5.1](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.5.1), commit `bd028b0870afc714e4d85fa94fe0bc2af94df628` | [Exact-commit CI](https://github.com/jaxernst/lasso-rpc/actions/runs/37555600096) |
-| RPC Core container | v0.5.1, image index `sha256:6861712eef30dc29850e6259cba55402202092768e4e82b294dbaca53857f307` | The [release manifest](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.1/container-release.json) binds source to image; [publication run](https://github.com/jaxernst/lasso-rpc/actions/runs/37556196437) |
+| RPC Core source | [v0.6.0](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.6.0), commit `c78a782d33aea8c12286f09a1af2151a3747ea89` | [Exact-commit CI](https://github.com/jaxernst/lasso-rpc/actions/runs/38866249695); the [source archive](https://github.com/jaxernst/lasso-rpc/releases/download/v0.6.0/source-archive-verification.json) matches the tag |
+| RPC Core container | `ghcr.io/jaxernst/lasso-rpc:v0.6.0`, image index `sha256:a10e020cbfbf965e46eeb7f6dd89e1fd2f8f73e06c93b4fb040a74993354fe30` | The [release manifest](https://github.com/jaxernst/lasso-rpc/releases/download/v0.6.0/container-release.json) binds source to image; [publication run](https://github.com/jaxernst/lasso-rpc/actions/runs/38867267905) |
 | Lasso Cloud | `source_sha` from [`/api/health`](https://lasso.sh/api/health) in each region | [What's new](/cloud/whats-new) lists each production release |
 | Cloud APIs and payment rails | Live [OpenAPI](https://lasso.sh/openapi.json), [`agent.json`](https://lasso.sh/agent.json) and [`SKILL.md`](https://lasso.sh/SKILL.md) | What the deployed service serves and which features are on |
 
 ## Core and Cloud by workload
 
-| Capability | RPC Core v0.5.1 | Lasso Cloud |
+| Capability | RPC Core v0.6.0 | Lasso Cloud |
 | --- | --- | --- |
 | HTTP reads and batches | Routed over the upstreams you configure | Routed over managed pools or your Custom profiles |
 | Signed transactions | One upstream dispatch | The same bytes to up to three providers in turn; sender faults stop at the first ([details](/cloud/rpc-behavior#transactions)) |
@@ -46,6 +46,7 @@ Full notes are on [GitHub releases](https://github.com/jaxernst/lasso-rpc/releas
 
 | Release | Highlights | Upgrade notes |
 | --- | --- | --- |
+| [v0.6.0](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.6.0) | `latency-weighted` is now `balanced-fast`, and `priority` has its own HTTP and WebSocket routes. `load-balanced` gives each physical upstream one first-pick share. Bare `/api/ready` reports replica readiness, so a dead upstream no longer takes every replica out of service. Bounded selection diagnostics name why a request found no eligible provider | Rename `LW_BETA` to `BALANCED_FAST_BETA`; the old name isn't read. `latency-weighted` URLs and `strategy` values keep working as permanent aliases. Load balancers that need upstream-backed readiness use `/api/ready?profile=PROFILE&chain=CHAIN` |
 | [v0.5.1](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.5.1) | A full Prometheus `/metrics` contract with per-route totals, latency histograms, attempt diagnostics, circuit, WebSocket and BEAM series, and a refreshed Grafana dashboard. Opt-in OpenTelemetry tracing (`LASSO_OTEL_ENABLED`) with W3C propagation and log correlation. Fixes a provider staying ineligible after its first 429 until restart | Upgrade if your providers return 429s. Prometheus consumers should review the new metric families and the `transport`, `profile` and `origin` labels |
 | [v0.5.0](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.5.0) | Route readiness, node-local Prometheus metrics, JSON console logs, profile validation and reload commands, standalone provider discovery and routing evidence. Tighter HTTP and WebSocket resource limits | Stricter request and discovery validation can reject malformed input that earlier versions accepted |
 | [v0.4.5](https://github.com/jaxernst/lasso-rpc/releases/tag/v0.4.5) | Phoenix, Cowboy, Cowlib and Ranch upgrades (Cowlib 2.20.0 resolves `CVE-2026-43971`). Correct Public Arbitrum archive routing. Requests no provider can serve fail at admission with a structured [`reason`](/api/error-codes#core-routing-exhaustion) | Review local archival declarations against your historical state reads |
@@ -57,21 +58,28 @@ None of these releases needs a profile or journal migration.
 ## Container verification
 
 Each release's container is verified on native Linux AMD64 and ARM64 runners
-after an anonymous pull and signed-attestation check. The v0.5.1
-[verification summary](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.1/container-verification.md)
+after an anonymous pull and signed-attestation check. The v0.6.0
+[verification summary](https://github.com/jaxernst/lasso-rpc/releases/download/v0.6.0/container-verification.md)
 records 23 checks per image
-([AMD64](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.1/verification-amd64.json),
-[ARM64](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.1/verification-arm64.json))
+([AMD64](https://github.com/jaxernst/lasso-rpc/releases/download/v0.6.0/verification-amd64.json),
+[ARM64](https://github.com/jaxernst/lasso-rpc/releases/download/v0.6.0/verification-arm64.json))
 covering upstream requests, HTTP failover, WebSocket RPC and `newHeads`
 delivery, configuration reload, history across container replacement and
-read-only profile mounts, plus a
-[live-provider smoke check](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.1/live-provider-verification-arm64.json)
-against a real Ethereum upstream. An
-[upgrade and rollback check](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.1/optional-upgrade-verification-arm64.json)
-between v0.5.0 and v0.5.1 preserved profiles, routing and benchmark history;
-its final proxy smoke step stopped on a macOS shell bug.
+read-only profile mounts. A
+[live-provider check](https://github.com/jaxernst/lasso-rpc/releases/download/v0.6.0/live-provider-verification-arm64.json)
+installed into an empty directory and served a real upstream
+`eth_blockNumber` and the dashboard. An
+[upgrade and rollback check](https://github.com/jaxernst/lasso-rpc/releases/download/v0.6.0/optional-upgrade-verification-arm64.json)
+from v0.5.1 preserved profiles, routing and benchmark history; its final
+reverse-proxy step didn't complete on the test host. Verify the attestation
+yourself with:
+
+```bash
+gh attestation verify oci://ghcr.io/jaxernst/lasso-rpc@sha256:a10e020cbfbf965e46eeb7f6dd89e1fd2f8f73e06c93b4fb040a74993354fe30 --repo jaxernst/lasso-rpc
+```
 
 Earlier reports:
+[v0.5.1](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.1/container-verification.md),
 [v0.5.0](https://github.com/jaxernst/lasso-rpc/releases/download/v0.5.0/container-verification.md),
 [v0.4.5](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.5/container-verification.md),
 [v0.4.4](https://github.com/jaxernst/lasso-rpc/releases/download/v0.4.4/container-verification.md),
