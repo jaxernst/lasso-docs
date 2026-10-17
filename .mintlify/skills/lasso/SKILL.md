@@ -125,7 +125,7 @@ The chain is a name or decimal ID from `chains` in `/agent.json`.
   `custom`), `x-lasso-cu`, `x-lasso-usd` (this request's charge),
   `x-lasso-balance-usd` and standard `RateLimit` headers.
 - `x-lasso-fallback` appears when a request was served somewhere other than
-  the profile it named: `payment`, `free`, `availability` or `profile`.
+  the profile it named: `payment`, `free` or `profile`.
 - `eth_chainId` can be answered without an upstream; use `eth_blockNumber` to
   show routing.
 
@@ -133,7 +133,6 @@ WebSocket requests with `lasso_meta: "notify"`
 receive the existing metadata frame with `cu`, `usd`, `balance_usd`, `access`
 and any `fallback`. CU/USD reflect the selected outcome; balance is the local
 post-charge estimate. Delivery never waits for settlement.
-Generation-0 metadata keeps its existing shape.
 
 Report the result, serving provider, latency and request ID. For diagnostics,
 `GET /api/v1/keys/<id>` with your management token, or `GET /api/v1/keys/current`
@@ -282,10 +281,8 @@ accounts went live no longer work; request a new one.
   Save it, wait `Retry-After`, then call RPC with it. Keep any valid grace secret
   until `previous_valid_until` (up to 86,400 seconds) and retry RPC with the
   replacement, **not rotation**. Deploy the new secret within the overlap.
-  Rotation keeps `allowed_profiles`. Mixed live/deleted scopes advertise a live
-  canonical profile; a deleted-only Custom scope can reuse an existing retained
-  slug for its allowed deleted identity, with the same fallback as the old URL.
-  Rotation does not create aliases or authorize Premium directly.
+  Rotation keeps `allowed_profiles`, and URLs that name a deleted Custom
+  profile keep their fallback. Rotation does not authorize Premium directly.
   If no usable allowed selector exists, `unknown_profile` leaves the secret,
   overlap and scope unchanged. Update `allowed_profiles` before rotating.
   Omitting `grace_seconds` gives 3,600 seconds (1 hour); sending 0 stops the old secret at once.
@@ -344,8 +341,8 @@ limits from traffic. The dry run checks chain identity only.
 Lasso tracks each provider's block height from the head reads routed through
 it and from background checks. A `ws_url` provides WebSocket capability;
 `heads: live` selects a per-block `newHeads` feed, and `heads: standby`
-supplies an elected fallback when no live feed is healthy. New providers with
-unset heads are passive; existing providers retain their resolved legacy policy.
+supplies an elected fallback when no live feed is healthy. Unset `heads` means
+passive.
 A provider with the same URL and credentials in several profiles is tracked once.
 On providers that bill per request, choose `heads: passive` for poll-based head
 tracking or `heads: off` to disable periodic head collection for that reference,
@@ -386,9 +383,12 @@ upstream dispatches.
 A signed transaction is resent as the same bytes to the next provider, up to
 three in total within one deadline, when a provider rate-limits it, times out
 or rejects it for a node-local reason. A sender fault such as insufficient
-funds or nonce too low stops at the first provider. Before returning any error,
-Lasso looks up the transaction hash and returns it if the transaction is pending
-or mined. Resending the same signed bytes is always safe.
+funds or nonce too low stops at the first provider. A request pinned to one
+provider (`/rpc/provider/<id>/<chain>`) goes to that provider only. When every
+attempt fails and the deadline has time left, Lasso asks one provider (the last
+one that answered, if any) for the transaction by hash and returns the hash
+instead of the error if it is pending or mined. Resending the same signed bytes
+is always safe.
 
 The app owns signing, nonces, replacement, receipts and finality. HTTP filter IDs are
 provider-local, so use `eth_getLogs` or subscriptions. Historical depth and
@@ -421,7 +421,7 @@ Every error Lasso originates carries `code` and `next_action`; follow it.
 | `payment_conflict`, `payment_pending` or payment 202 | Read `GET /api/v1/purchases/<id>` using the returned purchase ID; never pay again |
 | 409 `beneficiary_conflict` | Never pay again; keep the purchase ID and signed payment, report the key with `POST /api/v1/feedback`, then retry the same request |
 | Rotation 202 with `serving_ready: false` | Honor `Retry-After`; retain valid grace authority and retry replacement RPC, not rotation |
-| 429 `rate_limited` | Honor `Retry-After` |
+| 429 `rate_limit_exceeded` (RPC) or `rate_limited` (management API) | Honor `Retry-After` |
 | 503 `unavailable` | Check disabled capabilities in `/agent.json`; follow the refusal’s `next_action` and `Retry-After`, retry the same operation and retain its original payment identity. Never pay twice. |
 
 ## Report a problem
@@ -454,5 +454,3 @@ management routes answer gone (HTTP 410) with a `next_action` naming the
 - Open-source routing core (Apache-2.0): https://github.com/jaxernst/lasso-rpc
 
 Lasso Cloud is the managed service on lasso.sh; the routing core is open source.
-
-Head observation: Lasso learns provider heads from your traffic and a light poll; set `heads: live` on the provider you want tracked every block. Modes are `live`, `standby`, `passive` (unset), and `off`; background_observations remains the all-background veto. Legacy observation fields compile into the resolved policy and remain honored reference overrides. Existing feed placement is preserved; standby opens only when the chain has no healthy live feed. Head modes do not change client subscription capability or identity/capability recovery permissions.
