@@ -412,7 +412,7 @@ Every error Lasso originates carries `code` and `next_action`; follow it.
 
 | Code | Fix |
 |---|---|
-| 402 `balance_exhausted` | Credit the account (`next_action` names the URL) or subscribe |
+| 402 `balance_exhausted` | POST to `error.data.credit_url` to credit the account, or subscribe |
 | 403 `forbidden` on RPC | The key is scoped; use a profile `next_action` lists |
 | 404 `unknown_profile` | Use a profile `next_action` lists |
 | 401 `key_revoked` | The key was revoked or rotated past its overlap; use the current key |
