@@ -78,9 +78,16 @@ changed provider before storing anything:
 | `verifying` | Didn't answer; saved but kept out of routing, and rechecked every five minutes |
 | `failed` | Definitely wrong, such as another chain. The whole `PUT` is rejected with `provider_check_failed`, naming the provider |
 
-A newly saved profile can report `activating` with `retry_after_seconds`. Read
-`GET /api/v1/profiles/{slug}` until it reports `live` before moving traffic. A
-chain with no verified provider returns a JSON-RPC error until one verifies.
+A newly created profile has no live revision yet: it reports `activating` with
+`retry_after_seconds` until its first revision is ready, and RPC on it refuses
+with a retryable 503 (`service_initializing`) until then. Read
+`GET /api/v1/profiles/{slug}` until it reports `live` before moving traffic.
+
+Saving a replacement to an already-live profile is different: RPC keeps
+serving the previous revision while the replacement activates, as long as the
+replacement has at least one verified provider per chain. A replacement that
+leaves a chain with no verified provider has nothing to route on that chain
+until one verifies ([#2404](https://github.com/jaxernst/lasso-cloud/issues/2404)).
 
 ## Head tracking
 
