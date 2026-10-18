@@ -22,9 +22,10 @@ Content-Type: application/json
 ```
 
 The dry run checks every new provider, changes nothing, and needs no Custom
-access. Saving needs Custom access: subscribe, or buy days with a wallet
-([trial your own providers](/cloud/bring-your-own-rpc)). Then repeat the `PUT`
-without `dry_run` and call it:
+access. Saving needs Custom access: an account that has never had it gets five
+free days on its first saved profile; otherwise subscribe, or buy days with a
+wallet ([trial your own providers](/cloud/bring-your-own-rpc)). Then repeat
+the `PUT` without `dry_run` and call it:
 
 ```bash
 curl -sS "https://lasso.sh/rpc/k/<key>/profile/prod-base/fastest/base" \
@@ -47,6 +48,7 @@ other field is optional:
 | `block_protection` | chain | The app polls the latest block and shouldn't see it go backwards |
 | `max_lag_blocks` | chain | The app tolerates less (or more) staleness than the chain default |
 | `heads`: `live`, `standby`, `passive`, `off` | provider | You want to choose how Lasso tracks a provider's head; see [head tracking](#head-tracking) |
+| `background_observations` | provider | `false` stops background checks and idle recovery on a provider you're not actively using; defaults to `true`. `heads: off` only stops head observation |
 | `health_checks`: `standard` or `light` | chain | Lasso's checks should spend less of your provider quota |
 | `error_interpretation` | profile | You opt in to Lasso interpreting your providers' error messages |
 | `limits`: `archival`, `logs_span`, `methods_blocked` | provider | You know a limit Lasso hasn't learned, such as your plan's log-span cap |
@@ -98,28 +100,36 @@ Head modes don't change which providers serve client subscriptions. Omitting
 ## Lasso learns your providers
 
 You supply URLs and intent. Lasso works out the rest from health checks and
-live traffic: historical depth per method, methods a provider refuses, and its
-`eth_getLogs` span limit. `GET /api/v1/profiles/{slug}` shows that knowledge
-for each provider, with its source and effect:
+live traffic: historical depth per method, methods a provider refuses, its
+`eth_getLogs` span limit, and whether it looks like it's exhausting a quota.
+`GET /api/v1/profiles/{slug}` shows that knowledge for each provider, with its
+source, configured mode and effect:
 
 ```json
 {"name": "my-node", "status": "verified", "knowledge": {
-  "methods_refused": [{"method": "debug_traceTransaction", "source": "learned", "effect": "on"}],
-  "logs_span": {"blocks": 10000, "source": "probe", "effect": "on"}
+  "methods_refused": [{"method": "debug_traceTransaction", "source": "learned", "configured_mode": "on", "effect": "on", "suspended": false}],
+  "logs_span": {"blocks": 10000, "source": "probe", "configured_mode": "on", "effect": "on", "suspended": false},
+  "quota_exhaustion": {"value": true, "source": "learned", "configured_mode": "shadow", "effect": "shadow", "suspended": false}
 }}
 ```
 
-`effect: on` means the knowledge changes routing; `shadow` means Lasso observes
-it without acting on it. Learned historical depth and method refusals are on
-for Custom profiles: they move a provider that can't serve a request behind
-the alternatives, never dropping the last route. Declare `limits` only for what
-you know better than Lasso; declared limits outrank learned ones.
+`configured_mode` is the profile's setting for that kind of knowledge: `off`,
+`shadow` (Lasso observes without acting), or `on` (changes routing). `effect`
+is what's applied right now: it matches `configured_mode`, or reports
+`suspended` while you've paused that hint; `suspended` mirrors the same state
+as a boolean. Learned historical depth and method refusals default to `on` for
+Custom profiles: they move a provider that can't serve a request behind the
+alternatives, never dropping the last route. Quota exhaustion is `shadow`
+only, a signal that a provider looks throttled, shown to you but never acted
+on. Declare `limits` only for what you know better than Lasso; declared limits
+outrank learned ones.
 
 To correct what Lasso learned, call
 `DELETE /api/v1/profiles/{slug}/providers/{name}/knowledge`, or use the
 dashboard's **Learned behavior** panel: select a node to see its HTTP and
 WebSocket evidence, **Reset knowledge** for one transport, or **Suspend 1h**
-to pause one hint.
+to pause one hint. Set a provider's `background_observations: false` to stop
+all background checks and idle recovery on it.
 
 ## Block protection
 
@@ -150,8 +160,9 @@ instead; it works without protection.
 
 ## Limits
 
-- Holding a Custom profile needs Custom access; a dry run doesn't. Provisional
-  accounts can buy Custom access with a wallet. See
+- Holding a Custom profile needs Custom access; a dry run doesn't. An account
+  that has never had Custom access gets five free days on its first saved
+  profile; provisional accounts can also buy Custom access with a wallet. See
   [trial your own providers](/cloud/bring-your-own-rpc).
 - An account holds up to five Custom profiles.
 - If Custom access lapses, the profile is kept and its URLs are served as

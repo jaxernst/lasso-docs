@@ -353,8 +353,10 @@ polls and identity checks.
 
 1. `?dry_run=true` returns the changes and each provider's chain check without
    storing anything, and needs no Custom access.
-2. Holding a profile needs Custom access. Buy days with the same 402 exchange
-   as a top-up: `POST /api/v1/accounts/<id>/custom-access` with
+2. Holding a profile needs Custom access. An account that has never had Custom
+   access gets five free days when it saves its first profile;
+   `GET /api/v1/accounts/<id>` shows when they end under `subscriptions`.
+   Otherwise, buy days with the same 402 exchange as a top-up: `POST /api/v1/accounts/<id>/custom-access` with
    `{"days":7}`, at `account_payments.custom_access.day_usd` in `/agent.json`.
    A signed offer keeps its price even if the tariff changes.
 3. The same `PUT` without `dry_run` stores it. `provider_check_failed` names a
