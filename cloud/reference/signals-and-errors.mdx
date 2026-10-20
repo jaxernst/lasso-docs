@@ -16,7 +16,7 @@ to use these signals together, read [routing evidence](/cloud/observability).
 "error": {
   "code": <JSON-RPC code>,
   "message": "…",
-  "data": {"code": "balance_exhausted", "next_action": "POST https://lasso.sh/api/v1/accounts/…/credit, or subscribe"}
+  "data": {"code": "balance_exhausted", "next_action": "Credit the account or restore its allowance.", "credit_url": "/api/v1/accounts/<id>/credit"}
 }
 ```
 
@@ -66,7 +66,9 @@ WebSocket callers add `"lasso_meta": "notify"` to a request for a follow-up
 RPC errors stay standard JSON-RPC. Errors Lasso originates carry
 `error.data.code`, `error.data.next_action` and `error.data.retryable`. A
 retryable error with `Retry-After` is safe to repeat as is after the wait.
-The catalog covers local refusals and terminal routing outcomes:
+`balance_exhausted` additionally carries `error.data.credit_url`, the
+account's credit endpoint. The catalog covers local refusals and terminal
+routing outcomes:
 
 <RpcErrors />
 

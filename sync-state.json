@@ -1,7 +1,7 @@
 {
   "version": 1,
   "cloud": {
-    "observedDeployedSha": "5749c61eb97b89766793b680153576f26a41039b"
+    "observedDeployedSha": "ba2125a9884f755b58cfa30386c7eccb5911d041"
   },
   "core": {
     "release": "v0.6.0",

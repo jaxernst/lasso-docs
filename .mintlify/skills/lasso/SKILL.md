@@ -353,8 +353,10 @@ polls and identity checks.
 
 1. `?dry_run=true` returns the changes and each provider's chain check without
    storing anything, and needs no Custom access.
-2. Holding a profile needs Custom access. Buy days with the same 402 exchange
-   as a top-up: `POST /api/v1/accounts/<id>/custom-access` with
+2. Holding a profile needs Custom access. An account that has never had Custom
+   access gets five free days when it saves its first profile;
+   `GET /api/v1/accounts/<id>` shows when they end under `subscriptions`.
+   Otherwise, buy days with the same 402 exchange as a top-up: `POST /api/v1/accounts/<id>/custom-access` with
    `{"days":7}`, at `account_payments.custom_access.day_usd` in `/agent.json`.
    A signed offer keeps its price even if the tariff changes.
 3. The same `PUT` without `dry_run` stores it. `provider_check_failed` names a
@@ -362,7 +364,10 @@ polls and identity checks.
    saved as `verifying` and routes once a later check passes.
 4. Route the app over `https://lasso.sh/rpc/k/<key>/profile/prod-base/<strategy>/<chain>`.
    Replace the profile segment in an existing prefix rather than appending another.
-5. `GET /api/v1/profiles/prod-base` shows the revision, each provider's status
+5. An already-live profile keeps RPC admitted while a replacement with at least
+   one verified provider per chain activates. Requests for a chain that has no verified provider get a retryable 503 `profile_config_unavailable` until a later identity check verifies one.
+   For a newly created profile, honor `retry_after_seconds` and GET until `live`
+   before routing. `GET /api/v1/profiles/prod-base` shows the revision, each provider's status
    and what Lasso has learned (`effect: on` changes routing; `shadow` is
    observed only). Provider URLs and header values are never returned.
 
@@ -410,7 +415,7 @@ Every error Lasso originates carries `code` and `next_action`; follow it.
 
 | Code | Fix |
 |---|---|
-| 402 `balance_exhausted` | Credit the account (`next_action` names the URL) or subscribe |
+| 402 `balance_exhausted` | POST to `error.data.credit_url` to credit the account, or subscribe |
 | 403 `forbidden` on RPC | The key is scoped; use a profile `next_action` lists |
 | 404 `unknown_profile` | Use a profile `next_action` lists |
 | 401 `key_revoked` | The key was revoked or rotated past its overlap; use the current key |

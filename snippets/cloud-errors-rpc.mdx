@@ -22,4 +22,4 @@
 | `rate_limit_exceeded` | 429 | Yes | Retry after the indicated delay. |
 | `not_prepared` | 503 | Yes | Retry shortly. |
 | `profile_config_unavailable` | 503 | Yes | Retry shortly. For a Custom profile, have its owner check GET /api/v1/profiles/&#123;slug&#125; and wait until activation reports live. |
-| `unavailable` | 503 | Yes | Retry shortly. For a newly created or updated Custom profile, have its owner check GET /api/v1/profiles/&#123;slug&#125; and wait until activation reports live. If it persists, check the key: an unrecognized secret, such as a mistyped one, is refused the same way. |
+| `unavailable` | 503 | Yes | Retry shortly. For a newly created Custom profile, have its owner check GET /api/v1/profiles/&#123;slug&#125; and wait until activation reports live. If it persists, check the key: an unrecognized secret, such as a mistyped one, is refused the same way. |

@@ -43,10 +43,15 @@ Each provider comes back `verified`, `verifying` (didn't answer yet) or
 add `limits` only for a cap you know, such as your plan's log span. Lasso
 learns the rest from traffic.
 
-## 3. Buy Custom access for the trial
+## 3. Custom access for the trial
 
-Holding a profile needs Custom access. Buy a few days with the user's wallet,
-within their approved budget:
+Holding a profile needs Custom access, but a provisional account that has
+never had it gets five free days the moment it saves its first profile below
+— no payment needed for this trial. `GET /api/v1/accounts/{account_id}` shows
+when they end under `subscriptions`.
+
+If this account already used its free days, or the trial needs longer than
+five days, buy more with the user's wallet, within their approved budget:
 
 ```http
 POST https://lasso.sh/api/v1/accounts/{account_id}/custom-access
