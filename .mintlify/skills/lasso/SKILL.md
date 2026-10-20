@@ -365,8 +365,7 @@ polls and identity checks.
 4. Route the app over `https://lasso.sh/rpc/k/<key>/profile/prod-base/<strategy>/<chain>`.
    Replace the profile segment in an existing prefix rather than appending another.
 5. An already-live profile keeps RPC admitted while a replacement with at least
-   one verified provider per chain activates. A replacement that leaves a chain with no verified
-   provider has nothing to route until one verifies ([#2404](https://github.com/jaxernst/lasso-cloud/issues/2404)).
+   one verified provider per chain activates. Requests for a chain that has no verified provider get a retryable 503 `profile_config_unavailable` until a later identity check verifies one.
    For a newly created profile, honor `retry_after_seconds` and GET until `live`
    before routing. `GET /api/v1/profiles/prod-base` shows the revision, each provider's status
    and what Lasso has learned (`effect: on` changes routing; `shadow` is
