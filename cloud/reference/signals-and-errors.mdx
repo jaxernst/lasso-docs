@@ -73,9 +73,11 @@ routing outcomes:
 <RpcErrors />
 
 Provider errors keep their code, message and data. When every eligible
-provider fails, the final JSON-RPC error arrives in an HTTP 200 response. An
-`eth_getLogs` range a provider refuses as too large returns `-32005` with
-`data.code: "log_range_limit"`; split the range and retry.
+provider fails, the final JSON-RPC error arrives in an HTTP 200 response. A
+provider-reported `eth_getLogs` range limit tries the remaining candidates
+with the unchanged query first; only once none of them serve it does Lasso
+return `-32005` with `data.reason: "log_range_too_large"` and `data.action:
+"reduce_block_range"`. Split the range and retry.
 
 ## Transaction submission errors
 
