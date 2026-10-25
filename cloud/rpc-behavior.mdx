@@ -114,7 +114,10 @@ then each chain's activated fork.
   unchanged.
 - **Upstream errors keep their `code`, `message` and `data`**, even when the
   provider sent them with an HTTP 4xx or 5xx. HTML, gateway text and other
-  transport failures are treated as provider failures and can fail over.
+  transport failures are treated as provider failures and can fail over. When
+  Lasso's own retry budget runs out across several providers without a usable
+  response, it returns its own sanitized error instead; see
+  [response signals and errors](/cloud/reference/signals-and-errors#rpc-errors).
 - **Parameters.** EIP-1898 block selectors need exactly one of `blockNumber` or
   `blockHash`, and `requireCanonical` only with `blockHash`. An EIP-234
   `eth_getLogs` filter can't mix `blockHash` with `fromBlock` or `toBlock`.
