@@ -125,8 +125,8 @@ source, configured mode and effect:
 `shadow` (Lasso observes without acting), or `on` (changes routing). `effect`
 is what's applied right now: it matches `configured_mode`, or reports
 `suspended` while you've paused that hint; `suspended` mirrors the same state
-as a boolean. Learned historical depth and method refusals default to `on` for
-Custom profiles: they move a provider that can't serve a request behind the
+as a boolean. Learned historical depth, method refusals and `eth_getLogs` span
+limits are `on`: they move a provider that can't serve a request behind the
 alternatives, never dropping the last route. Quota exhaustion is `shadow`
 only, a signal that a provider looks throttled, shown to you but never acted
 on. Declare `limits` only for what you know better than Lasso; declared limits

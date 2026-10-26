@@ -47,8 +47,9 @@ test, not as a coverage promise.
 When a provider refuses an `eth_getLogs` range as too large, Lasso returns
 `-32005` with `data.code: "log_range_limit"`; follow its `next_action`: split
 the range and retry. Lasso doesn't
-split it for you. On a Custom profile, Lasso learns each provider's span limit
-from these refusals and shows it in the profile's knowledge.
+split it for you. Lasso learns each provider's span limit from these refusals
+and tries providers that accept a wider range first. On a Custom profile, the
+learned limit shows in the profile's knowledge.
 
 ## Limits
 
