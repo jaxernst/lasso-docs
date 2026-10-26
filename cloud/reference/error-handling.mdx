@@ -19,7 +19,9 @@ Lasso returns the error to you as-is and doesn't try other providers.
 If the provider is the problem, such as being rate limited, missing the data,
 not supporting the method, rejecting the range, timing out or failing
 internally, Lasso tries the next provider. This applies to reads that are safe
-to repeat. Lasso never resends a transaction.
+to repeat. A signed transaction goes to up to three providers in turn, and only
+provider faults move it on; a sender fault such as nonce too low or insufficient
+funds stops at the first and is returned to you.
 
 Lasso also [learns from these errors](/cloud/provider-learning): a provider that
 keeps failing a kind of request is tried later for that kind of request.

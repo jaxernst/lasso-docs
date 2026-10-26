@@ -39,7 +39,7 @@ served:
 | The URL names | Served as |
 |---|---|
 | `premium`, or no profile segment | `premium` while included usage or balance covers it; otherwise `public`, marked with `x-lasso-fallback` (see [balance and payment fallback](/cloud/balance-and-fallback)) |
-| `public` | `public`, uncharged, while the account has any spending power: balance, included usage, a payment grace window or a free allowance. An account with none gets 402 `balance_exhausted` on every profile |
+| `public` | `public`, uncharged, while the account has any spending power: balance, included usage, a payment grace window or a free allowance. An account with none gets 402 `balance_exhausted` on `premium` and `public`; a Custom profile with Custom access still serves |
 | A Custom profile | `custom` while your account has Custom access; otherwise `premium`, marked `x-lasso-fallback: profile` |
 
 Name `public` for traffic that doesn't need premium providers, such as

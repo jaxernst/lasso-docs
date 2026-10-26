@@ -84,11 +84,13 @@ with a retryable 503 (`service_initializing`) until then. Read
 `GET /api/v1/profiles/{slug}` until it reports `live` before moving traffic.
 
 Saving a replacement to an already-live profile is different: RPC keeps
-serving the previous revision while the replacement activates, as long as the
-replacement has at least one verified provider per chain. Requests for a
-chain that has no verified provider get a retryable 503
-(`profile_config_unavailable`) until a later identity check verifies one;
-other chains on the same profile keep serving.
+serving the previous revision while the replacement activates. A chain whose
+providers are all still `verifying` keeps its previously verified configuration,
+settings included, until a later identity check verifies one. A chain with both
+verified and `verifying` providers publishes the verified subset and its new
+settings immediately. Only a new chain with no previously verified
+configuration returns a retryable 503 (`profile_config_unavailable`) until a
+provider verifies; other chains on the same profile keep serving.
 
 ## Head tracking
 
