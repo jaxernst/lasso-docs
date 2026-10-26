@@ -81,6 +81,7 @@
               "cloud/serving-access-and-pricing",
               "cloud/balance-and-fallback",
               "cloud/custom-profiles",
+              "cloud/provider-learning",
               "cloud/accounts-and-agents"
             ]
           },
@@ -98,6 +99,7 @@
             "pages": [
               "cloud/rpc-behavior",
               "cloud/reference/signals-and-errors",
+              "cloud/reference/error-handling",
               "cloud/reference/chains-and-prices",
               "cloud/reference/agent-entry-points",
               {

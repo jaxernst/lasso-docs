@@ -1,0 +1,43 @@
+---
+title: Error handling
+description: How Lasso decides whether to retry a failed request on another provider, and what you get back when no provider can serve it.
+---
+
+# Error handling
+
+When a provider returns an error, Lasso decides whether the error belongs to
+your request or to that provider, and acts on that.
+
+## Errors caused by your request
+
+If the request itself is wrong, such as invalid parameters, a malformed
+envelope or a reverted contract call, every provider would give the same answer.
+Lasso returns the error to you as-is and doesn't try other providers.
+
+## Errors caused by the provider
+
+If the provider is the problem, such as being rate limited, missing the data,
+not supporting the method, rejecting the range, timing out or failing
+internally, Lasso tries the next provider. This applies to reads that are safe
+to repeat. Lasso never resends a transaction.
+
+Lasso also [learns from these errors](/cloud/provider-learning): a provider that
+keeps failing a kind of request is tried later for that kind of request.
+
+## When no provider can serve the request
+
+Lasso tries a bounded number of providers. If every one fails, you get one Lasso
+error instead of whichever provider happened to answer last:
+
+- When every provider rejected an `eth_getLogs` range, `data.code` is
+  `log_range_limit` and `next_action` says to reduce the block range.
+- Otherwise `data.code` is `provider_error`, and the message says how many
+  providers Lasso tried and the reason they shared.
+- It never includes provider names or a provider's raw message.
+
+Every code and its fix is listed in [response signals and errors](/cloud/reference/signals-and-errors).
+
+## Related
+
+- [How Lasso learns your providers](/cloud/provider-learning)
+- [Routing](/cloud/routing): how Lasso picks the first provider.

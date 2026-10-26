@@ -130,7 +130,8 @@ limits are `on`: they move a provider that can't serve a request behind the
 alternatives, never dropping the last route. Quota exhaustion is `shadow`
 only, a signal that a provider looks throttled, shown to you but never acted
 on. Declare `limits` only for what you know better than Lasso; declared limits
-outrank learned ones.
+outrank learned ones. [How Lasso learns your providers](/cloud/provider-learning)
+explains how learning works and stays correct.
 
 To correct what Lasso learned, call
 `DELETE /api/v1/profiles/{slug}/providers/{name}/knowledge`, or use the
