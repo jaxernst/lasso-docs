@@ -1,0 +1,57 @@
+---
+title: How Lasso learns your providers
+description: Lasso watches every upstream answer and stops sending requests to providers that can't serve them, without you configuring their limits.
+---
+
+# How Lasso learns your providers
+
+Every provider has limits nobody wrote down: methods it doesn't serve, how far
+back it keeps state, how wide an `eth_getLogs` range it accepts. Lasso learns
+these from the answers it already gets, then routes around them. You don't
+configure them, and you don't change your requests.
+
+## What it learns
+
+For each provider, Lasso learns:
+
+- **Methods it refuses.** A provider that keeps answering "method not supported"
+  stops getting that method first.
+- **How far back it serves.** A provider that only keeps recent state stops
+  getting reads for older blocks first.
+- **Its `eth_getLogs` range limit.** A provider that rejects wide ranges stops
+  getting wide ranges first.
+
+This runs on every profile: Lasso's managed pools and your Custom profiles.
+
+## How it acts
+
+Learning only changes the **order** in which Lasso tries providers. A provider
+that can't serve a request is tried after the ones that can. It is never
+removed, and Lasso always keeps the last route, so a request still has
+somewhere to go even if everything learned turns out to be wrong.
+
+## How it stays correct
+
+- **It needs repeated evidence.** One odd answer doesn't create a limit. A range
+  limit, for example, needs failures from two separate requests close together.
+- **A success clears it.** If a provider later serves what it once refused, the
+  learned limit goes away.
+- **It fades.** Learned limits expire unless new failures keep renewing them, so
+  a provider that upgrades its plan gets traffic back on its own.
+- **It's scoped.** Knowledge belongs to one provider account and one method. One
+  customer's credentials don't teach Lasso about another's.
+- **It survives restarts.** Lasso restores what it learned when a node restarts.
+
+## What you control on a Custom profile
+
+- **See it.** Each provider's learned knowledge, with its source, is in the
+  profile; see [Custom profiles](/cloud/custom-profiles#lasso-learns-your-providers).
+- **Declare what you know.** A limit you declare, such as your plan's log range,
+  always outranks a learned one.
+- **Correct it.** Reset a provider's knowledge, or pause one learned hint for an
+  hour, from the API or the dashboard.
+
+## Related
+
+- [Error handling](/cloud/reference/error-handling): what happens when a provider fails.
+- [Indexer backfills](/cloud/indexer-backfills): range limits in practice.

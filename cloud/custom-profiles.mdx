@@ -83,14 +83,14 @@ A newly created profile has no live revision yet: it reports `activating` with
 with a retryable 503 (`service_initializing`) until then. Read
 `GET /api/v1/profiles/{slug}` until it reports `live` before moving traffic.
 
-Saving a replacement to an already-live profile is different: it activates
-chain by chain. A chain with at least one verified provider publishes the
-replacement's verified subset and settings immediately. A chain whose
-replacement providers are all still `verifying` keeps serving its previous
-verified configuration, including its settings, until one of them verifies. A
-chain with no previous verified configuration and no verified replacement
-provider gets a retryable 503 (`profile_config_unavailable`) until an identity
-check verifies one; other chains on the same profile keep serving.
+Saving a replacement to an already-live profile is different: RPC keeps
+serving the previous revision while the replacement activates. A chain whose
+providers are all still `verifying` keeps its previously verified configuration,
+settings included, until a later identity check verifies one. A chain with both
+verified and `verifying` providers publishes the verified subset and its new
+settings immediately. Only a new chain with no previously verified
+configuration returns a retryable 503 (`profile_config_unavailable`) until a
+provider verifies; other chains on the same profile keep serving.
 
 ## Head tracking
 
@@ -127,12 +127,13 @@ source, configured mode and effect:
 `shadow` (Lasso observes without acting), or `on` (changes routing). `effect`
 is what's applied right now: it matches `configured_mode`, or reports
 `suspended` while you've paused that hint; `suspended` mirrors the same state
-as a boolean. Learned historical depth and method refusals default to `on` for
-Custom profiles: they move a provider that can't serve a request behind the
+as a boolean. Learned historical depth, method refusals and `eth_getLogs` span
+limits are `on`: they move a provider that can't serve a request behind the
 alternatives, never dropping the last route. Quota exhaustion is `shadow`
 only, a signal that a provider looks throttled, shown to you but never acted
 on. Declare `limits` only for what you know better than Lasso; declared limits
-outrank learned ones.
+outrank learned ones. [How Lasso learns your providers](/cloud/provider-learning)
+explains how learning works and stays correct.
 
 To correct what Lasso learned, call
 `DELETE /api/v1/profiles/{slug}/providers/{name}/knowledge`, or use the
