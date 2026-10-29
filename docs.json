@@ -81,7 +81,7 @@
               "cloud/serving-access-and-pricing",
               "cloud/balance-and-fallback",
               "cloud/custom-profiles",
-              "cloud/provider-learning",
+              "concepts/provider-learning",
               "cloud/accounts-and-agents"
             ]
           },
@@ -144,7 +144,8 @@
                   "concepts/routing-strategies",
                   "concepts/profiles",
                   "concepts/provider-selection",
-                  "concepts/circuit-breakers"
+                  "concepts/circuit-breakers",
+                  "concepts/provider-learning"
                 ]
               },
               {
@@ -287,6 +288,10 @@
     {
       "source": "/cloud/reference/v2-compatibility",
       "destination": "/cloud/accounts-and-agents"
+    },
+    {
+      "source": "/cloud/provider-learning",
+      "destination": "/concepts/provider-learning"
     }
   ]
 }

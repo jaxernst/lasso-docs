@@ -60,8 +60,8 @@ chains:
 
 `selection` belongs under the chain. The profile body accepts only the `chains`
 mapping. A `routing.method_overrides` block is not supported. See the released
-[file schema](https://github.com/jaxernst/lasso-rpc/blob/v0.6.0/lib/lasso/config/file_schema.ex)
-and [configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.6.0/docs/CONFIGURATION.md#provider-capabilities).
+[file schema](https://github.com/jaxernst/lasso-rpc/blob/v0.7.0/lib/lasso/config/file_schema.ex)
+and [configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.7.0/docs/CONFIGURATION.md#provider-capabilities).
 
 ## Strategy ranking
 
@@ -87,6 +87,14 @@ Open circuits are excluded. Each strategy defines its within-tier order, includi
 A channel in tier 2 precedes one in tier 3 even if the latter has a better
 latency or configured priority. Half-open admission is controlled; appearing
 in the candidate order does not reserve permission to send.
+
+## Learned ordering
+
+After ranking and health tiering, matching providers with learned method
+refusals, historical depth or log-span limits are moved behind alternatives
+within the same tier. Declared capabilities still take precedence, and learning
+keeps the last route. See [provider learning](/concepts/provider-learning) for
+controls, evidence and restart behavior.
 
 ## Execution and failover
 

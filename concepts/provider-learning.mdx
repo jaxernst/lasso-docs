@@ -1,0 +1,103 @@
+---
+title: How Lasso learns your providers
+description: How learned method refusals, historical depth and log-range limits change provider order in RPC Core and Cloud, and how to inspect or control them.
+---
+
+Lasso learns provider limits from upstream answers: methods a provider refuses,
+how far back it serves history, and the numeric `eth_getLogs` ranges it accepts.
+Use this page to understand changes in provider order and inspect the evidence.
+Your requests keep the same shape.
+
+For Core, request a routing explanation with metadata:
+
+```bash
+curl 'http://localhost:4000/rpc/ethereum?include_meta=body' \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"fromBlock":"0x100","toBlock":"0x200"}],"id":1}'
+```
+
+## What it learns
+
+| Limit | RPC Core v0.7.0 | Lasso Cloud |
+| --- | --- | --- |
+| Method refusals | On by default; matching providers are moved behind alternatives | On for managed pools and Custom profiles |
+| Historical depth | On by default; matching providers are moved behind alternatives | On for managed pools and Custom profiles |
+| Numeric `eth_getLogs` span | On by default; matching providers are moved behind alternatives | On for managed pools and Custom profiles |
+| Quota exhaustion and plan refusals | No quota or plan-refusal exclusion | A credential is taken out of rotation until revalidation succeeds, keeping the last route |
+
+## How ordering stays correct
+
+Method, depth and span learning change the order of eligible connections within
+the same availability tier. A matching provider is **moved behind** alternatives;
+learning keeps the last route. Declared capabilities take precedence, and learning
+does not extend a deadline or grant another transaction dispatch.
+
+- **Repeated evidence establishes a limit.** Historical depth needs a qualified
+  request age and fresh failure witnesses. Head lag, empty results and zero
+  values do not establish missing history.
+- **Span evidence is specific.** Numeric ranges and explicit block-span failures
+  establish a span limit. Result-volume errors and ambiguous wording do not.
+- **Success can withdraw a hint.** Newer accepted success that contradicts the
+  learned boundary can clear it. Hints also expire.
+- **Knowledge is scoped.** Endpoint, credentials, transport and sharing scope
+  define the evidence boundary. Method refusals are method-specific; historical
+  hints also distinguish the resource being read.
+
+## Control and inspect Core learning
+
+These variables accept `on` or `off`, default to `on`, and require a restart.
+Invalid values fail startup. Set all three to `off` to keep v0.6.0 ordering:
+
+```dotenv
+LASSO_PROVIDER_KNOWLEDGE_METHOD_REFUSAL_MODE=off
+LASSO_PROVIDER_KNOWLEDGE_HISTORICAL_DEPTH_MODE=off
+LASSO_PROVIDER_KNOWLEDGE_SPAN_LIMIT_MODE=off
+```
+
+Disabling an effect keeps its observations available for inspection. Core keeps
+learned state in node-local memory and rebuilds it from traffic after restart;
+it does not restore it from a database or exchange it across nodes.
+
+Opt-in [request metadata](/observability/request-metadata) includes a bounded
+`learning_decision` explanation. On the node,
+`Lasso.Diagnostics.provider_knowledge(profile, chain_id, provider_id)` returns
+hints per transport.
+
+Prometheus exposes two node-local counters:
+
+| Metric | Meaning |
+| --- | --- |
+| `lasso_provider_knowledge_applied_deferrals_total{kind}` | Order changes in a materialized batch; deferred routes in later lazy batches are not counted |
+| `lasso_provider_knowledge_retractions_total{kind,reason="contradicted"}` | Published hints withdrawn after accepted success contradicted the boundary; expiry and witness eviction are not counted |
+
+Kinds are `method_refusal`, `historical_depth` and `span_limit`. Counters reset
+on restart. An order change does not prove that a failure was avoided. See the
+released [configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.7.0/docs/CONFIGURATION.md#learned-routing)
+and [metric contract](https://github.com/jaxernst/lasso-rpc/blob/v0.7.0/docs/PROMETHEUS.md#learned-routing-counters).
+
+## Control Cloud learning on a Custom profile
+
+Cloud restores its learned knowledge after restarts. Since October 29, 2026,
+quota exhaustion and plan refusals take the affected credential out of rotation
+until revalidation succeeds, while keeping the last route.
+
+- **See it.** Inspect each provider's knowledge and source in the profile; see
+  [Custom profiles](/cloud/custom-profiles#lasso-learns-your-providers).
+- **Declare what you know.** A declared limit, such as your plan's log range,
+  outranks a learned one.
+- **Correct it.** Reset a provider's knowledge, or pause one learned hint for an
+  hour, from the API or dashboard.
+
+## Limits
+
+Learning does not qualify every method, parameter or historical selector for
+you. Test your application's real requests against your provider plans. Core's
+learned ordering does not include Cloud's credential exclusion for quota or plan
+refusals.
+
+## Next
+
+- [Provider capabilities](/configuration/capabilities): declare Core limits.
+- [Provider selection](/concepts/provider-selection): eligibility and order.
+- [Cloud error handling](/cloud/reference/error-handling): upstream failures.
+- [Indexer backfills](/cloud/indexer-backfills): range limits in practice.

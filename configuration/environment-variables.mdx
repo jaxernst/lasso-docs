@@ -26,6 +26,18 @@ description: Runtime variables for RPC Core containers and source deployments.
 | `LASSO_HTTP_POOL_COUNT` | No | Independent Finch pools per upstream host | `1` |
 | `BALANCED_FAST_BETA` | No | Latency exponent for [`balanced-fast`](/concepts/routing-strategies#balanced-fast); a positive number, where higher values favor low latency more strongly | `3.0` |
 
+### Learned provider limits
+
+All three effects default to `on`. Each accepts `on` or `off`; invalid values
+fail startup. Restart after changing them. Set all three to `off` to keep
+v0.6.0 ordering. See [provider learning](/concepts/provider-learning).
+
+| Variable | Default | Effect |
+| --- | --- | --- |
+| `LASSO_PROVIDER_KNOWLEDGE_METHOD_REFUSAL_MODE` | `on` | Move providers with matching learned method refusals behind alternatives |
+| `LASSO_PROVIDER_KNOWLEDGE_HISTORICAL_DEPTH_MODE` | `on` | Move providers with matching learned history limits behind alternatives |
+| `LASSO_PROVIDER_KNOWLEDGE_SPAN_LIMIT_MODE` | `on` | Move providers with matching learned log-span limits behind alternatives |
+
 ### Clustering
 
 | Variable | Required | Description |
