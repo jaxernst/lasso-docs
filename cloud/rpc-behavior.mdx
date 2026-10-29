@@ -61,13 +61,16 @@ profile's knowledge.
 
 ## Transactions
 
-`eth_sendRawTransaction` sends the same signed bytes to up to three providers
-in turn, within one deadline. A rate limit, timeout, full pool, underpriced
-replacement or unfamiliar rejection moves it to the next provider. A sender
-fault stops at the first: nonce too low or too high, insufficient funds, an
-invalid signature, a malformed transaction or invalid gas or fee limits. So
-does a response saying the node already knows the transaction. A provider pin
-sends to that provider only.
+`eth_sendRawTransaction` sends the same signed bytes sequentially within one
+deadline, with an allowance of three sends. A rate limit or quota exhaustion
+moves it to the next provider without consuming that allowance, and the same
+provider is never tried twice; a timeout, full pool, underpriced replacement
+or unfamiliar rejection moves it to the next provider and does count against
+the allowance. All sends share a limit of 16 candidate admissions. A sender
+fault stops at the first: nonce too low or too high,
+insufficient funds, an invalid signature, a malformed transaction or invalid
+gas or fee limits. So does a response saying the node already knows the
+transaction. A provider pin sends to that provider only.
 
 Before returning an error, Lasso looks the transaction up by hash once, and
 returns the hash if the transaction is pending or mined. If the lookup can't
@@ -97,9 +100,11 @@ methods without failover; see [supported methods](/api/supported-methods).
 
 Lasso shares upstream subscriptions across your clients and moves them to
 another provider in the same profile when one fails, backfilling missed
-`newHeads` and `logs` over HTTP and suppressing duplicates. Pending-transaction
-subscriptions aren't served. The engine's behavior is documented in
-[WebSocket subscriptions](/advanced/websocket-subscriptions).
+`newHeads` and `logs` over HTTP and suppressing duplicates. When no alternate
+provider is configured, Lasso instead retries reconnecting to that same
+provider within the recovery deadline, rather than ending the subscription.
+Pending-transaction subscriptions aren't served. The engine's behavior is
+documented in [WebSocket subscriptions](/advanced/websocket-subscriptions).
 
 ## Standards and provider differences
 

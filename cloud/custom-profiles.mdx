@@ -111,15 +111,16 @@ Head modes don't change which providers serve client subscriptions. Omitting
 
 You supply URLs and intent. Lasso works out the rest from health checks and
 live traffic: historical depth per method, methods a provider refuses, its
-`eth_getLogs` span limit, and whether it looks like it's exhausting a quota.
-`GET /api/v1/profiles/{slug}` shows that knowledge for each provider, with its
-source, configured mode and effect:
+`eth_getLogs` span limit, whether it's exhausting a quota, and whether its
+plan refuses the chain outright. `GET /api/v1/profiles/{slug}` shows that
+knowledge for each provider, with its source, configured mode and effect:
 
 ```json
 {"name": "my-node", "status": "verified", "knowledge": {
   "methods_refused": [{"method": "debug_traceTransaction", "source": "learned", "configured_mode": "on", "effect": "on", "suspended": false}],
   "logs_span": {"blocks": 10000, "source": "probe", "configured_mode": "on", "effect": "on", "suspended": false},
-  "quota_exhaustion": {"value": true, "source": "learned", "configured_mode": "on", "effect": "on", "suspended": false}
+  "quota_exhaustion": {"value": true, "source": "learned", "configured_mode": "on", "effect": "excluded", "suspended": false},
+  "capability_refusal": {"value": true, "source": "learned", "configured_mode": "on", "effect": "excluded", "suspended": false}
 }}
 ```
 
@@ -128,10 +129,11 @@ source, configured mode and effect:
 is what's applied right now: it matches `configured_mode`, or reports
 `suspended` while you've paused that hint; `suspended` mirrors the same state
 as a boolean. Learned historical depth, method refusals, `eth_getLogs` span
-limits, and quota exhaustion are `on` by default. Matching method, depth and
-span limits mean a provider is moved behind alternatives. Quota exhaustion and
-plan refusals take the affected credential out of rotation until revalidation
-succeeds. Both behaviors keep the last route.
+limits, quota exhaustion and chain-plan refusal are `on` by default. Matching
+method, depth and span limits move a provider behind alternatives. Quota
+exhaustion and chain-plan refusal (`capability_refusal`) instead report
+`effect: "excluded"` while they skip the affected credential until revalidation
+succeeds. Both behaviors keep one last route when every candidate is excluded.
 Declare `limits` only for what you know better than Lasso; declared limits
 outrank learned ones. [How Lasso learns your providers](/concepts/provider-learning)
 explains how learning works and stays correct.

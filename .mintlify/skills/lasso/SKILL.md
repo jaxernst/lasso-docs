@@ -13,7 +13,7 @@ compatibility: >
   for an enabled rail.
 metadata:
   author: Lasso
-  version: "14.4"
+  version: "14.5"
   website: https://lasso.sh
   routing_core: https://github.com/jaxernst/lasso-rpc
 ---
@@ -114,6 +114,20 @@ URL="$LASSO_RPC_URL/fastest/base"
 curl -fsS -D - "$URL?include_meta=body" -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
 ```
+
+For free Ethereum RPC, save the returned `key` as `LASSO_RPC_KEY` and derive
+the public path from `rpc_url`:
+
+```bash
+LASSO_PUBLIC_RPC_URL="${LASSO_RPC_URL%%/rpc/*}/rpc/profile/public/ethereum"
+curl -fsS "$LASSO_PUBLIC_RPC_URL?include_meta=body" \
+  -H "authorization: Bearer $LASSO_RPC_KEY" \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
+```
+
+The fresh key's premium URL draws on its starting balance; the public path
+uses public providers with no request charge.
 
 The chain is a name or decimal ID from `chains` in `/agent.json`.
 
@@ -287,9 +301,19 @@ accounts went live no longer work; request a new one.
   overlap and scope unchanged. Update `allowed_profiles` before rotating.
   Omitting `grace_seconds` gives 3,600 seconds (1 hour); sending 0 stops the old secret at once.
 
-  For no downtime: rotate with a grace longer than your rollout plus a
-  rollback, deploy the new secret everywhere, confirm calls succeed with it,
-  then let the old secret lapse at `previous_valid_until`.
+  For zero downtime:
+
+  1. Choose `grace_seconds` to cover deployment plus rollback time (default
+     3,600 seconds; maximum 86,400).
+  2. Rotate once with the management Bearer token. Save the replacement URLs
+     and `previous_valid_until` in the secret store; wait for replacement RPC
+     to succeed, honoring `Retry-After` on a 202.
+  3. Deploy the replacement everywhere and confirm traffic succeeds before
+     `previous_valid_until`. Keep the old secret available for rollback during
+     that overlap, then let it lapse.
+
+  State the deployment order and expiry in your handoff, without secrets.
+  After overlap expires, the old secret returns `key_revoked`.
 - `PATCH /api/v1/keys/<id>` with `{"allowed_profiles":["<slug>"]}` narrows
   authorization; it does not move an existing URL to that profile. Use its
   explicit profile URL. Bare URLs always select premium and return `forbidden`
@@ -702,8 +726,14 @@ deleted rows (`DELETE ... RETURNING` yields the retraction list).
 Replay-safe reads fail over within one deadline and a bounded number of
 upstream dispatches.
 
+Definitive capacity refusals (rate limits or quota exhaustion) do not consume
+the three-send allowance. Actual dispatches remain recorded, and a physical
+upstream is never tried twice. All sends retain identical signed bytes and share
+the absolute deadline and global limit of 16 candidate admissions. Timeouts and
+ambiguous outcomes consume the allowance; acceptance ends sending immediately.
+
 A signed transaction is resent as the same bytes to the next provider, up to
-three in total within one deadline, when a provider rate-limits it, times out
+three allowance-consuming sends within one deadline, when a provider rate-limits it, times out
 or rejects it for a node-local reason. A sender fault such as insufficient
 funds or nonce too low stops at the first provider. A request pinned to one
 provider (`/rpc/provider/<id>/<chain>`) goes to that provider only. When every
