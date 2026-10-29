@@ -62,4 +62,4 @@ Tracing is best-effort. The SDK's batch processor drops spans under pressure or 
 
 If traces stop appearing, check `LASSO_OTEL_ENABLED`, `OTEL_SDK_DISABLED`, the receiver address, protocol and credentials, the sampler, and the collector's own export and drop metrics. An empty trace search does not show that traffic is idle; use [metrics](/observability/metrics) for that. To turn tracing off, set `LASSO_OTEL_ENABLED=false` and restart.
 
-See the [released tracing guide](https://github.com/jaxernst/lasso-rpc/blob/v0.6.0/docs/TRACING.md) for a Collector pipeline example and sweeper tuning details.
+See the [released tracing guide](https://github.com/jaxernst/lasso-rpc/blob/v0.7.0/docs/TRACING.md) for a Collector pipeline example and sweeper tuning details.

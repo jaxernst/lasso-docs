@@ -60,12 +60,12 @@ latency or successful service.
 
 ## Retention and overhead
 
-In v0.6.0, BenchmarkStore periodically trims raw per-chain samples. A burst can
+In v0.7.0, BenchmarkStore periodically trims raw per-chain samples. A burst can
 exceed that threshold before the next trim, and aggregated provider/method score
 entries have no fixed cardinality cap in this release. It is not a durable
 complete request journal. Monitor process and ETS memory for your configured
 profile, method, and provider mix. The released
-[BenchmarkStore source](https://github.com/jaxernst/lasso-rpc/blob/v0.6.0/lib/lasso/core/benchmarking/benchmark_store.ex)
+[BenchmarkStore source](https://github.com/jaxernst/lasso-rpc/blob/v0.7.0/lib/lasso/core/benchmarking/benchmark_store.ex)
 defines the exact behavior; this page does not assign a fixed per-call overhead
 or memory footprint to every deployment.
 
@@ -75,6 +75,6 @@ it is not hosted capacity or an SLA. [Versions and evidence](/releases-and-avail
 links the current release acceptance evidence.
 
 Implementation references:
-[Fastest](https://github.com/jaxernst/lasso-rpc/blob/v0.6.0/lib/lasso/core/selection/strategies/fastest.ex),
-[BalancedFast](https://github.com/jaxernst/lasso-rpc/blob/v0.6.0/lib/lasso/core/selection/strategies/balanced_fast.ex),
-and [routing evidence](https://github.com/jaxernst/lasso-rpc/blob/v0.6.0/lib/lasso/core/routing_evidence.ex).
+[Fastest](https://github.com/jaxernst/lasso-rpc/blob/v0.7.0/lib/lasso/core/selection/strategies/fastest.ex),
+[BalancedFast](https://github.com/jaxernst/lasso-rpc/blob/v0.7.0/lib/lasso/core/selection/strategies/balanced_fast.ex),
+and [routing evidence](https://github.com/jaxernst/lasso-rpc/blob/v0.7.0/lib/lasso/core/routing_evidence.ex).

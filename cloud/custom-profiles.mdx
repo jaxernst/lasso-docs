@@ -128,10 +128,12 @@ source, configured mode and effect:
 is what's applied right now: it matches `configured_mode`, or reports
 `suspended` while you've paused that hint; `suspended` mirrors the same state
 as a boolean. Learned historical depth, method refusals, `eth_getLogs` span
-limits, and quota exhaustion are `on` by default: they move a provider that
-can't serve a request behind the alternatives, never dropping the last route.
+limits, and quota exhaustion are `on` by default. Matching method, depth and
+span limits mean a provider is moved behind alternatives. Quota exhaustion and
+plan refusals take the affected credential out of rotation until revalidation
+succeeds. Both behaviors keep the last route.
 Declare `limits` only for what you know better than Lasso; declared limits
-outrank learned ones. [How Lasso learns your providers](/cloud/provider-learning)
+outrank learned ones. [How Lasso learns your providers](/concepts/provider-learning)
 explains how learning works and stays correct.
 
 To correct what Lasso learned, call

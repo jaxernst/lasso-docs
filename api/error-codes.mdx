@@ -40,7 +40,7 @@ permits, with one dispatch and no cross-request affinity. Cloud rejects its
 
 ## Core routing exhaustion
 
-When no eligible attempt can serve a request, Core v0.6.0 returns a JSON-RPC
+When no eligible attempt can serve a request, Core v0.7.0 returns a JSON-RPC
 `-32000` error over **HTTP 200**, preserving the request ID. `data` has
 `reason`, `retry_after_ms`, and `upstream_attempts`. `retry_after_ms` can be
 non-null only for `no_eligible_providers`.
@@ -74,8 +74,8 @@ on current circuit state:
 ```
 
 The shape comes from the released
-[controller regression](https://github.com/jaxernst/lasso-rpc/blob/v0.6.0/test/lasso_web/controllers/rpc_controller_test.exs)
-and [request pipeline](https://github.com/jaxernst/lasso-rpc/blob/v0.6.0/lib/lasso/core/request/request_pipeline.ex).
+[controller regression](https://github.com/jaxernst/lasso-rpc/blob/v0.7.0/test/lasso_web/controllers/rpc_controller_test.exs)
+and [request pipeline](https://github.com/jaxernst/lasso-rpc/blob/v0.7.0/lib/lasso/core/request/request_pipeline.ex).
 When every upstream a request reached rejected the method, Core returns that
 upstream's `-32601` with its message and data instead. If another outcome
 occurred, such as a provider failure, quota exhaustion or timeout, you get that
@@ -86,7 +86,7 @@ when available. It does not promise an exhaustive provider diagnostic schema.
 
 ## Large `eth_getLogs` queries
 
-Core v0.6.0 turns a recognized provider block-range or result-size limit, or
+Core v0.7.0 turns a recognized provider block-range or result-size limit, or
 its own bounded response-size rejection, into one JSON-RPC error:
 
 ```json
@@ -105,8 +105,10 @@ its own bounded response-size rejection, into one JSON-RPC error:
 ```
 
 Retry with a smaller `fromBlock`–`toBlock` span and collect the ranges in your
-application. Lasso does not automatically split the query or try another
-provider for this deterministic limit. A timeout without a recognized limit
+application. Lasso does not automatically split the query. An upstream range
+or result-size refusal can fail over to another eligible provider within the
+request budget; if none succeeds, Core returns the range action. Core's own
+bounded response-size rejection is terminal. A timeout without a recognized limit
 does not imply that reducing the range is the only remedy. Other malformed
 filter arguments retain their original error rather than this action.
 

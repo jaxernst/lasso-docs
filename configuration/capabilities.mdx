@@ -5,7 +5,11 @@ description: Declare method restrictions, historical limits, and provider error 
 
 ## Provider Capabilities
 
-Capabilities declare what a provider supports and its limits. Validated at boot time.
+Capabilities declare what a provider supports and its limits. Lasso validates
+these declarations at startup and reload. In v0.7.0, `unsupported_methods`,
+`unsupported_categories` and `limits.block_age_methods` must be lists: use `[]`
+for no declarations. A field left as YAML `null` fails validation; a rejected
+reload keeps the previous configuration.
 
 ```yaml
 capabilities:
@@ -35,5 +39,9 @@ When `capabilities` is omitted, defaults to permissive (only `local_only` method
 
 
 These declarations constrain routing; they are not a proof of universal upstream compatibility. Test representative successful requests and known failure cases before relying on a provider-specific rule. Use the narrowest reliable match. Provider APIs, plans, and error messages can change.
+
+RPC Core v0.7.0 also [learns method refusals, historical depth and log-span
+limits](/concepts/provider-learning) from traffic. Matching providers are moved
+behind alternatives; declarations take precedence over learned limits.
 
 Discovery produces configuration for review. RPC Core does not promise unsupervised adaptation of every method, parameter, or historical limit. Changes to YAML require a successful reload on each running node. See [Profiles](/concepts/profiles).

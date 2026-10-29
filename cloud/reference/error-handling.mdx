@@ -23,8 +23,10 @@ to repeat. A signed transaction goes to up to three providers in turn, and only
 provider faults move it on; a sender fault such as nonce too low or insufficient
 funds stops at the first and is returned to you.
 
-Lasso also [learns from these errors](/cloud/provider-learning): a provider that
-keeps failing a kind of request is tried later for that kind of request.
+Lasso also [learns from these errors](/concepts/provider-learning): a provider that
+keeps refusing a method, history or span is moved behind alternatives for
+matching requests. Quota exhaustion and plan refusals take the affected
+credential out of rotation until revalidation succeeds, keeping the last route.
 
 ## When no provider can serve the request
 
@@ -41,5 +43,5 @@ Every code and its fix is listed in [response signals and errors](/cloud/referen
 
 ## Related
 
-- [How Lasso learns your providers](/cloud/provider-learning)
+- [How Lasso learns your providers](/concepts/provider-learning)
 - [Routing](/cloud/routing): how Lasso picks the first provider.
