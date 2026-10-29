@@ -9,6 +9,13 @@ Lasso handles each method by whether it's safe to retry, depends on history,
 or holds state on one provider. Use this table to plan each workload's rollout;
 the sections below give the details.
 
+Transaction dispatch differs between the hosted service and self-hosted engine:
+
+| Product | `eth_sendRawTransaction` dispatch |
+|---|---|
+| Lasso Cloud | Same signed bytes to up to three providers in turn; sender faults stop retries. A final hash lookup can recover an accepted transaction. |
+| RPC Core | One upstream dispatch; no retry or fanout after dispatch. Reconcile an uncertain result by hash. |
+
 | Workload | Failover | What your app owns |
 |---|---|---|
 | Current reads | Retried on another provider when safe | Chain reorgs and provider freshness differences |

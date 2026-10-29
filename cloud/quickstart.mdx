@@ -34,7 +34,8 @@ You now have an account with a small starting balance and its first key. Save
 add keys, build Custom profiles and hand the account to a person later.
 
 If the response is `202` with `serving_ready: false`, wait `Retry-After`
-seconds and use the same key. Don't create another.
+seconds, then send the RPC call below to the saved `rpc_url`. Retry RPC if
+it is still pending, honoring `Retry-After`; the key already exists.
 
 ## 2. Call it
 
@@ -60,6 +61,18 @@ curl -fsS --retry 5 "$LASSO_RPC_URL/fastest/base?include_meta=body" \
 `lasso_meta` names the provider that served the call and where the time went.
 Every response also carries `x-lasso-usd`, what the call cost, and
 `x-lasso-balance-usd`, what's left.
+
+For free Ethereum RPC, save the returned `key` as `LASSO_RPC_KEY` and derive
+the public path from `rpc_url`. The premium path uses the starting balance;
+public providers have no request charge.
+
+```bash
+LASSO_PUBLIC_RPC_URL="${LASSO_RPC_URL%%/rpc/*}/rpc/profile/public/ethereum"
+curl -fsS "$LASSO_PUBLIC_RPC_URL?include_meta=body" \
+  -H "authorization: Bearer $LASSO_RPC_KEY" \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
+```
 
 ## 3. Put it in your app
 
