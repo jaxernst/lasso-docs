@@ -397,7 +397,7 @@ export LASSO_STREAM_URL="https://lasso.sh/streams/k/$LASSO_KEY/base/logs?address
 curl -fsS "$LASSO_STREAM_URL&wait=20&consumer=indexer"
 ```
 
-The beta serves Ethereum (`ethereum` or `1`) and Base (`base` or `8453`). Choose `/logs` or
+The beta serves Ethereum (`ethereum` or `1`), Base (`base` or `8453`), and Arbitrum (`arbitrum` or `42161`). Choose `/logs` or
 `/blocks`. Logs accept `address` (at most 100 comma-separated addresses) and
 `topic0`–`topic3` (comma-separated alternatives at each position; positions are
 ANDed). Omit a filter to match anything. Headers take no address/topic filters.
@@ -405,10 +405,11 @@ ANDed). Omit a filter to match anything. Headers take no address/topic filters.
 nor cursor encoding; resume the same cursor with a different label if desired.
 `wait` is 0–30 seconds, default 20; use zero to drain pages in a cron job.
 Position precedence is `Last-Event-ID`, then `cursor`, then `from`. Supply one:
-`from` is a nonnegative decimal block or `latest`, which includes the current tip
+`from` is a nonnegative decimal block or `latest`, which includes the current published tip
 block. Keep cursors opaque and use them only with the same chain/source/filter.
-A `from` above the tip waits, then returns `503 chain_unavailable` with
-`Retry-After` (1–30 seconds) if its preceding block is still unverified.
+A cold read or `from` above the published tip returns a successful pending page
+with `retry_after`. Keep the supplied start or committed cursor and retry after
+that delay; apply no pending data.
 
 Every successful pull is HTTP 200 with one page, including quiet/no-op pages:
 
@@ -416,15 +417,26 @@ Every successful pull is HTTP 200 with one page, including quiet/no-op pages:
 {"chain":8453,"from":21004401,"through":{"number":21004410,"hash":"0x…"},"tip":21004410,"safe":null,"finalized":null,"cursor":"c1.…","items":[]}
 ```
 
-`through`, `safe` and `finalized` identify blocks by number and hash; the latter
-two may be null. Page numbers are decimal; item quantities are JSON-RPC hex.
+`through`, `safe` and `finalized` identify blocks by number and hash. Marks may
+be null; `through` and `cursor` may also be null on an initial pending page. Page numbers are decimal; item quantities are JSON-RPC hex.
 Log items are `eth_getLogs` objects plus the validated header's `blockTimestamp`,
 with no `removed` field. Blocks are headers without transaction, uncle or
 withdrawal lists. Items are ordered by block number, then log index. Pages
 contain at most 10,000 whole blocks, targeting 1 MiB of items with a 4 MiB ceiling; an oversized
 single block is delivered whole, alone, or returns 503.
 
-Apply every page, including empty corrections, in exactly one transaction:
+Finalized history trusts the routed provider outside the feed's known window.
+A header contradicting a hash already verified by the feed is refused and tried
+on the next provider. Per-stream history has no separate confirmation wave.
+History is fetched in the background through the Streams routing profile. A
+provider range refusal reduces the stream's span; encoded buffers bound page
+volume. The feed seeds headers forward from finality and retains continuous
+header coverage through its published tip. Payloads are retained only for the
+hot tail. A cold successful page can carry `retry_after` with a null cursor or
+through value: keep the original `from` or committed cursor, wait that many
+seconds, and retry without applying the pending page.
+
+Apply every completed page, including empty corrections, in exactly one transaction:
 
 ```text
 delete this source's rows where block_number >= page.from
@@ -469,11 +481,14 @@ def request_url():
     q.pop("from", None)
     q.pop("cursor", None)
     row = db.execute("SELECT cursor FROM positions WHERE source=?", (SOURCE,)).fetchone()
-    q["cursor" if row else "from"] = row[0] if row else START
+    q["cursor" if row and row[0] else "from"] = row[0] if row and row[0] else START
     q["wait"] = "20"
     return urlunsplit((u.scheme, u.netloc, u.path, urlencode(q), ""))
 
 def apply_page(page):
+    if page.get("retry_after"):
+        time.sleep(page["retry_after"])
+        return  # keep START and the last committed cursor; apply no pending data
     with db:
         db.execute("DELETE FROM items WHERE source=? AND block>=?", (SOURCE, page["from"]))
         db.executemany("INSERT INTO items VALUES (?,?,?)", [
@@ -598,7 +613,7 @@ while True:
 | 429 | `too_many_readers` | Close extra readers before retrying |
 | 429 | `rate_limit_exceeded` | Honor `Retry-After` when present; otherwise back off before retrying |
 | 503 | `chain_unavailable` | Honor `Retry-After`; retry the same committed position |
-| 503 | `history_unavailable` | No usable history/confirmation pair; honor `Retry-After` and retain the committed cursor |
+| 503 | `history_unavailable` | No usable history page or prefix; honor `Retry-After` and retain the committed cursor |
 
 HTTP errors other than 402 use `{"error":"<code>", ...details}`, with optional
 `reason`, `expected_source` or rejected `anchor`. HTTP 503 always includes
@@ -624,10 +639,12 @@ cursor; `resync_required` rebuilds this source from `START_BLOCK`. Authorization
 and funding controls stop the recipe for user action.
 
 A key has at most 10 concurrent readers (`429 too_many_readers`) and 2 concurrent
-history builds. `503 history_unavailable` with `all_circuits_open` or
-`confirmation_unavailable` refuses before history work starts. `read_unavailable`
-means a first history read could not finish with a verified prefix. Neither
-failure rebuilds internally within `wait`. Keep the committed cursor and retry
+history builds. `503 history_unavailable` with `all_circuits_open` refuses before
+upstream work when every serving circuit is open. `read_unavailable` means a
+history read could not return a usable prefix without a more specific upstream
+cause. Upstream refusals can retain their category as `reason`, with `provider`,
+`code` and `category` fields. Refusals carry no items or cursor and do not rebuild
+internally within `wait`. Keep the committed cursor and retry
 after HTTP `Retry-After` or the SSE control body's `retry_after` seconds.
 This does not mean the requested history depth is unsupported. Feed/page
 capacity failures can still return `503 chain_unavailable`.

@@ -82,10 +82,10 @@ return `-32005` with `data.reason: "log_range_too_large"` and `data.action:
 When Lasso's own retry budget for a read runs out across several providers
 without a usable response, it returns its own error instead of the last
 provider's: `-32601` when every attempt was rejected as unsupported, `-32005`
-when every attempt was rate limited, otherwise `-32000`. `error.data.upstream_attempts`
-is how many providers Lasso tried, and `error.data.categories` breaks that count
-down by cause; neither upstream identities, messages nor response data are
-included.
+when every attempt was rate limited or had exhausted its provider allowance,
+otherwise `-32000`. `error.data.upstream_attempts` is how many providers Lasso
+tried, and `error.data.categories` breaks that count down by cause; neither
+upstream identities, messages nor response data are included.
 
 ## Transaction submission errors
 
