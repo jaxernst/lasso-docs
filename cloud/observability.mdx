@@ -95,3 +95,13 @@ the fields.
   header, field and code.
 - [Routing](/cloud/routing): what the evidence means.
 - [Balance and payment fallback](/cloud/balance-and-fallback): watching spend.
+
+## Understand latency
+
+`lasso_meta` timings measure work inside Lasso, including upstream calls. They
+exclude client network RTT, TCP/TLS setup, edge routing, and response delivery.
+Reuse connections with HTTP keep-alive or HTTP/2. In a production Base
+`eth_blockNumber` measurement on October 29, 2026, median client latency was
+119 ms with a fresh connection versus 42 ms reused; metadata reported 13 ms.
+These are measurements from one client location, not a latency guarantee.
+The public tier uses free providers and has a wider latency tail than premium.
