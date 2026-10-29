@@ -119,7 +119,7 @@ source, configured mode and effect:
 {"name": "my-node", "status": "verified", "knowledge": {
   "methods_refused": [{"method": "debug_traceTransaction", "source": "learned", "configured_mode": "on", "effect": "on", "suspended": false}],
   "logs_span": {"blocks": 10000, "source": "probe", "configured_mode": "on", "effect": "on", "suspended": false},
-  "quota_exhaustion": {"value": true, "source": "learned", "configured_mode": "shadow", "effect": "shadow", "suspended": false}
+  "quota_exhaustion": {"value": true, "source": "learned", "configured_mode": "on", "effect": "on", "suspended": false}
 }}
 ```
 
@@ -127,11 +127,10 @@ source, configured mode and effect:
 `shadow` (Lasso observes without acting), or `on` (changes routing). `effect`
 is what's applied right now: it matches `configured_mode`, or reports
 `suspended` while you've paused that hint; `suspended` mirrors the same state
-as a boolean. Learned historical depth, method refusals and `eth_getLogs` span
-limits are `on`: they move a provider that can't serve a request behind the
-alternatives, never dropping the last route. Quota exhaustion is `shadow`
-only, a signal that a provider looks throttled, shown to you but never acted
-on. Declare `limits` only for what you know better than Lasso; declared limits
+as a boolean. Learned historical depth, method refusals, `eth_getLogs` span
+limits, and quota exhaustion are `on` by default: they move a provider that
+can't serve a request behind the alternatives, never dropping the last route.
+Declare `limits` only for what you know better than Lasso; declared limits
 outrank learned ones. [How Lasso learns your providers](/cloud/provider-learning)
 explains how learning works and stays correct.
 

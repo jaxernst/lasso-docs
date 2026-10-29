@@ -8,6 +8,7 @@
 | `payment_required` | 402 | Sign one challenge with an x402 or MPP client and repeat this request with PAYMENT-SIGNATURE or Authorization: Payment. |
 | `custom_access_required` | 403 | Buy access with POST /api/v1/accounts/current/custom-access or subscribe. |
 | `forbidden` | 403 | Request claim links with an unrestricted agent's management token; a key created before agents existed can use its own RPC key. |
+| `not_in_beta` | 403 | Request access to the Streams beta. |
 | `not_found` | 404 | Check the resource ID and credential scope. |
 | `unknown_profile` | 404 | Use a profile listed by GET /api/v1/profiles. |
 | `account_merged` | 409 | Create the profile from the account it was merged into. |
@@ -21,6 +22,7 @@
 | `profile_suspended` | 409 | Restore Custom access to reactivate it, or delete it with DELETE /api/v1/profiles/&#123;slug&#125; and apply the document again. |
 | `revision_conflict` | 409 | Read it again with GET /api/v1/profiles/&#123;slug&#125;, then reapply. |
 | `slug_taken` | 409 | Choose another slug; existing key URLs keep their profile identity. |
+| `stream_limit` | 409 | Delete an unused saved stream before creating another. |
 | `gone` | 410 | Use the /api/v1 operation this response names. |
 | `amount_out_of_range` | 422 | Stay within the per-purchase range or day range listed in /agent.json. |
 | `balance_limit` | 422 | Nothing was charged. Use a smaller amount. |

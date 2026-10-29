@@ -35,12 +35,15 @@ a request's age from its block selector and steers it toward providers known to
 serve that depth. State reads by block hash go only to archival providers,
 because a hash's age is unknown before dispatch.
 
-`eth_getLogs` also has provider-specific range and result-size limits. When a
-provider refuses a range as too large, Lasso returns `-32005` with
-`data.code: "log_range_limit"` and a `next_action` to narrow the range; split
-it in your app. When a provider refuses `eth_getLogs` for plan reasons, Lasso
-tries the same query on another provider. Qualify your exact queries with
-[indexer backfills](/cloud/indexer-backfills).
+`eth_getLogs` also has provider-specific range and result-size limits. A
+provider's own limit differs by provider, so Lasso tries the same query on
+the remaining candidates first; it returns `-32005` with `data.reason:
+"log_range_too_large"` and `data.action: "reduce_block_range"` only once none
+of them can serve it. Split a returned range error into smaller
+`fromBlock`–`toBlock` spans in your app. Lasso's own response-size cap applies
+to every provider alike and returns that `-32005` at once. A provider that
+refuses `eth_getLogs` for plan reasons is treated the same way. Qualify your
+exact queries with [indexer backfills](/cloud/indexer-backfills).
 
 ## Trace and debug methods
 
@@ -111,7 +114,10 @@ then each chain's activated fork.
   unchanged.
 - **Upstream errors keep their `code`, `message` and `data`**, even when the
   provider sent them with an HTTP 4xx or 5xx. HTML, gateway text and other
-  transport failures are treated as provider failures and can fail over.
+  transport failures are treated as provider failures and can fail over. When
+  Lasso's own retry budget runs out across several providers without a usable
+  response, it returns its own sanitized error instead; see
+  [response signals and errors](/cloud/reference/signals-and-errors#rpc-errors).
 - **Parameters.** EIP-1898 block selectors need exactly one of `blockNumber` or
   `blockHash`, and `requireCanonical` only with `blockHash`. An EIP-234
   `eth_getLogs` filter can't mix `blockHash` with `fromBlock` or `toBlock`.
