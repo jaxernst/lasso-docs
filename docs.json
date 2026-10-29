@@ -239,6 +239,7 @@
     ]
   },
   "redirects": [
+    {"source": "/support", "destination": "/support-security-lifecycle"},
     {
       "source": "/cloud/block-continuity",
       "destination": "/advanced/block-continuity"
