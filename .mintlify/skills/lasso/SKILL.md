@@ -28,9 +28,7 @@ provider pool by measured latency and health, with failover and per-request
 evidence. This skill covers creating, installing, funding, handing off,
 rotating and customizing that endpoint over plain HTTP.
 
-Pro subscription pricing is published at [lasso.sh/pricing](https://lasso.sh/pricing)
-and in `agent.json`. New subscriptions use the current catalog price.
-Included usage and access are unchanged.
+See [plans and pricing](https://lasso.sh/pricing).
 
 ## Rules
 
@@ -136,8 +134,23 @@ uses public providers with no request charge.
 The chain is a name or decimal ID from `chains` in `/agent.json`.
 
 - `include_meta=body` adds `lasso_meta`: strategy used, candidates,
-  `selected_provider`, retries, and upstream and overhead latency.
-  `include_meta=headers` leaves the body unchanged and adds `x-lasso-meta`.
+  `selected_provider`, retries (candidate advances), dispatches (physical upstream sends of the request's own method, excluding auxiliary lookups,
+  including all slices when chunking is enabled), and upstream and overhead latency.
+  `fallback_profile` names the serving profile when it differs from
+  `service_profile_id` and is absent otherwise.
+  `include_meta=headers` leaves the body unchanged and adds `x-lasso-meta`
+  plus `x-lasso-fallback-profile` when a routing fallback served the request.
+  Range refusals stay within the current profile. When chunking is enabled,
+  range children also keep timeouts and provider failures within their serving
+  profile. Ordinary calls, including block-hash `eth_getLogs`, can use configured
+  capability and outage fallback; Premium can fall back to Public.
+- Chunked `eth_getLogs` adds `x-lasso-slices` and metadata fields `slices`,
+  `limit_fired` (`span`, `response_volume`, `sends`, `deadline`, `reorg`, `none`),
+  `max_block_range` (verified prefix length, or prefix plus projected remaining
+  fit on send exhaustion; omitted when unknown), and `cap_source` (`declared`,
+  `learned`, `measured`, `unknown`), naming the route bound sizing the final plan.
+  A successful call is charged once regardless of its
+  slice count; a failed parent call is charged zero.
 - Every response carries `x-lasso-request-id`; quote it when reporting a
   problem. Served requests add `x-lasso-access` (`premium`, `public` or
   `custom`), `x-lasso-cu`, `x-lasso-usd` (this request's charge),
@@ -182,7 +195,11 @@ segment in the returned prefix; do not append another one.
 Health and known capability steer candidates first, as a preference rather
 than a guarantee. Premium and Custom serve all four strategies; `public`,
 payment fallback and free access serve `load-balanced`, and
-`lasso_meta.strategy` reports what was used. A URL without a strategy uses
+`lasso_meta.strategy` and `applied_strategy` report what was used. For an
+explicit strategy URL, metadata also names `requested_strategy` and
+`strategy_adjusted`; Public `/fastest/` reports `fastest` requested and
+`load-balanced` applied. Response headers expose `x-lasso-requested-strategy`
+for explicit strategy URLs and `x-lasso-strategy` for the applied strategy. A URL without a strategy uses
 `balanced-fast` on Premium and `load-balanced` on Custom profiles.
 `latency-weighted` is an alias of `balanced-fast`. `agent.json` lists exact USD
 prices per method and strategy.
@@ -405,10 +422,11 @@ polls and identity checks.
 
 Omitting a provider removes it; omitting a provider's `url` keeps the stored
 one. Omitted `heads` in a whole replacement resets that provider to passive.
+Set `transactions: {relays: [provider_name], public_fallback: false}` on a chain to send signed transactions only to those relays; reads and subscriptions use the other providers. Set `public_fallback: true` to allow a second send phase over the same profile's other providers after relay exhaustion.
 `Accept: application/yaml` exports compatible head policies for self-hosted Lasso RPC
 Core. A provider with `heads: standby` returns 422 `invalid_config` with its field
 path because the target Core YAML cannot represent elected fallback; the stored
-profile is unchanged. `DELETE` removes it; URLs naming it then serve as `premium`. When Custom
+profile is unchanged. A chain with `transactions` also returns 422 at that field until the supported Core target enforces relay policies. `DELETE` removes it; URLs naming it then serve as `premium`. When Custom
 access lapses, the profile is kept and its URLs serve from `premium`, charged
 at request prices, until renewed.
 
@@ -421,71 +439,95 @@ or consumer position. RPC profile/strategy URL segments do not apply to Streams.
 
 ```bash
 # Keep this credential-bearing URL in the app's secret store.
-export LASSO_STREAM_URL="https://lasso.sh/streams/k/$LASSO_KEY/base/logs?address=$CONTRACT&from=latest"
-curl -fsS "$LASSO_STREAM_URL&wait=20&consumer=indexer"
+export LASSO_STREAM_URL="https://lasso.sh/streams/k/$LASSO_KEY/base/logs?address=$CONTRACT"
+curl -fsS "$LASSO_STREAM_URL&from=latest&wait=20&label=indexer"
 ```
 
 The beta serves Ethereum (`ethereum` or `1`), Base (`base` or `8453`), and Arbitrum (`arbitrum` or `42161`). Choose `/logs` or
 `/blocks`. Logs accept `address` (at most 100 comma-separated addresses) and
 `topic0`–`topic3` (comma-separated alternatives at each position; positions are
 ANDed). Omit a filter to match anything. Headers take no address/topic filters.
-`consumer` is a display label only. It changes neither data, billing identity
-nor cursor encoding; resume the same cursor with a different label if desired.
-`wait` is 0–30 seconds, default 20; use zero to drain pages in a cron job.
-Position precedence is `Last-Event-ID`, then `cursor`, then `from`. Supply one:
-`from` is a nonnegative decimal block or `latest`, which includes the current published tip
-block. Keep cursors opaque and use them only with the same chain/source/filter.
-A cold read or `from` above the published tip returns a successful pending page
-with `retry_after`. Keep the supplied start or committed cursor and retry after
-that delay; apply no pending data.
 
-Every successful pull is HTTP 200 with one page, including quiet/no-op pages:
+`latest` includes the current published tip block. Keep `next` opaque and use
+it only with the same chain/source/filter. An omitted `from` is a 400, never the
+tip. `wait` is 0–30 seconds, default 20;
+use zero to drain pages in a cron job. `label` is a display name shown on the
+dashboard; it changes neither data, billing identity nor position.
+
+Every 200 is one page:
 
 ```json
-{"chain":8453,"from":21004401,"through":{"number":21004410,"hash":"0x…"},"tip":21004410,"safe":null,"finalized":null,"cursor":"c1.…","items":[]}
+{"from":21004401,"through":{"number":21004410,"hash":"0x…"},"tip":21004410,"safe":null,"finalized":null,"next":"c1.…","items":[]}
 ```
 
-`through`, `safe` and `finalized` identify blocks by number and hash. Marks may
-be null; `through` and `cursor` may also be null on an initial pending page. Page numbers are decimal; item quantities are JSON-RPC hex.
-Log items are `eth_getLogs` objects plus the validated header's `blockTimestamp`,
-with no `removed` field. Blocks are headers without transaction, uncle or
-withdrawal lists. Items are ordered by block number, then log index. Pages
-contain at most 10,000 whole blocks, targeting 1 MiB of items with a 4 MiB ceiling; an oversized
-single block is delivered whole, alone, or returns 503.
+<!-- streams-contract:start -->
+A stream is a replayable feed of one chain's contract logs or block headers,
+selected by the URL's filters and delivered in block order, with reorgs corrected.
 
-Finalized history trusts the routed provider outside the feed's known window.
-A header contradicting a hash already verified by the feed is refused and tried
-on the next provider. Per-stream history has no separate confirmation wave.
-History is fetched in the background through the Streams routing profile. A
-provider range refusal reduces the stream's span; encoded buffers bound page
-volume. The feed seeds headers forward from finality and retains continuous
-header coverage through its published tip. Payloads are retained only for the
-hot tail. A cold successful page can carry `retry_after` with a null cursor or
-through value: keep the original `from` or committed cursor, wait that many
-seconds, and retry without applying the pending page.
+You read a stream in pages from a position you hold. Each page carries the
+blocks from `page.from` through `page.through`. `from` accepts `latest`, a block
+number, or a page's `next`; send an earlier block number as `from` to replay
+from there.
 
-Apply every completed page, including empty corrections, in exactly one transaction:
+| | HTTP pull | SSE |
+|---|---|---|
+| Delivery | One request returns one page | One open connection pushes pages as blocks arrive |
+| Choose for | Clients that ask on their own schedule: cron jobs, serverless functions, batch jobs | Long-running services that keep one connection open |
+| Continue | Ask again with `from=<page.next>` | Each event's `id` is `page.next`; after a disconnect, reconnect with `Last-Event-ID: <saved next>`, which wins over `from` |
 
-```text
-delete this source's rows where block_number >= page.from
-insert page.items
-save page.cursor
-```
+Both transports deliver the same pages. To read one:
 
-A correction may rewind below the original start or end below the old head.
-When `through.number == from - 1`, it contains no blocks. A cursor ahead of the
-verified tip waits and can receive a no-op echoing that cursor; this differs
-from a fresh `from` above tip. Persist the cursor with the rows, never on receipt.
+1. Request the stream URL with `from` (required). Pull adds `wait=20` to
+   long-poll up to 20 s at the tip; SSE sends `Accept: text/event-stream`.
+2. Apply every 200 once, in one database transaction:
 
-If a connection ends, reconnect from the committed cursor and follow the returned error.
+   ```text
+   delete this source's rows where block_number >= page.from
+   insert page.items
+   save page.next
+   ```
+
+   A correction starts lower and carries `reorg: true`; this rule undoes the
+   reorg. A page with no items and the same `next` means nothing new yet:
+   applying it changes nothing, so keep your `next` and ask again.
+3. Continue from the saved `next`, one page at a time, as the table shows. Apply
+   only complete pages: after a network error or an incomplete body, retry the
+   same `from`. For SSE, reconnect yourself from the saved `next` so the
+   connection resumes at your last commit.
+   SSE writes a page at least every 30 s; treat 60 s of silence as dead and reconnect with Last-Event-ID.
+4. Follow the status:
+
+| HTTP | Code | Continue with |
+|---|---|---|
+| 400 | `invalid_parameter` | Correct the request; `cursor=` is not a parameter, pass `next` as `from`. Changing a source/filter requires a fresh start |
+| 401 | `unauthorized` | An enabled current key; SSE sends an error and closes if authority expires |
+| 402 | `balance_exhausted` | Fund within the user's budget, then resume with the saved `from` |
+| 403 | `not_entitled` | An allowlisted account with Streams access |
+| 404 | `chain_not_served` | A chain supported by Streams |
+| 409 | `resync_required` | Rebuild this source from your own start block; this is not a transient upstream failure |
+| 429 | `too_many_readers`, `rate_limit_exceeded` | Back off, honoring `Retry-After` when present; close extra readers |
+| 503 | `chain_unavailable` | Retry the same `from` after `Retry-After` (always 1–30 s) |
+<!-- streams-contract:end -->
+
+`through`, `safe` and `finalized` identify blocks by number and hash; marks may
+be null. `from` is always an integer and `next` is always a string. Page numbers
+are decimal; item quantities are JSON-RPC hex. `safe` and `finalized` are the
+chain's own block tags. Log items are `eth_getLogs` objects plus the validated
+header's `blockTimestamp`, with no `removed` field. Blocks are headers without
+transaction, uncle or withdrawal lists. Items are ordered by block number, then
+log index. Pages contain at most 10,000 whole blocks, targeting 1 MiB of items
+with a 4 MiB ceiling; an oversized single block is delivered whole, alone, or
+returns 503.
+
+If a connection ends, reconnect with your saved `from` and follow the returned error.
 
 ### Pull loop
 
 Save this as `streams.py`. `STREAM_ID` is a credential-free local name for the
 fixed chain/source/filter. Use a different ID/database when changing filters.
-Set `START_BLOCK` to a block you trust for an explicit rebuild. This example
-uses Python's standard library and SQLite; put your materialized model updates
-inside `apply_page`'s transaction.
+Set `START_BLOCK` to a block you trust, or `latest`. This example uses Python's
+standard library and SQLite; put your materialized model updates inside
+`apply_page`'s transaction.
 
 ```python
 import json, os, sqlite3, time
@@ -500,30 +542,25 @@ START = os.environ["START_BLOCK"]
 db = sqlite3.connect("streams.sqlite")
 db.executescript("""
 CREATE TABLE IF NOT EXISTS items (source TEXT, block INTEGER, payload TEXT);
-CREATE TABLE IF NOT EXISTS positions (source TEXT PRIMARY KEY, cursor TEXT);
+CREATE TABLE IF NOT EXISTS positions (source TEXT PRIMARY KEY, next TEXT);
 """)
 
 def request_url():
     u = urlsplit(URL)
     q = dict(parse_qsl(u.query))
-    q.pop("from", None)
-    q.pop("cursor", None)
-    row = db.execute("SELECT cursor FROM positions WHERE source=?", (SOURCE,)).fetchone()
-    q["cursor" if row and row[0] else "from"] = row[0] if row and row[0] else START
+    row = db.execute("SELECT next FROM positions WHERE source=?", (SOURCE,)).fetchone()
+    q["from"] = row[0] if row else START
     q["wait"] = "20"
     return urlunsplit((u.scheme, u.netloc, u.path, urlencode(q), ""))
 
 def apply_page(page):
-    if page.get("retry_after"):
-        time.sleep(page["retry_after"])
-        return  # keep START and the last committed cursor; apply no pending data
     with db:
         db.execute("DELETE FROM items WHERE source=? AND block>=?", (SOURCE, page["from"]))
         db.executemany("INSERT INTO items VALUES (?,?,?)", [
             (SOURCE, int(item.get("blockNumber", item.get("number")), 16), json.dumps(item))
             for item in page["items"]
         ])
-        db.execute("INSERT OR REPLACE INTO positions VALUES (?,?)", (SOURCE, page["cursor"]))
+        db.execute("INSERT OR REPLACE INTO positions VALUES (?,?)", (SOURCE, page["next"]))
 
 def rebuild_source():
     with db:
@@ -546,7 +583,7 @@ def handle_control(body):
     if code == "resync_required":
         rebuild_source()
     else:
-        time.sleep(body.get("retry_after", 2))  # keep the committed cursor
+        time.sleep(body.get("retry_after", 2))  # keep the saved from
 
 def pull():
     while True:
@@ -568,19 +605,21 @@ if __name__ == "__main__":
 
 ### SSE
 
-The same URL accepts `Accept: text/event-stream`. Each page has `id: <cursor>`
-and `data: <page>`, with no `event:` field (the default `message` event).
-After the first page, quiet SSE waits have a one-second minimum even at `wait=0`.
+The same URL accepts `Accept: text/event-stream`. Each page, empty ones
+included, has `id: <next>` and `data: <page>`, with no `event:` field (the
+default `message` event). `Last-Event-ID` is read as `from` (a block number or a
+`next`, never `latest`) and wins over the `from` query parameter. After the
+first page, quiet SSE waits have a one-second minimum even at `wait=0`.
 
 ```bash
-curl -N -H 'Accept: text/event-stream' "$LASSO_STREAM_URL&wait=20"
+curl -N -H 'Accept: text/event-stream' "$LASSO_STREAM_URL&from=latest&wait=20"
 ```
 
 For persisted consumers, pull is the simplest transport. To consume SSE, save
-this beside `streams.py`. It reuses the same synchronous transaction and resumes
-from the committed cursor after a disconnect. An apply error exits and closes
-the connection; restart only after fixing it. Do not let EventSource's automatic
-last-delivered ID advance past an uncommitted page.
+this beside `streams.py`. It reuses the same synchronous transaction and
+reconnects with the saved `from` after a disconnect. An apply error exits and
+closes the connection; restart only after fixing it. Do not let EventSource
+reconnect on its own: its `Last-Event-ID` can be ahead of your commits.
 
 ```python
 from streams import *
@@ -630,27 +669,14 @@ while True:
 
 ### Errors and funding
 
-| HTTP | Code | Continue with |
-|---|---|---|
-| 400 | `invalid_cursor`, `invalid_parameter` | Correct the input; changing a source/filter requires a fresh start |
-| 401 | `unauthorized` | An enabled current key; SSE sends an error and closes if authority expires |
-| 402 | `balance_exhausted` | Fund within the user's budget, then resume the committed cursor |
-| 403 | `not_entitled` | An allowlisted account with Streams access |
-| 404 | `chain_not_served` | A chain supported by Streams |
-| 409 | `resync_required` | Rebuild this source from a trusted start; this is not a transient upstream failure |
-| 429 | `too_many_readers` | Close extra readers before retrying |
-| 429 | `rate_limit_exceeded` | Honor `Retry-After` when present; otherwise back off before retrying |
-| 503 | `chain_unavailable` | Honor `Retry-After`; retry the same committed position |
-| 503 | `history_unavailable` | No usable history page or prefix; honor `Retry-After` and retain the committed cursor |
-
 HTTP errors other than 402 use `{"error":"<code>", ...details}`, with optional
-`reason`, `expected_source` or rejected `anchor`. HTTP 503 always includes
-`Retry-After: <seconds>` (1–30); managed account rate-limit 429 can include it,
-while reader/auth-limit 429 need not. JSON pull uses chunked framing without
-`Content-Length`. A page is complete only when the response finishes cleanly.
-An aborted HTTP/1 connection or a reset HTTP/2 stream means retry from the last
-committed cursor without applying the partial page. Responses other than 402
-set `Cache-Control: no-store` and `X-Accel-Buffering: no`.
+`reason`, `expected_source` or rejected `anchor`. Successful pages carry no
+`Retry-After`; the long poll paces them. Managed account rate-limit 429 can
+include `Retry-After`, while reader/auth-limit 429 need not. JSON pull uses
+chunked framing without `Content-Length`. A page is complete only when the
+response finishes cleanly. An aborted HTTP/1 connection or a reset HTTP/2
+stream means retry with the saved `from` without applying the partial page.
+Responses other than 402 set `Cache-Control: no-store` and `X-Accel-Buffering: no`.
 
 Pull 402 carries `payment-required` (x402) / `www-authenticate` (MPP) when available,
 `Cache-Control: no-store`, and
@@ -658,32 +684,28 @@ Pull 402 carries `payment-required` (x402) / `www-authenticate` (MPP) when avail
 `POST` href and prefers `{usd: "1.00"}`, the smallest purchase currently allowed.
 The amount adapts to enabled payment rails' minimum and maximum. Use the returned amount and the existing funding
 recipe, within the user's purchase budget: pay an offer or top up using the
-returned credit action, then resume from your committed cursor. SSE sends an `event: error` containing the same JSON
-body, `retry: 60000`, no cursor ID, then closes. Other failures after SSE starts
+returned credit action, then resume with your saved `from`. SSE sends an `event: error` containing the same JSON
+body, `retry: 60000`, no `id`, then closes. Other failures after SSE starts
 send `event: error` with the string-code body and close. Before the first SSE
 page, failures return the normal HTTP status and JSON instead. Control events
-are not pages. Retry `chain_unavailable` and `history_unavailable` controls and HTTP 503 from the committed
-cursor; `resync_required` rebuilds this source from `START_BLOCK`. Authorization
+are not pages. Retry `chain_unavailable` controls and HTTP 503 with the saved
+`from`; `resync_required` rebuilds this source from `START_BLOCK`. Authorization
 and funding controls stop the recipe for user action.
 
+`503 chain_unavailable` names its cause in `reason` (for example `cold_start`
+when `from=latest` meets a cold chain). The action is always the same: retry the
+same `from` after `Retry-After`. Refusals carry no items and never move your
+position.
+
 A key has at most 10 concurrent readers (`429 too_many_readers`) and 2 concurrent
-history builds. `503 history_unavailable` with `all_circuits_open` refuses before
-upstream work when every serving circuit is open. `read_unavailable` means a
-history read could not return a usable prefix without a more specific upstream
-cause. Upstream refusals can retain their category as `reason`, with `provider`,
-`code` and `category` fields. Refusals carry no items or cursor and do not rebuild
-internally within `wait`. Keep the committed cursor and retry
-after HTTP `Retry-After` or the SSE control body's `retry_after` seconds.
-This does not mean the requested history depth is unsupported. Feed/page
-capacity failures can still return `503 chain_unavailable`.
-Account request-rate limits and key revocation also apply. Delivery costs
-**$0.10 per million events**, with a **$0.10 minimum per account per active UTC
-day**, charged from the same USD balance as RPC. Live, history, replay and reorg
-correction items count; each block header is one event. A successful empty
-public page activates the day but adds no event charge. Errors, keepalives and
+history builds. Account request-rate limits and key revocation also apply.
+Delivery costs **$0.10 per million events**, with a **$0.10 minimum per account
+per active UTC day**, charged from the same USD balance as RPC. Live, history,
+replay and reorg correction items count; each block header is one event. A page
+with no items is free and does not activate the day. Errors, keepalives and
 blocks scanned are free. Passive dashboard board samples are free and do not
 activate a day. The dashboard Test reader delivers through the public key
-endpoint and is billed like every reader, including successful empty pages.
+endpoint and is billed like every reader.
 The beta does not offer free interactive reads. Pro included usage
 does not pay for Streams. `/agent.json` publishes the versioned UTC-day tariff.
 
@@ -704,7 +726,7 @@ All these routes require beta access; management refusal is `403 not_in_beta`.
 
 At most 100 saved recipes per account; delete one to free a slot. Parameters
 normalize address/topic strings or arrays into sorted unique lowercase arrays;
-`from`, `wait` and `consumer` describe the connection. Keys and cursors are never
+`from`, `wait` and `label` describe the connection. Keys and positions are never
 saved. Build the public URL by substituting a key into `url_template` locally.
 Usage accepts `from_day` and `through_day` ISO dates, at most 31 days, default
 seven. It reports events, bytes and USD/nanodollar cost after background flush.
@@ -773,7 +795,7 @@ Streams read errors use the shapes in [Errors and funding](#errors-and-funding).
 | 401 `key_revoked` | The key was revoked or rotated past its overlap; use the current key |
 | 422 `rpc_route_required` | Add `/<chain>` or `/<strategy>/<chain>` to the URL |
 | 422 `unknown_chain`, `unknown_strategy` | Use a value from `/agent.json` (`ethereum`, not `mainnet`) |
-| `-32005` `log_range_limit`, or `timeout` on `eth_getLogs` | Narrow the `eth_getLogs` block range |
+| `-32602` `log_range_limit`, or `timeout` on `eth_getLogs` | Narrow the `eth_getLogs` block range |
 | `custom_access_required` | Buy Custom access or have the owner subscribe |
 | `payment_conflict`, `payment_pending` or payment 202 | Read `GET /api/v1/purchases/<id>` using the returned purchase ID; never pay again |
 | 409 `beneficiary_conflict` | Never pay again; keep the purchase ID and signed payment, report the key with `POST /api/v1/feedback`, then retry the same request |
@@ -818,3 +840,14 @@ Streams bills complete pages successfully written to the connection by the
 server, not client acknowledgments. A fully written SSE frame can be billable
 even if a disconnect prevents the client from consuming it. Truncated or failed
 page writes are free; successful replay deliveries bill again.
+
+
+`lasso_meta` timings measure work inside Lasso, including upstream calls. They
+exclude client network RTT, TCP/TLS setup, edge routing, and response delivery.
+Reuse connections with HTTP keep-alive or HTTP/2. In a production Base
+`eth_blockNumber` measurement on October 29, 2026, median client latency was
+119 ms with a fresh connection versus 42 ms reused; metadata reported 13 ms.
+
+`X-Lasso-Region` identifies the serving node on HTTP responses and WebSocket
+upgrades. Opt-in metadata includes the same `region` in body, header, and
+WebSocket notification forms. The serving region can differ from the edge POP.
