@@ -29,8 +29,8 @@ evidence. This skill covers creating, installing, funding, handing off,
 rotating and customizing that endpoint over plain HTTP.
 
 Pro subscription pricing is published at [lasso.sh/pricing](https://lasso.sh/pricing)
-and in `agent.json`. New subscriptions use the current catalog price; existing
-subscribers keep their current price at renewal. Included usage and access are unchanged.
+and in `agent.json`. New subscriptions use the current catalog price.
+Included usage and access are unchanged.
 
 ## Rules
 
