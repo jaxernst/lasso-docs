@@ -45,8 +45,9 @@ does not extend a deadline or grant another transaction dispatch.
 
 ## Control and inspect Core learning
 
-These variables accept `on` or `off`, default to `on`, and require a restart.
-Invalid values fail startup. Set all three to `off` to keep v0.6.0 ordering:
+These variables default to `on` and require a restart. Each accepts `on`/`off`,
+`true`/`false`, or `1`/`0` in any case; other values fail startup. Set all
+three to `off` to keep v0.6.0 ordering:
 
 ```dotenv
 LASSO_PROVIDER_KNOWLEDGE_METHOD_REFUSAL_MODE=off

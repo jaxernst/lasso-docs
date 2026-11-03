@@ -44,13 +44,23 @@ because a hash's age is unknown before dispatch.
 
 `eth_getLogs` also has provider-specific range and result-size limits. A
 provider's own limit differs by provider, so Lasso tries the same query on
-the remaining candidates first; it returns `-32005` with `data.reason:
+the remaining candidates first; it returns `-32602` with `data.reason:
 "log_range_too_large"` and `data.action: "reduce_block_range"` only once none
 of them can serve it. Split a returned range error into smaller
 `fromBlock`–`toBlock` spans in your app. Lasso's own response-size cap applies
-to every provider alike and returns that `-32005` at once. A provider that
+to every provider alike and returns that `-32602` at once. A provider that
 refuses `eth_getLogs` for plan reasons is treated the same way. Qualify your
 exact queries with [indexer backfills](/cloud/indexer-backfills).
+
+### Log completeness
+
+Lasso doesn't split a range and combine the results, so a successful
+`eth_getLogs` response is one provider's answer. Lasso doesn't check the
+returned rows against your query or another provider, and a successful response
+can be incomplete: in a staging capture, a provider returned a successful
+response missing one log. A provider's range limit describes the query sizes it
+accepts, not that its results are complete. Keep splitting wide ranges in your
+client. If your application needs every log, reconcile against a second source.
 
 ## Trace and debug methods
 
