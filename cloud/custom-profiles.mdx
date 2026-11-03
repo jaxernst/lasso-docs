@@ -52,10 +52,19 @@ other field is optional:
 | `health_checks`: `standard` or `light` | chain | Lasso's checks should spend less of your provider quota |
 | `error_interpretation` | profile | You opt in to Lasso interpreting your providers' error messages |
 | `limits`: `archival`, `logs_span`, `methods_blocked` | provider | You know a limit Lasso hasn't learned, such as your plan's log-span cap |
+| `transactions`: `{providers, fallback}` | chain | Signed transactions on this chain should only reach specific providers |
 
 Chains are keyed by name or decimal ID. The live field list, limits and
 workload recipes are in the
 [configuration schema](https://lasso.sh/api/v1/configuration-schema).
+
+Set `transactions: {"providers": ["provider_name"], "fallback": "none"}` on a
+chain to send signed transactions only to those providers; reads and
+subscriptions keep using the chain's other providers. Set `fallback` to
+`read_providers` to allow a second send phase over the profile's other
+providers once those are exhausted. A chain with `transactions` returns 422
+`invalid_config` from the YAML export until self-hosted Lasso RPC Core supports
+send policies.
 
 Editing rules:
 
