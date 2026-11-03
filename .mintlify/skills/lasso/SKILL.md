@@ -28,6 +28,8 @@ provider pool by measured latency and health, with failover and per-request
 evidence. This skill covers creating, installing, funding, handing off,
 rotating and customizing that endpoint over plain HTTP.
 
+See [plans and pricing](https://lasso.sh/pricing).
+
 ## Rules
 
 - Stay inside the user's delegation and spending budget. Ask only for missing
