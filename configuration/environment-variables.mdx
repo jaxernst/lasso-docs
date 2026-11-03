@@ -28,9 +28,10 @@ description: Runtime variables for RPC Core containers and source deployments.
 
 ### Learned provider limits
 
-All three effects default to `on`. Each accepts `on` or `off`; invalid values
-fail startup. Restart after changing them. Set all three to `off` to keep
-v0.6.0 ordering. See [provider learning](/concepts/provider-learning).
+All three effects default to `on`. Each accepts `on`/`off`, `true`/`false`, or
+`1`/`0` in any case; other values fail startup. Restart after changing them.
+Set all three to `off` to keep v0.6.0 ordering. See
+[provider learning](/concepts/provider-learning).
 
 | Variable | Default | Effect |
 | --- | --- | --- |

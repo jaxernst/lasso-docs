@@ -32,6 +32,7 @@ to use these signals together, read [routing evidence](/cloud/observability).
 | `x-lasso-balance-usd` | An estimate of the balance after this charge. `GET /api/v1/accounts/{id}` is authoritative |
 | `RateLimit-Policy`, `RateLimit` | IETF rate-limit fields, named after the bucket that bound the request: `managed`, `public` or the Custom profile's slug |
 | `x-lasso-meta` | With `include_meta=headers`: unpadded base64url JSON of `lasso_meta` |
+| `x-lasso-fallback-profile` | Present only when a routing fallback served the request on a different profile than `service_profile_id` named |
 
 | `x-lasso-fallback` | Why |
 |---|---|
@@ -52,7 +53,9 @@ Add `?include_meta=body` for a top-level `lasso_meta` object, or
 | `selected_provider` | The provider that served the request |
 | `upstream_latency_ms` | Time spent at the provider |
 | `lasso_overhead_ms` | Time spent in Lasso |
-| `retries` | Attempts after the first |
+| `retries` | Candidate advances after the first |
+| `dispatches` | Physical upstream sends of the request's own method, excluding auxiliary lookups |
+| `fallback_profile` | The serving profile, only when it differs from `service_profile_id`; absent otherwise |
 
 Read serving access and fallback from the `x-lasso-access` and
 `x-lasso-fallback` headers. Managed providers appear under public aliases;
@@ -76,7 +79,7 @@ Provider errors keep their code, message and data. When every eligible
 provider fails, the final JSON-RPC error arrives in an HTTP 200 response. A
 provider-reported `eth_getLogs` range limit tries the remaining candidates
 with the unchanged query first; only once none of them serve it does Lasso
-return `-32005` with `data.reason: "log_range_too_large"` and `data.action:
+return `-32602` with `data.reason: "log_range_too_large"` and `data.action:
 "reduce_block_range"`. Split the range and retry.
 
 When Lasso's own retry budget for a read runs out across several providers

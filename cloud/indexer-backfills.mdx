@@ -45,11 +45,15 @@ test, not as a coverage promise.
 ## Handle range limits
 
 When no eligible provider serves an `eth_getLogs` range after a range refusal, Lasso returns
-`-32005` with `data.code: "log_range_limit"`; follow its `next_action`: split
+`-32602` with `data.code: "log_range_limit"`; follow its `next_action`: split
 the range and retry. Lasso doesn't
 split it for you. Lasso learns each provider's span limit from these refusals
 and tries providers that accept a wider range first. On a Custom profile, the
 learned limit shows in the profile's knowledge.
+
+A successful response can still be missing logs, so read
+[log completeness](/cloud/rpc-behavior#log-completeness) if your application
+needs every log.
 
 ## Limits
 
