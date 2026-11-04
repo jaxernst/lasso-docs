@@ -92,6 +92,11 @@ Final transaction errors carry `error.data.error_type: transaction_rejection`,
 `retryable` is `true`, `next_action` says it's safe to resend the same signed
 transaction; when `false`, it says to check the transaction's hash for a
 receipt before signing a new one, then address the cause in the error message.
+Private, bundle, cancellation, conditional and synchronous send methods are
+sends too: on a chain with a
+[`transactions` policy](/cloud/custom-profiles#the-document) they stay inside its
+providers, and only `eth_sendRawTransaction` gets the final hash lookup.
+
 A successful response means a provider accepted the transaction, not that it
 was included. Your app owns signing, nonces, replacement, receipts and finality.
 Self-hosted RPC Core sends a transaction to
@@ -143,8 +148,12 @@ then each chain's activated fork.
 - **Parameters.** EIP-1898 block selectors need exactly one of `blockNumber` or
   `blockHash`, and `requireCanonical` only with `blockHash`. An EIP-234
   `eth_getLogs` filter can't mix `blockHash` with `fromBlock` or `toBlock`.
-- **Unknown, vendor and chain-specific methods** pass through with one
-  dispatch each and no failover.
+- **Unknown, vendor and chain-specific methods** get one dispatch and no
+  failover within the request. When a provider refuses one with `-32601`, Lasso
+  learns that and moves later requests to another provider. A method whose
+  parameters carry signed transaction bytes follows the transaction path, once.
+  Key-custody methods such as `personal_sendTransaction` are refused before
+  routing.
 
 ## Limits
 

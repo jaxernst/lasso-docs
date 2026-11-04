@@ -9,6 +9,99 @@ explains it. To check what's serving right now, read `source_sha` from
 [`/api/health`](https://lasso.sh/api/health). RPC Core releases have their own
 notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
 
+<Update label="November 4, 2026" description="Release 300" tags={["Transactions", "Routing", "Agents", "Custom profiles"]}>
+
+- **Choose which providers receive signed transactions.** Set
+  `transactions: {providers, fallback}` on a Custom profile chain to send signed
+  transactions only to those providers, while reads and subscriptions use the
+  others. `fallback: read_providers` adds a second send phase over the profile's
+  other providers. Private, bundle, cancellation, conditional and synchronous
+  send methods stay inside the same set. Stored profiles moved over automatically;
+  replace the earlier `relays` and `public_fallback` names in any saved requests.
+  [Custom profiles](/cloud/custom-profiles#the-document)
+- **Methods are handled by what they do.** An unknown method carrying signed
+  transaction bytes follows your send policy. Other unknown methods get one
+  dispatch; when a provider refuses one with `-32601`, Lasso learns that and moves
+  later requests to another provider. `lasso_meta` reports `execution_safety` and
+  `classified_by`. [RPC method behavior](/cloud/rpc-behavior#standards-and-provider-differences)
+- **Key responses return URL templates.** `rpc_url_template` and
+  `ws_url_template` replace `rpc_url` and `ws_url`, and contain `{chain}`, so what
+  you copy always says it needs a chain. Update code that reads the old fields;
+  existing keys and URLs keep working. [Keys and profiles](/cloud/keys-and-profiles)
+- **New accounts come with their claim link.** Creating an account also returns
+  `claim_url` and `claim_expires_at`, so an agent can hand it to a person without
+  a second request. [Accounts and agents](/cloud/accounts-and-agents)
+- **Paid Custom profiles go live on the first sign of payment.** A paid draft now
+  activates as soon as any subscription event shows it paid, rather than waiting
+  for one specific billing event. [Custom profiles](/cloud/custom-profiles)
+
+</Update>
+
+<Update label="November 3, 2026" description="Release 299" tags={["Chains", "Agents"]}>
+
+- **BNB Smart Chain on Public.** Call it as `bsc` on the free Public profile as
+  well as Premium. [Chains and prices](/cloud/reference/chains-and-prices)
+- **See which profiles serve each chain.** Every chain in
+  [`/agent.json`](https://lasso.sh/agent.json) lists its hosted `profiles`.
+- **Batch mistakes get named errors.** An empty batch returns `empty_batch` and
+  one over 50 items returns `batch_too_large`, both over HTTP 400.
+  [Signals and errors](/cloud/reference/signals-and-errors)
+
+</Update>
+
+<Update label="October 30, 2026" description="Release 292" tags={["Routing", "Observability"]}>
+
+- **See when a fallback served your request.** `x-lasso-fallback-profile` and
+  `lasso_meta.fallback_profile` name the serving profile when it differs from the
+  one you asked for. [Signals and errors](/cloud/reference/signals-and-errors)
+
+</Update>
+
+<Update label="October 29, 2026" description="Release 291" tags={["Subscriptions", "Transactions", "Custom profiles"]}>
+
+- **Subscriptions survive a sole provider's reconnect.** With one WebSocket
+  provider configured, Lasso retries that provider and keeps your subscription.
+  [WebSocket subscriptions](/cloud/rpc-behavior#websocket-subscriptions)
+- **Exhausted providers don't use up a send.** A rate limit or quota refusal moves
+  a signed transaction to the next provider without counting against its three
+  sends. [Transactions](/cloud/rpc-behavior#transactions)
+- **Custom profiles skip providers known to be out of quota.** Lasso also learns
+  chain-plan refusals and routes around both until the provider recovers.
+  [Custom profiles](/cloud/custom-profiles#lasso-learns-your-providers)
+
+</Update>
+
+<Update label="October 25, 2026" description="Release 287" tags={["Errors"]}>
+
+- **One clear error when no provider can serve a request.** Lasso returns its own
+  error, with the reason its providers shared, instead of whichever one answered
+  last. [Error handling](/cloud/reference/error-handling#when-no-provider-can-serve-the-request)
+
+</Update>
+
+<Update label="October 24, 2026" description="Release 286" tags={["Routing"]}>
+
+- **Learned `eth_getLogs` span limits steer routing.** Lasso learns each provider's
+  limit from its refusals and tries providers that accept a wider range first.
+  [Indexer backfills](/cloud/indexer-backfills#handle-range-limits)
+
+</Update>
+
+<Update label="October 20, 2026" description="Release 282" tags={["Routing"]}>
+
+- **Provider learning is on by default.** Lasso learns which providers refuse a
+  method or lack old history, and moves them behind alternatives while keeping
+  the last route available. [Provider learning](/concepts/provider-learning)
+
+</Update>
+
+<Update label="October 18, 2026" description="Release 278" tags={["Custom profiles"]}>
+
+- **Five free Custom days.** An account that has never had Custom access gets five
+  free days when it saves its first profile. [Custom profiles](/cloud/custom-profiles)
+
+</Update>
+
 <Update label="October 15, 2026" description="Release 273" tags={["Agents", "Payments", "Custom profiles", "Usage"]}>
 
 - **Buy a funded RPC key at one fixed URL.** `POST /api/v1/credit` creates an

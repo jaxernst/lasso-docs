@@ -56,6 +56,8 @@ Add `?include_meta=body` for a top-level `lasso_meta` object, or
 | `retries` | Candidate advances after the first |
 | `dispatches` | Physical upstream sends of the request's own method, excluding auxiliary lookups |
 | `fallback_profile` | The serving profile, only when it differs from `service_profile_id`; absent otherwise |
+| `execution_safety` | How Lasso classified the method's effect: `replay_safe`, `raw_transaction_broadcast`, `subscription` or `unknown` |
+| `classified_by` | What decided that class: `registry`, `signed_bytes` or `default` |
 
 Read serving access and fallback from the `x-lasso-access` and
 `x-lasso-fallback` headers. Managed providers appear under public aliases;

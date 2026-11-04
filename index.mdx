@@ -26,9 +26,10 @@ Create an endpoint with one request and no signup, then call Base through it:
 
 ```bash
 LASSO_RPC_URL=$(curl -fsS https://lasso.sh/api/v1/keys \
-  -H 'content-type: application/json' -d '{"name":"try"}' | jq -r .rpc_url)
+  -H 'content-type: application/json' -d '{"name":"try"}' \
+  | jq -r '.rpc_url_template | sub("\\{chain\\}"; "base")')
 
-curl -fsS --retry 5 "$LASSO_RPC_URL/base?include_meta=body" \
+curl -fsS --retry 5 "$LASSO_RPC_URL?include_meta=body" \
   -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}' \
   | jq '{result, provider: .lasso_meta.selected_provider.id, ms: .lasso_meta.upstream_latency_ms}'
