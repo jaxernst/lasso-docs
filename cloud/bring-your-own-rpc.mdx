@@ -19,7 +19,7 @@ curl -sS https://lasso.sh/api/v1/keys \
   -H 'content-type: application/json' -d '{"name":"prod"}'
 ```
 
-Put `rpc_url` in the app's secret store. The profile steps below use the
+Put `rpc_url_template` in the app's secret store. The profile steps below use the
 response's `management_token`, which makes you the account's agent.
 
 ## 2. Dry-run the profile
@@ -68,7 +68,7 @@ has no request price.
 ## 4. Save it and route the key over it
 
 Repeat the `PUT` without `dry_run`. Then point the app at the profile's URL:
-replace the `/profile/premium` segment in `rpc_url` with `/profile/prod-base`.
+use the template's base with `/profile/prod-base` in place of `/profile/premium/{chain}`.
 
 ```bash
 LASSO_RPC_URL=https://lasso.sh/rpc/k/<key>/profile/prod-base
@@ -93,7 +93,8 @@ provider serves the unpinned URL while one of them is throttled or down.
 
 ## 6. Hand it over
 
-Request a claim link and give it to your user privately:
+Give your user the `claim_url` from the response that created the account,
+privately. If it expired, request a replacement:
 
 ```http
 POST https://lasso.sh/api/v1/accounts/current/claim-link

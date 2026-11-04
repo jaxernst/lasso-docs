@@ -28,7 +28,7 @@ curl -sS https://lasso.sh/api/v1/keys \
   -H 'content-type: application/json' -d '{"name":"prod"}'
 ```
 
-Put `rpc_url` and `ws_url` in the production secret store. The response's
+Put `rpc_url_template` and `ws_url_template` in the production secret store. The response's
 `management_token` makes you the account's agent; the next steps use it to add
 keys and hand the account over.
 
@@ -50,9 +50,9 @@ user can add it to their account when they claim it.
 
 ## 3. Install the URLs
 
-Put each environment's `rpc_url` (and `ws_url` if the app subscribes) in that
-environment's secret store as `LASSO_RPC_URL`, then choose a pool and strategy
-per call site:
+Put each environment's `rpc_url_template`, without its trailing `/{chain}`, in
+that environment's secret store as `LASSO_RPC_URL` (likewise `ws_url_template` if
+the app subscribes), then choose a pool and strategy per call site:
 
 | Call site | URL suffix |
 |---|---|
@@ -98,13 +98,16 @@ payment for the same top-up. Every key draws on this one balance.
 
 ## 6. Hand the account to your user
 
+Give your user the `claim_url` from the response that created the account,
+privately. It works once and expires in 24 hours. If it expired, request a
+replacement:
+
 ```http
 POST https://lasso.sh/api/v1/accounts/current/claim-link
 Authorization: Bearer <management token>
 ```
 
-Give your user the `claim_url` privately. It works once and expires in 24
-hours. When they open it, they choose **Keep as a new account**, becoming its
+When they open it, they choose **Keep as a new account**, becoming its
 first admin, or **Add to your account**, moving everything into the account
 they already have. Keeping it changes nothing about how the app serves. Adding
 it shows a preview of what changes before they confirm. Either way your token

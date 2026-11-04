@@ -21,25 +21,29 @@ curl -sS https://lasso.sh/api/v1/keys \
 ```json
 {
   "key": "lasso_…",
-  "rpc_url": "https://lasso.sh/rpc/k/lasso_…/profile/premium",
-  "ws_url": "wss://lasso.sh/ws/rpc/k/lasso_…/profile/premium",
+  "rpc_url_template": "https://lasso.sh/rpc/k/lasso_…/profile/premium/{chain}",
+  "ws_url_template": "wss://lasso.sh/ws/rpc/k/lasso_…/profile/premium/{chain}",
   "account_id": "…",
   "management_token": "lasso_mk_…",
-  "serving_ready": true
+  "serving_ready": true,
+  "claim_url": "https://lasso.sh/claim/…",
+  "claim_expires_at": "2026-11-05T12:00:00Z"
 }
 ```
 
 You now have an account with a small starting balance and its first key. Save
-`rpc_url` as `LASSO_RPC_URL`, and keep `management_token` private: it lets you
-add keys, build Custom profiles and hand the account to a person later.
+`rpc_url_template` without its trailing `/{chain}` as `LASSO_RPC_URL`, and keep
+`management_token` private: it lets you add keys, build Custom profiles and
+hand the account to a person later. `claim_url` is a private 24-hour link for
+that handoff.
 
 If the response is `202` with `serving_ready: false`, wait `Retry-After`
-seconds, then send the RPC call below to the saved `rpc_url`. Retry RPC if
+seconds, then send the RPC call below to the saved URL. Retry RPC if
 it is still pending, honoring `Retry-After`; the key already exists.
 
 ## 2. Call it
 
-Append a chain to `rpc_url`, and optionally a strategy before it:
+Append a chain to `LASSO_RPC_URL`, and optionally a strategy before it:
 
 ```bash
 curl -fsS --retry 5 "$LASSO_RPC_URL/fastest/base?include_meta=body" \
@@ -63,7 +67,7 @@ Every response also carries `x-lasso-usd`, what the call cost, and
 `x-lasso-balance-usd`, what's left.
 
 For free Ethereum RPC, save the returned `key` as `LASSO_RPC_KEY` and derive
-the public path from `rpc_url`. The premium path uses the starting balance;
+the public path from `LASSO_RPC_URL`. The premium path uses the starting balance;
 public providers have no request charge.
 
 ```bash

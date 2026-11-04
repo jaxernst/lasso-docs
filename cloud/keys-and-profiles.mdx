@@ -30,8 +30,8 @@ const trades = `${base}/profile/prod-base/fastest/base`;      // your own provid
 
 | Base | Form |
 |---|---|
-| `https://lasso.sh/rpc/k/<key>` | HTTP, key in the path (`rpc_url`) |
-| `wss://lasso.sh/ws/rpc/k/<key>` | WebSocket, key in the path (`ws_url`) |
+| `https://lasso.sh/rpc/k/<key>` | HTTP, key in the path (`rpc_url_template`) |
+| `wss://lasso.sh/ws/rpc/k/<key>` | WebSocket, key in the path (`ws_url_template`) |
 | `https://lasso.sh/rpc` | HTTP, key in `Authorization: Bearer <key>` or `x-lasso-api-key` |
 | `wss://lasso.sh/ws/rpc` | WebSocket, key in `Authorization: Bearer <key>` or `x-lasso-api-key` |
 
@@ -45,10 +45,11 @@ const trades = `${base}/profile/prod-base/fastest/base`;      // your own provid
 - `<base>[/profile/<profile>]/provider/<name>/<chain>` pins one provider for
   debugging. Managed providers use their public aliases.
 
-Creating or rotating an unrestricted key returns `rpc_url` and `ws_url` ending
-in `/profile/premium`; a scoped key's URLs end in an allowed profile. Append a
-strategy and a chain. To use another profile, replace that segment rather than
-adding a second one.
+Creating or rotating an unrestricted key returns `rpc_url_template` and
+`ws_url_template` ending in `/profile/premium/{chain}`; a scoped key's templates
+name an allowed profile. Replace `{chain}` with a chain or `<strategy>/<chain>`
+before calling. To use another profile, replace that segment rather than adding
+a second one.
 
 ## Scope a key
 
@@ -65,7 +66,7 @@ Content-Type: application/json
 {"name": "jobs", "allowed_profiles": ["public"]}
 ```
 
-Its `rpc_url` ends in `/profile/public`. A scoped key that names another
+Its `rpc_url_template` ends in `/profile/public/{chain}`. A scoped key that names another
 profile, or a URL without a profile segment when `premium` isn't allowed, gets
 `forbidden`, listing what it can use. A key scoped to a Custom profile isn't
 safe to expose: if Custom access lapses, it's served and charged as `premium`.

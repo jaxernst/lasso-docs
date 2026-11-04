@@ -51,8 +51,9 @@ to take the account over.
 
 ## Hand off without changing anything
 
-When an agent built something for a person, it requests a claim link and gives
-the URL to that person privately:
+When an agent built something for a person, it gives that person the `claim_url`
+from the response that created the account, privately. To replace it, request
+a new link:
 
 ```http
 POST https://lasso.sh/api/v1/accounts/current/claim-link

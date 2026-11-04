@@ -117,7 +117,7 @@ With no body, it quotes the smallest amount every enabled rail accepts. The
 authorized, then repeat the same request. Settlement works like a top-up:
 `200` confirms the credit, and `202` returns a `status_url` to poll.
 
-The paid response returns `key.rpc_url`, `key.ws_url`, `key.key`,
+The paid response returns `key.rpc_url_template`, `key.ws_url_template`, `key.key`,
 `key.management_token` and `key.account_id`; save them privately. If the
 response is lost, replay the same signed payment: it returns the same
 credentials and credits once. Credentials revoked or rotated since aren't
