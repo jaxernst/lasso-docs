@@ -17,7 +17,7 @@
 | `invalid_request` | 400 | No | Send a bounded JSON-RPC envelope. |
 | `unknown_chain` | 400 | No | Choose a chain whose profiles field in /agent.json chains includes the requested hosted profile. |
 | `key_revoked` | 401 | No | Use the current key. |
-| `unauthorized` | 401 | No | Use the rpc_url a key was created with, or create one with POST /api/v1/keys; see /llms.txt. |
+| `unauthorized` | 401 | No | Replace &#123;chain&#125; in the key's rpc_url_template with a chain or &lt;strategy>/&lt;chain>, or create a key with POST /api/v1/keys; see /llms.txt. |
 | `balance_exhausted` | 402 | No | Credit the account or restore its allowance. |
 | `forbidden` | 403 | No | Use an allowed profile. |
 | `unknown_profile` | 404 | No | Use a known profile slug. |

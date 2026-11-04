@@ -444,28 +444,13 @@ polls and identity checks.
 
 Omitting a provider removes it; omitting a provider's `url` keeps the stored
 one. Omitted `heads` in a whole replacement resets that provider to passive.
-Set `transactions: {providers: [provider_name], fallback: none}` on a chain to send signed transactions only to those relays; reads and subscriptions use the other providers. Set `fallback: read_providers` to allow a second send phase over the same profile's other providers after relay exhaustion.
-Private sends establish no read affinity. While a transaction remains private,
-ordinary providers return null for its transaction and receipt, and their pending
-nonce excludes that transaction until inclusion. Clients manage their own nonces;
-Lasso maintains no private pending overlay.
-
-Lasso does not forward caller request headers such as `X-Flashbots-Signature`.
-Methods requiring a sender signature header are not supported through Lasso yet.
-Configured provider headers are separate from per-request sender signatures.
-Relay-native send methods stay inside the transaction provider set, but routing
-them there does not remove an upstream signature-header requirement. Only
-`eth_sendRawTransaction` receives post-error hash confirmation; other send methods
-return their upstream result without a hash lookup.
-
-The transaction send class includes `eth_sendRawTransaction`,
-`eth_sendPrivateRawTransaction`, `eth_sendPrivateTransaction`,
-`eth_cancelPrivateTransaction`, `eth_sendBundle`, `eth_cancelBundle`,
-`mev_sendBundle`, `eth_sendRawTransactionConditional` and
-`eth_sendRawTransactionSync`.
-Transaction providers are selected one at a time; fallback and any resend remain
-sequential within the original request budget.
-
+Set `transactions: {providers: [provider_name], fallback: none}` on a chain to send
+signed transactions only to those providers; reads and subscriptions use the
+others. `fallback: read_providers` allows a second send phase over the other
+providers. While a transaction is private, ordinary providers return null for it
+and their pending nonce excludes it, so manage nonces client-side. Caller headers
+such as `X-Flashbots-Signature` are not forwarded. Only `eth_sendRawTransaction`
+gets a post-error hash lookup.
 
 `Accept: application/yaml` exports compatible head policies for self-hosted Lasso RPC
 Core. A provider with `heads: standby` returns 422 `invalid_config` with its field
@@ -794,14 +779,8 @@ deleted rows (`DELETE ... RETURNING` yields the retraction list).
 Replay-safe reads fail over within one deadline and a bounded number of
 upstream dispatches.
 
-Definitive capacity refusals (rate limits or quota exhaustion) do not consume
-the three-send allowance. Actual dispatches remain recorded, and a physical
-upstream is never tried twice. All sends retain identical signed bytes and share
-the absolute deadline and global limit of 16 candidate admissions. Timeouts and
-ambiguous outcomes consume the allowance; acceptance ends sending immediately.
-
-A signed transaction is resent as the same bytes to the next provider, up to
-three allowance-consuming sends within one deadline, when a provider rate-limits it, times out
+A signed transaction is resent as the same bytes to the next provider, within
+one deadline and send allowance, when a provider rate-limits it, times out
 or rejects it for a node-local reason. A sender fault such as insufficient
 funds or nonce too low stops at the first provider. A request pinned to one
 provider (`/rpc/provider/<id>/<chain>`) goes to that provider only. When every
@@ -813,7 +792,8 @@ is always safe.
 The app owns signing, nonces, replacement, receipts and finality. HTTP filter IDs are
 provider-local, so use `eth_getLogs` or subscriptions. Historical depth and
 `eth_getLogs` range caps vary by provider, so keep range splitting in
-indexers.
+indexers. A successful `eth_getLogs` response is one provider's answer and can
+be incomplete, so reconcile against a second source if you need every log.
 
 Limits: 10 unauthenticated account creations per hour per IP; 100 active keys
 and 5 Custom profiles per account. Rate limits are shared by all of an
