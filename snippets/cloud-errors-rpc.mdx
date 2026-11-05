@@ -7,6 +7,7 @@
 | `invalid_params` | 200 | No | Fix the request parameters. |
 | `invalid_request` | 200 | No | Send a bounded JSON-RPC envelope. |
 | `local_capacity_rejection` | 200 | Varies | Reduce the request size. Check whether the request was applied, such as whether a transaction landed, before sending it again. |
+| `log_filter_refused` | 200 | No | Add an address filter. |
 | `log_range_limit` | 200 | No | Reduce the eth_getLogs block range and retry. |
 | `method_not_found` | 200 | No | Use a method Lasso serves; see /agent.json. |
 | `provider_error` | 200 | Varies | Check whether the request was applied, such as whether a transaction landed, before sending it again. |

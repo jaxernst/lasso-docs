@@ -35,6 +35,9 @@ error instead of whichever provider happened to answer last:
 
 - When every provider rejected an `eth_getLogs` range, `data.code` is
   `log_range_limit` and `next_action` says to reduce the block range.
+- When every provider refused an address-less `eth_getLogs` filter, `data.code`
+  is `log_filter_refused` and `next_action` says to add an address filter. A mix
+  of that refusal with other failures does not use this code.
 - Otherwise `data.code` is `provider_error`, and the message says how many
   providers Lasso tried and the reason they shared.
 - It never includes provider names or a provider's raw message.
