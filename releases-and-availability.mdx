@@ -26,7 +26,7 @@ Checked November 6, 2026:
 | Capability | RPC Core v0.8.0 | Lasso Cloud |
 | --- | --- | --- |
 | HTTP reads and batches | Routed over the upstreams you configure | Routed over managed pools or your Custom profiles |
-| Signed transactions | One upstream dispatch, optionally restricted to declared [transaction providers](/configuration/profiles#transaction-providers) | The same bytes to up to three providers in turn; sender faults stop at the first ([details](/cloud/rpc-behavior#transactions)) |
+| Signed transactions | One upstream dispatch; with declared [transaction providers](/guides/private-sends), the same bytes to up to three of them in turn | The same bytes to up to three providers in turn; sender faults stop at the first ([details](/cloud/rpc-behavior#transactions)) |
 | WebSocket `newHeads` and `logs` | Shared upstream streams with bounded failover and backfill | The same, on every account |
 | Historical state and logs | Declared capabilities plus learned depth and log-range limits that reorder providers ([learning](/concepts/provider-learning)) | Steered toward providers known to serve that history |
 | HTTP filters | Forwarded to one provider, without failover | Rejected with `-32601`; use `eth_getLogs` or subscriptions |

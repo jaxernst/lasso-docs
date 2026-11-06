@@ -15,4 +15,4 @@ The default maximum is 50 items (`max_batch_requests`). Each item is validated a
 
 Use unique IDs for unambiguous correlation. A batch does not pin all items to one upstream or create an atomic state snapshot. Specify block selectors where your application needs a particular state reference.
 
-Execution safety applies per item. `eth_sendRawTransaction` receives one upstream dispatch; placing it in a batch does not make replay safe. Subscription methods require WebSocket. See [Supported methods](/api/supported-methods).
+Execution safety applies per item. `eth_sendRawTransaction` keeps its [send behavior](/api/supported-methods#signed-transaction-submission); placing it in a batch does not make replay safe. Subscription methods require WebSocket. See [Supported methods](/api/supported-methods).

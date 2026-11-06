@@ -134,7 +134,8 @@
                   "introduction",
                   "quickstart",
                   "installation",
-                  "guides/route-across-providers"
+                  "guides/route-across-providers",
+                  "guides/private-sends"
                 ]
               },
               {
