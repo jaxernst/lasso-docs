@@ -63,8 +63,10 @@ chain to send signed transactions only to those providers; reads and
 subscriptions keep using the chain's other providers. Set `fallback` to
 `read_providers` to allow a second send phase over the profile's other
 providers once those are exhausted. A chain with `transactions` returns 422
-`invalid_config` from the YAML export until self-hosted Lasso RPC Core supports
-send policies.
+`invalid_config` from the YAML export: Cloud's exporter does not carry
+transaction relay policies into self-hosted Core profiles yet, independent of
+[Core's own support](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/docs/CONFIGURATION.md#transaction-providers)
+for the block.
 
 Editing rules:
 

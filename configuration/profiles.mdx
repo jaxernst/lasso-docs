@@ -83,6 +83,7 @@ chains:
 | `name` | string | No | Display name (defaults to chain key) |
 | `block_time_ms` | integer | No | Average block time in milliseconds. Used for optimistic lag calculation and the continuity freshness bound |
 | `head_policy` | string | No | `off` (default), `local` (one process), or `global` (enrolled fleet). Global mode requires the [publication journal and fleet setup](/deployment/block-continuity) |
+| `transactions` | object | No | `{providers: [provider_id], fallback: none}` restricts signed-transaction sends on this chain to the named providers; reads, subscriptions and block recovery keep using the rest. Added in v0.8.0 |
 
 ### Monitoring
 
@@ -111,6 +112,24 @@ Controls provider eligibility filtering during request routing.
 |-------|------|---------|-------------|
 | `max_lag_blocks` | integer | unset | Filter routes proven more than N blocks behind a qualified profile reference. Missing or ambiguous evidence stays eligible; if every route lags, Core keeps them available |
 | `archival_threshold` | integer | 128 | Blocks before data is considered "archival". Requests for blocks older than `head - threshold` are only routed to archival providers |
+
+### Transaction providers
+
+Added in v0.8.0. `transactions: {providers: [provider_id], fallback: none}` on
+a chain sends signed transactions only to the listed providers, one at a time;
+reads, subscriptions and block recovery keep using the chain's other
+providers. Each listed ID must name a send-capable provider on that chain,
+and at least one other provider must remain to serve reads. Omit the block
+for ordinary routing, which also applies to profiles created before v0.8.0.
+
+Sending fails closed by default: if no transaction provider can take the
+send, the request fails rather than reaching a read provider. Set `fallback`
+to `read_providers` to add an explicit second phase over the chain's other
+providers once the transaction providers are exhausted, within the same
+deadline and dispatch budget; the two sides are never ranked together. See
+the [transaction providers configuration](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/docs/CONFIGURATION.md#transaction-providers)
+and [routing behavior](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/docs/ROUTING.md#transaction-providers)
+for the full contract, including the private-send example profile.
 
 ### WebSocket
 

@@ -52,6 +52,13 @@ to every provider alike and returns that `-32602` at once. A provider that
 refuses `eth_getLogs` for plan reasons is treated the same way. Qualify your
 exact queries with [indexer backfills](/cloud/indexer-backfills).
 
+An address-less `eth_getLogs` filter, such as a topic-only scan, can hit a
+provider that refuses that shape outright. Lasso tries the query on the
+remaining candidates first; only once every one of them has refused does it
+return `-32602` with `data.reason: "log_filter_refused"` and `data.action:
+"add_address_filter"`, at no charge. A mix of that refusal with other failures
+keeps the ordinary exhaustion error instead.
+
 ### Log completeness
 
 Lasso doesn't split a range and combine the results, so a successful
