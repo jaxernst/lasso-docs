@@ -1,0 +1,134 @@
+---
+title: Private sends
+description: Send signed transactions only to providers you choose, keep reads on your other providers, and decide what happens when those providers are unavailable.
+---
+
+Choose which providers receive your signed transactions while your application
+keeps one RPC URL. Reads, subscriptions and block recovery use the chain's other
+providers. Use this to keep transactions out of the public mempool until
+inclusion. It needs RPC Core v0.8.0 or later.
+
+## Add transaction providers
+
+Mount a `profiles/` directory as described in
+[Docker deployment](/deployment/docker#custom-profiles-and-credentials), and put
+your provider URLs in `.env`. Save this as `profiles/private-sends.yml`:
+
+```yaml
+---
+name: Private sends
+slug: private-sends
+---
+chains:
+  ethereum:
+    chain_id: 1
+    transactions:
+      providers: [relay_a, relay_b]
+      fallback: none
+    providers:
+      - id: relay_a
+        url: ${RELAY_A_URL}
+      - id: relay_b
+        url: ${RELAY_B_URL}
+      - id: reads
+        url: ${ETH_READ_URL}
+```
+
+Recreate the container so it picks up the new `.env` values, then check the
+configuration:
+
+```bash
+docker compose up -d --force-recreate --wait
+docker compose exec -T lasso /app/bin/lasso check-config
+```
+
+Point your application at `http://localhost:4000/rpc/profile/private-sends/ethereum`.
+The [example profile](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/config/examples/private-sends.yml)
+fills this in with public relay endpoints.
+
+To confirm a send stayed inside the set, add `?include_meta=body` to the URL.
+The response names the provider that received it and the policy that applied:
+
+```json
+{
+  "lasso_meta": {
+    "selected_provider": {"id": "relay_a"},
+    "send_policy": {
+      "providers": ["relay_a", "relay_b"],
+      "fallback": "none",
+      "phase": "providers"
+    }
+  }
+}
+```
+
+## Choose a fallback
+
+| `fallback` | When the transaction providers are exhausted | Choose it when |
+|---|---|---|
+| `none` (default) | The send fails and nothing reaches a read provider. Sends stop until a transaction provider recovers or you change the policy | Disclosure costs more than a stalled transaction |
+| `read_providers` | A second phase sends to read providers, within the same deadline and dispatch budget. They normally broadcast it to the public mempool | Landing the transaction matters more than keeping it private |
+
+## What stays visible
+
+Private means out of the public mempool before inclusion. It doesn't hide a
+transaction from everyone who handles it.
+
+- **Relay operators and builders.** Transaction providers and their downstream
+  builders see every transaction sent to them, and can delay or drop it. Relay
+  modes differ: some also share with every registered builder or with searchers.
+  Read each operator's documentation for the mode in your URL.
+- **Calldata in simulations.** `eth_call` and `eth_estimateGas` send calldata to a
+  read provider, so simulating through Lasso shows that provider your intent
+  before you sign. Simulate locally when that matters.
+- **Hash polling.** Polling a private transaction's hash through a read provider
+  ties the hash to your connection and timing. While the transaction is private,
+  that provider returns null for it.
+- **Timeouts.** A timeout doesn't prove a provider never received the bytes. A
+  retry reaches another transaction provider, and each one is another recipient.
+- **Wallets.** A wallet that rebroadcasts through another endpoint bypasses the
+  boundary.
+- **After inclusion.** A mined transaction is public.
+
+## Handle nonces
+
+Ordinary providers exclude a private transaction from their pending nonce until
+inclusion, so manage nonces in your client. Lasso keeps no pending overlay.
+
+## Errors
+
+| Situation | Response |
+|---|---|
+| No send could be dispatched | `-32000` with `reason: "transaction_providers_unavailable"`, `retryable: true`, `upstream_attempts: 0` and, when known, `retry_after_ms` |
+| Dispatched sends failed and no hash lookup found the transaction | The last upstream error, with `send_policy` in its data |
+| A send pinned to a provider outside the set | `-32602` with `pin_outside_transaction_providers` |
+| A read pinned to a transaction provider | `-32602` with `transaction_provider_send_only` |
+
+After a failed `eth_sendRawTransaction`, Lasso looks up the hash among the
+providers of the phase that sent it, never outside it. The
+[API reference](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/docs/API_REFERENCE.md#transaction-send-errors-and-metadata)
+has the full contract.
+
+## Limits
+
+- Each listed provider must exist on the chain and be able to send, with no
+  duplicates, and at least one other provider must remain to serve reads.
+- The policy covers every
+  [send method](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/docs/RPC_STANDARDS.md#execution-classes),
+  including relay-native and bundle methods, simulations of signed transactions,
+  and unregistered methods whose params carry a signed transaction.
+- Lasso doesn't forward caller headers such as `X-Flashbots-Signature`, so methods
+  that need a sender signature header don't work through it.
+- Background checks still reach transaction providers: the `eth_chainId` identity
+  probe, and the `newHeads` head subscription when the provider has a `ws_url`.
+  Neither carries transaction data. `background_observations: false` on the
+  provider stops both.
+- The bundled `public` profile leaves `transactions` unset.
+
+## Next
+
+- [Profile configuration](/configuration/profiles#transaction-providers): the
+  field reference.
+- [Routing behavior](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/docs/ROUTING.md#transaction-providers):
+  how requests use each side.
+- [Custom profiles](/cloud/custom-profiles): the same policy on Lasso Cloud.
