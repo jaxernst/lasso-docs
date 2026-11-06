@@ -62,7 +62,10 @@ Set `transactions: {"providers": ["provider_name"], "fallback": "none"}` on a
 chain to send signed transactions only to those providers; reads and
 subscriptions keep using the chain's other providers. Set `fallback` to
 `read_providers` to allow a second send phase over the profile's other
-providers once those are exhausted. A chain with `transactions` returns 422
+providers once those are exhausted. Those providers and their builders still see
+each transaction, and read providers see the calldata of any `eth_call` or
+`eth_estimateGas`; see
+[what stays visible](/guides/private-sends#what-stays-visible). A chain with `transactions` returns 422
 `invalid_config` from the YAML export: Cloud's exporter does not carry
 transaction relay policies into self-hosted Core profiles yet, independent of
 [Core's own support](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/docs/CONFIGURATION.md#transaction-providers)

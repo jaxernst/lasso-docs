@@ -64,6 +64,22 @@ The dashboard has a WebSocket tester too.
 
 WebSocket routes take the same segments under `/ws/rpc/`.
 
+## 5. Keep sends private
+
+To keep signed transactions out of the public mempool, name the providers that
+may receive them on a chain in your profile:
+
+```yaml
+transactions:
+  providers: [relay_a]
+  fallback: none
+```
+
+Reads stay on the chain's other providers, and a send fails rather than reaching
+them unless you set `fallback: read_providers`. Those relays and their builders
+still see each transaction, and read providers see the calldata of any `eth_call`
+or `eth_estimateGas`. [Private sends](/guides/private-sends) has the full setup.
+
 ## Next
 
 - [Route across your own providers](/guides/route-across-providers): put your
