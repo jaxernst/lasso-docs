@@ -1,0 +1,94 @@
+---
+title: Stop RPC outages and rate limits from reaching your app
+description: Put one endpoint in front of several RPC providers so a provider outage, 429 or exhausted quota moves to the next provider instead of becoming your app's error
+---
+
+# Stop RPC outages and rate limits from reaching your app
+
+A single provider URL fails whenever that provider does. This guide puts one
+Lasso endpoint in front of several providers, so reads move to the next provider
+when one is down or rate limited. Your app keeps standard JSON-RPC and only the
+URL changes. Use it when provider errors are reaching your users.
+
+## 1. Create an endpoint
+
+One request returns a working key, with no signup:
+
+```bash
+curl -sS https://lasso.sh/api/v1/keys \
+  -H 'content-type: application/json' -d '{"name":"prod"}'
+```
+
+Keep the response's credentials out of source control. Replace `{chain}` in its
+`rpc_url_template` with a chain such as `ethereum`, `base` or `arbitrum`, and
+give that URL to viem, ethers, Foundry, Hardhat or your indexer in place of your
+provider URL. See [install Lasso in your app](/cloud/install).
+
+## 2. Choose your providers
+
+| Your situation | Use | Next |
+|---|---|---|
+| You want routing without managing provider accounts | The `premium` managed pool, which a URL with no profile uses | [Serving access and pricing](/cloud/serving-access-and-pricing) |
+| You already pay for providers or run nodes | A Custom profile over those accounts | [Trial your own providers](/cloud/bring-your-own-rpc) |
+| You need to run the proxy yourself | Lasso RPC Core, the open-source engine | [Route across your own providers](/guides/route-across-providers) |
+
+## 3. Pick a strategy per call site
+
+| Workload | Strategy |
+|---|---|
+| Spreading load and quota across providers, such as backends and indexers | `load-balanced` |
+| User-facing reads | `balanced-fast` |
+| Latency-sensitive paths | `fastest` |
+| A preferred primary with fallbacks | `priority` |
+
+The strategy goes in the URL, so one app can use several. See
+[routing](/cloud/routing).
+
+## What happens when a provider fails
+
+| Provider behavior | What Lasso does |
+|---|---|
+| Answers 429 | Moves it behind healthy providers until its cooldown ends |
+| Times out or fails internally on a read | Retries the read on the next provider, within the request deadline |
+| Keeps failing | Opens its [circuit](/concepts/circuit-breakers); after a cooldown, a trial request decides whether it returns |
+| Refuses a method, history depth or `eth_getLogs` span | Tries the next provider and [learns the limit](/concepts/provider-learning), moving it behind alternatives for matching requests |
+| Exhausts its quota | Skips that credential until revalidation succeeds, keeping one last route if every candidate is excluded |
+
+Lasso also moves live WebSocket `newHeads` and `logs` subscriptions to another
+provider and backfills missed blocks.
+
+## Check that it worked
+
+Set `LASSO_RPC_URL` to `rpc_url_template` without `/{chain}`, then ask for
+routing evidence on any call:
+
+```bash
+curl -sS "$LASSO_RPC_URL/base?include_meta=body" \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
+```
+
+`lasso_meta` names the provider that served the request, the candidates and any
+retries. See [routing evidence](/cloud/observability).
+
+## Limits
+
+- Failover covers reads that are safe to repeat. `eth_sendRawTransaction` sends
+  the same signed bytes to up to three providers in turn, and a sender fault
+  such as nonce too low stops at the first. See
+  [transactions](/cloud/rpc-behavior#transactions).
+- Lasso tries a bounded number of providers. If every one fails, you get one
+  JSON-RPC error inside an HTTP 200, so check the body's `error`, not only the
+  status. See [error handling](/cloud/reference/error-handling).
+- A profile never borrows providers from another pool. Failover is only as
+  independent as the providers in that profile, so pick ones that don't share a
+  failure domain.
+- A pinned provider URL has no failover.
+
+## Next
+
+- [RPC method behavior](/cloud/rpc-behavior): what each kind of request does.
+- [Set up production RPC with an agent](/cloud/guides/production-rpc-with-an-agent):
+  hand this setup to an agent.
+- [Balance and payment fallback](/cloud/balance-and-fallback): what happens when
+  a balance runs out.

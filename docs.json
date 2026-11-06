@@ -88,6 +88,7 @@
           {
             "group": "Guides",
             "pages": [
+              "cloud/guides/rpc-outages-and-rate-limits",
               "cloud/guides/production-rpc-with-an-agent",
               "cloud/bring-your-own-rpc",
               "cloud/indexer-backfills",
