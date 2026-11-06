@@ -455,7 +455,7 @@ gets a post-error hash lookup.
 `Accept: application/yaml` exports compatible head policies for self-hosted Lasso RPC
 Core. A provider with `heads: standby` returns 422 `invalid_config` with its field
 path because the target Core YAML cannot represent elected fallback; the stored
-profile is unchanged. A chain with `transactions` also returns 422 at that field until the supported Core target enforces relay policies. `DELETE` removes it; URLs naming it then serve as `premium`. When Custom
+profile is unchanged. A chain with `transactions` also returns 422 at that field; Cloud's exporter does not carry transaction relay policies into self-hosted Core profiles yet. `DELETE` removes it; URLs naming it then serve as `premium`. When Custom
 access lapses, the profile is kept and its URLs serve from `premium`, charged
 at request prices, until renewed.
 
@@ -818,6 +818,7 @@ Streams read errors use the shapes in [Errors and funding](#errors-and-funding).
 | 422 `rpc_route_required` | Add `/<chain>` or `/<strategy>/<chain>` to the URL |
 | 422 `unknown_chain`, `unknown_strategy` | Use a value from `/agent.json` (`ethereum`, not `mainnet`) |
 | `-32602` `log_range_limit`, or `timeout` on `eth_getLogs` | Narrow the `eth_getLogs` block range |
+| `-32602` `log_filter_refused` on `eth_getLogs` | Add an address filter |
 | `custom_access_required` | Buy Custom access or have the owner subscribe |
 | `payment_conflict`, `payment_pending` or payment 202 | Read `GET /api/v1/purchases/<id>` using the returned purchase ID; never pay again |
 | 409 `beneficiary_conflict` | Never pay again; keep the purchase ID and signed payment, report the key with `POST /api/v1/feedback`, then retry the same request |

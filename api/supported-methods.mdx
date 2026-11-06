@@ -27,6 +27,15 @@ fan out after dispatch. A lost response may mean the upstream accepted the
 transaction. Clients remain responsible for signing, nonce management,
 replacement, transaction-hash reconciliation, receipts, and finality.
 
+Relay-native submission methods, bundle methods, simulations of signed
+transactions, and any other method whose params carry signed transaction
+bytes are classified the same way and also run once. A chain's
+[`transactions` configuration](/configuration/profiles#transaction-providers)
+(v0.8.0) restricts which providers see that dispatch; profiles without the
+block keep this ordinary one-dispatch routing. Opt-in metadata reports the
+chosen [execution class](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/docs/RPC_STANDARDS.md#execution-classes)
+as `execution_safety` and how it was decided as `classified_by`.
+
 ## Node-local methods
 
 The transport policy globally disallows `eth_sendTransaction`, `eth_accounts`,
