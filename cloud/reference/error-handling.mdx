@@ -12,7 +12,13 @@ your request or to that provider, and acts on that.
 
 If the request itself is wrong, such as invalid parameters, a malformed
 envelope or a reverted contract call, every provider would give the same answer.
-Lasso returns the error to you as-is and doesn't try other providers.
+Lasso returns the error to you as-is.
+
+A provider can be wrong about that. When one says a read that is safe to repeat
+had invalid parameters or was malformed, Lasso asks one other provider before
+returning the error. If that provider answers, you get its result; otherwise
+you get the original error. Reverted calls and signed transactions are never
+re-sent this way.
 
 ## Errors caused by the provider
 
