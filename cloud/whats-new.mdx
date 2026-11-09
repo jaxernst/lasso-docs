@@ -9,6 +9,29 @@ explains it. To check what's serving right now, read `source_sha` from
 [`/api/health`](https://lasso.sh/api/health). RPC Core releases have their own
 notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
 
+<Update label="November 9, 2026, second release" description="Release 307" tags={["Reliability"]}>
+
+- **A second opinion before blaming your request.** When a provider says a read
+  had invalid parameters or was malformed, Lasso asks one other provider before
+  returning that error. If the other provider answers, you get its result, so a
+  valid request isn't failed on one provider's word.
+  [Error handling](/cloud/reference/error-handling#errors-caused-by-your-request)
+
+</Update>
+
+<Update label="November 9, 2026" description="Release 306" tags={["Reliability"]}>
+
+- **Clearer errors.** Invalid methods and unknown keys are no longer marked
+  retryable.
+
+</Update>
+
+<Update label="November 8, 2026" description="Release 305" tags={["Reliability"]}>
+
+Reliability improvements.
+
+</Update>
+
 <Update label="November 6, 2026" description="Release 304" tags={["Reliability"]}>
 
 Reliability improvements.

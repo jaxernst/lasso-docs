@@ -55,7 +55,7 @@ strategies [price differently](/cloud/serving-access-and-pricing).
 |---|---|
 | Reads: balances, calls, receipts, blocks, logs | Retried on the next provider in the order, within the request deadline |
 | Historical reads | Retried on the next provider, steered toward those known to serve that history |
-| `eth_sendRawTransaction` | The same signed bytes go to the next provider, up to three in total; sender faults stop there. See [transactions](/cloud/rpc-behavior#transactions) |
+| `eth_sendRawTransaction` | The same signed bytes go to the next provider, within an allowance of three sends; sender faults stop there. See [transactions](/cloud/rpc-behavior#transactions) |
 | WebSocket `newHeads` and `logs` | Moved to another provider, with missed blocks backfilled |
 | A provider answering 429 | Moved behind healthy providers until its cooldown ends |
 | A provider that keeps failing | Its [circuit](/concepts/circuit-breakers) opens; after a cooldown, a trial request decides whether it returns |
