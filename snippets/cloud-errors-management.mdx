@@ -29,6 +29,7 @@
 | `invalid_config` | 422 | Correct each field path listed in details, then retry. |
 | `invalid_field` | 422 | Correct the request using /openapi.json. |
 | `provider_check_failed` | 422 | Fix or remove the URL of provider '&lt;provider>', then retry. |
+| `system_provider_edit_required` | 422 | POST /api/v1/profiles/&#123;slug&#125;/provider-edits with expected_revision, operation (set, add, remove), chain_id, provider and fields. |
 | `unknown_chain` | 422 | Use a chain name or decimal ID from /agent.json chains, such as 'ethereum' or '8453'. |
 | `unknown_field` | 422 | Remove '&lt;field>'; /openapi.json lists accepted fields. |
 | `rate_limited` | 429 | Honor Retry-After before retrying. |

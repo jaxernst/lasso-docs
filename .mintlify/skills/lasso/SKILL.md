@@ -447,7 +447,9 @@ one. Omitted `heads` in a whole replacement resets that provider to passive.
 Set `transactions: {providers: [provider_name], fallback: none}` on a chain to send
 signed transactions only to those providers; reads and subscriptions use the
 others. `fallback: read_providers` allows a second send phase over the other
-providers. While a transaction is private, ordinary providers return null for it
+providers, which normally broadcast to the public mempool. Those transaction
+providers and their builders still see each transaction, and read providers see the
+calldata of any `eth_call` or `eth_estimateGas`. While a transaction is private, ordinary providers return null for it
 and their pending nonce excludes it, so manage nonces client-side. Caller headers
 such as `X-Flashbots-Signature` are not forwarded. Only `eth_sendRawTransaction`
 gets a post-error hash lookup.
@@ -455,7 +457,7 @@ gets a post-error hash lookup.
 `Accept: application/yaml` exports compatible head policies for self-hosted Lasso RPC
 Core. A provider with `heads: standby` returns 422 `invalid_config` with its field
 path because the target Core YAML cannot represent elected fallback; the stored
-profile is unchanged. A chain with `transactions` also returns 422 at that field; Cloud's exporter does not carry transaction relay policies into self-hosted Core profiles yet. `DELETE` removes it; URLs naming it then serve as `premium`. When Custom
+profile is unchanged. Chain-level `transactions` policies are included in the Core YAML export. `DELETE` removes it; URLs naming it then serve as `premium`. When Custom
 access lapses, the profile is kept and its URLs serve from `premium`, charged
 at request prices, until renewed.
 
