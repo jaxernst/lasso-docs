@@ -74,8 +74,8 @@ retries. See [routing evidence](/cloud/observability).
 ## Limits
 
 - Failover covers reads that are safe to repeat. `eth_sendRawTransaction` sends
-  the same signed bytes to up to three providers in turn, and a sender fault
-  such as nonce too low stops at the first. See
+  the same signed bytes to the next provider, within an allowance of three
+  sends, and a sender fault such as nonce too low stops at the first. See
   [transactions](/cloud/rpc-behavior#transactions).
 - Lasso tries a bounded number of providers. If every one fails, you get one
   JSON-RPC error inside an HTTP 200, so check the body's `error`, not only the
