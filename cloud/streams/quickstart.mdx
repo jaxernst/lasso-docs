@@ -1,0 +1,87 @@
+---
+title: "Streams quickstart"
+description: "Create a stream in the dashboard, read pages over SSE with curl, then try polling."
+---
+
+Create a stream in the dashboard, then open its URL over SSE.
+Streams is an allowlisted beta: open **Streams** in the [dashboard](https://lasso.sh)
+and choose **Request access**. You also need an enabled account RPC API key
+([keys](/cloud/keys-and-profiles)) and enough balance for
+[delivery](/cloud/streams/overview#pricing).
+
+## 1. Create a stream
+
+Sign in at [lasso.sh](https://lasso.sh) and open **Streams**. Choose a chain,
+enter your contract addresses, select events, and choose a starting block.
+Leave **From block** blank to start at the latest block, or enter `0` for genesis.
+Save the stream, then copy its read URL with your account RPC key.
+
+Store the URL privately. This example selects all logs at one contract on Base:
+
+```bash
+export LASSO_KEY='YOUR_ACCOUNT_RPC_KEY'
+export CONTRACT='YOUR_CONTRACT_ADDRESS'
+export LASSO_STREAM_URL="https://lasso.sh/streams/k/$LASSO_KEY/base/logs?address=$CONTRACT"
+```
+
+The examples append parameters with `&`. For a URL without filters, such as
+`.../base/blocks`, add the first one with `?` instead.
+
+If you use the copied dashboard URL, keep its filters. The examples below set
+`from` themselves; remove an existing `from` query parameter before appending it.
+
+## 2. Open an SSE connection
+
+```bash
+curl -N -sS -H 'Accept: text/event-stream' \
+  "$LASSO_STREAM_URL&from=latest&wait=20"
+```
+
+One connection pushes pages as blocks arrive. Each complete frame looks like:
+
+```text
+id: c1.…
+data: {"from":21004401,"through":{"number":21004410,"hash":"0x…"},"tip":21004410,"safe":null,"finalized":null,"next":"c1.…","items":[]}
+
+```
+
+`items` holds matching logs, ordered by block number then log index. A quiet
+filter can produce an empty page. Stop curl with Ctrl-C.
+To backfill, replace `from=latest` with your starting block number.
+
+Curl displays pages but does not persist them. In an app, apply each page and save
+`next` in [one transaction](/cloud/streams/consuming-pages). After a disconnect,
+resume from that saved value:
+
+```bash
+curl -N -sS -H 'Accept: text/event-stream' \
+  -H "Last-Event-ID: $SAVED_NEXT" "$LASSO_STREAM_URL&from=latest&wait=20"
+```
+
+`Last-Event-ID` wins over `from`. Set `SAVED_NEXT` to your last committed cursor,
+not merely the last frame received.
+
+## 3. Try polling
+
+For cron, serverless or batch jobs, omit the SSE header. Each request returns
+one JSON page and waits up to 20 seconds at the tip:
+
+```bash
+curl -sS "$LASSO_STREAM_URL&from=latest&wait=20"
+# After committing the page, set SAVED_NEXT to its next value:
+curl -sS --get "$LASSO_STREAM_URL" \
+  --data-urlencode "from=$SAVED_NEXT" --data-urlencode 'wait=20'
+```
+
+Use `wait=0` to drain available pages in a scheduled job; stop when `next` stays
+unchanged. A `503` response means retry the same position after `Retry-After`.
+
+## Positions
+
+`from` is required. Use a decimal block number, `latest`, or the opaque `next`
+from a page. Never reuse a cursor with a changed chain, source or filter.
+
+## Next
+
+- [Consuming pages correctly](/cloud/streams/consuming-pages)
+- [Run a durable consumer](/cloud/streams/integration)

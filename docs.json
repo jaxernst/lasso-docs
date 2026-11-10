@@ -86,6 +86,16 @@
             ]
           },
           {
+            "group": "Streams",
+            "pages": [
+              "cloud/streams/overview",
+              "cloud/streams/quickstart",
+              "cloud/streams/consuming-pages",
+              "cloud/streams/integration",
+              "cloud/streams/api-reference"
+            ]
+          },
+          {
             "group": "Guides",
             "pages": [
               "cloud/guides/rpc-outages-and-rate-limits",
