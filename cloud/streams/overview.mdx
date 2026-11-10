@@ -1,0 +1,71 @@
+---
+title: "Streams"
+description: "Backfill and live-stream smart contract events over HTTP with ordered pages, reorg corrections, and durable cursors."
+---
+
+Backfill and live-stream any set of smart contract events over a simple HTTP API.
+A stream is one URL for a chain and a filter: contract addresses and event topics.
+Start with the [quickstart](/cloud/streams/quickstart) to read your first page.
+
+```bash
+curl -N -H 'Accept: text/event-stream' "$LASSO_STREAM_URL&from=latest"
+```
+
+## Backfill, then follow live
+
+Start at any block, including genesis (`from=0`). Streams delivers pages in block
+order, then follows the tip on the same connection. For contract logs, choose
+addresses and topics; for block headers, use the `blocks` source without filters.
+You hold the position, so each consumer can restart or replay independently.
+
+Pages contain complete blocks. Reorgs arrive as correction pages that start lower.
+Apply the [transaction rule](/cloud/streams/consuming-pages) to replace affected
+rows. Each page also carries the chain's `safe` and `finalized` block marks when
+available. Use finalized marks to gate irreversible side effects.
+
+| Transport | Choose it for | Continue with |
+|---|---|---|
+| Server-Sent Events (SSE) | Long-running services; one connection pushes pages | Reconnect from your committed cursor |
+| Polling with `wait` | Cron, serverless and batch jobs | Request `from=<page.next>` |
+
+Both transports deliver the same pages. No SDK is required.
+
+## Access and authentication
+
+Streams is an **allowlisted beta**. Your account must have Streams access and an
+enabled account RPC API key. The read URL embeds that key:
+`https://lasso.sh/streams/k/{key}/{chain}/logs`. Keep the full URL in your secret
+store and out of logs. RPC profile and strategy segments do not apply.
+
+A saved dashboard stream is a credential-free recipe, not a running consumer.
+It stores neither a key nor your cursor. You can also build the read URL directly.
+Management APIs use the account's management Bearer token, not its RPC key.
+
+## Pricing
+
+Delivery costs **$0.10 per million events**, with a **$0.10 minimum per account
+per active UTC day**, drawn from the account's USD balance. Pro included RPC usage
+does not pay for Streams. Check the current versioned tariff in
+[service discovery](https://lasso.sh/agent.json).
+
+Live, historical, replay and correction items count. Each block header counts as
+one event. Empty pages, errors, keepalives and blocks scanned are free. Empty
+pages do not activate a day. Passive dashboard samples are free; the Test reader
+uses the billable public endpoint. The beta has no free interactive reads.
+
+Billing records complete pages successfully written by the server, not client
+acknowledgments. A fully written frame may be billable even if you disconnect
+before consuming it. Failed or truncated writes are free; replay deliveries bill again.
+
+## Limits
+
+The beta serves Ethereum (`ethereum` or `1`), Base (`base` or `8453`), and
+Arbitrum (`arbitrum` or `42161`). Each key allows 10 concurrent readers and two
+concurrent history builds. Account request-rate limits also apply.
+
+## Next
+
+- [Quickstart](/cloud/streams/quickstart): create a stream and read it.
+- [Consuming pages](/cloud/streams/consuming-pages): persist and resume correctly.
+- [Integration guides](/cloud/streams/integration): runnable consumers.
+- [API reference](/cloud/streams/api-reference): endpoints and parameters.

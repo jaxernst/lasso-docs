@@ -1,0 +1,343 @@
+---
+title: "Integration guides"
+description: "Run durable Node.js and Python SSE or polling consumers, then gate side effects through a finalized outbox."
+---
+
+Run a consumer that persists both items and its cursor in SQLite. SSE is the
+default for a long-running service; polling uses the same transaction and saved
+position. These examples follow the dashboard consumer's serial apply and
+explicit reconnect contract, with concrete storage and transport recovery.
+
+## Node.js: SSE and polling
+
+Use Node.js 22.13 or newer. Save the following as `consumer.mjs`. It uses built-in
+fetch and SQLite, so you do not need a package install. Keep `STREAM_ID` fixed
+for one chain/source/filter; use a different ID when any of those change.
+
+```bash
+export LASSO_STREAM_URL="https://lasso.sh/streams/k/$LASSO_KEY/base/logs?address=$CONTRACT"
+export STREAM_ID='base-contract-events'
+export START_BLOCK='0' # or your contract's deployment block
+node consumer.mjs      # SSE
+# Alternative: one JSON page per request
+node consumer.mjs poll
+```
+
+Run one process per `STREAM_ID`. Stop the SSE process before trying polling
+against the same database. Both modes resume from the committed cursor.
+
+```javascript
+import { DatabaseSync } from 'node:sqlite';
+import { setTimeout as sleep } from 'node:timers/promises';
+
+const base = new URL(process.env.LASSO_STREAM_URL);
+const start = process.env.START_BLOCK; // numeric start for a complete rebuild
+if (!/^\d+$/.test(start ?? '')) throw new Error('Set START_BLOCK to a decimal block');
+const source = process.env.STREAM_ID ?? 'contract-logs';
+const db = new DatabaseSync(process.env.STREAM_DB ?? 'streams.sqlite');
+db.exec(`CREATE TABLE IF NOT EXISTS items (source TEXT, block INTEGER, payload TEXT);
+  CREATE TABLE IF NOT EXISTS positions (source TEXT PRIMARY KEY, next TEXT);`);
+function transaction(fn) {
+  db.exec('BEGIN');
+  try { fn(); db.exec('COMMIT'); }
+  catch (error) { db.exec('ROLLBACK'); throw error; }
+}
+function position() {
+  return db.prepare('SELECT next FROM positions WHERE source=?').get(source)?.next;
+}
+function apply(page) {
+  transaction(() => {
+    db.prepare('DELETE FROM items WHERE source=? AND block>=?').run(source, page.from);
+    const insert = db.prepare('INSERT INTO items VALUES (?,?,?)');
+    for (const item of page.items) {
+      insert.run(source, Number(BigInt(item.blockNumber ?? item.number)), JSON.stringify(item));
+    }
+    // Put your materialized model updates in this transaction too.
+    db.prepare('INSERT OR REPLACE INTO positions VALUES (?,?)').run(source, page.next);
+  });
+}
+function rebuild() {
+  transaction(() => {
+    db.prepare('DELETE FROM items WHERE source=?').run(source);
+    db.prepare('DELETE FROM positions WHERE source=?').run(source);
+  });
+}
+async function control(body, retry = 2) {
+  const code = body.error?.code ?? body.error;
+  if (code === 'resync_required') { rebuild(); return; }
+  if (['chain_unavailable', 'too_many_readers', 'rate_limit_exceeded'].includes(code)) {
+    await sleep(1000 * Number(body.retry_after ?? retry));
+    return;
+  }
+  // Do not log the request URL, which contains the key.
+  throw new Error(`Streams ${code}; inspect the response privately`);
+}
+async function open(sse) {
+  const url = new URL(base);
+  const saved = position();
+  url.searchParams.set('from', saved ?? start);
+  url.searchParams.set('wait', '20');
+  const headers = { Accept: sse ? 'text/event-stream' : 'application/json' };
+  if (sse && saved) headers['Last-Event-ID'] = saved;
+  const abort = new AbortController();
+  let timer;
+  const touch = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => abort.abort(), 60_000);
+  };
+  const close = () => { clearTimeout(timer); abort.abort(); };
+  touch();
+  let response;
+  try { response = await fetch(url, { headers, signal: abort.signal }); }
+  catch { close(); await sleep(2000); return; }
+  if (!response.ok) {
+    const retry = response.headers.get('retry-after') ?? 2;
+    let body;
+    try { body = await response.json(); }
+    catch { close(); await sleep(2000); return; }
+    close();
+    await control(body, retry);
+    return;
+  }
+  return { response, touch, close };
+}
+
+async function polling() {
+  for (;;) {
+    const connection = await open(false);
+    if (!connection) continue;
+    let page;
+    try { page = await connection.response.json(); }
+    catch { connection.close(); await sleep(2000); continue; }
+    connection.close();
+    apply(page); // outside transport recovery: apply failures are fatal
+  }
+}
+
+async function sse() {
+  for (;;) {
+    const connection = await open(true);
+    if (!connection) continue;
+    const reader = connection.response.body.getReader();
+    const decoder = new TextDecoder('utf-8', { fatal: true });
+    let buffer = '', data = [], event = 'message', reconnect = false;
+    try {
+      while (!reconnect) {
+        let chunk;
+        try { chunk = await reader.read(); }
+        catch { break; }
+        if (chunk.done) break; // discard any unfinished frame
+        connection.touch();
+        try { buffer += decoder.decode(chunk.value, { stream: true }); }
+        catch { break; }
+        let end;
+        while (!reconnect && (end = buffer.indexOf('\n')) >= 0) {
+          const line = buffer.slice(0, end).replace(/\r$/, '');
+          buffer = buffer.slice(end + 1);
+          if (line === '') {
+            if (data.length) {
+              let body;
+              try { body = JSON.parse(data.join('\n')); }
+              catch { reconnect = true; break; }
+              if (event === 'error') {
+                connection.close();
+                await control(body);
+                reconnect = true;
+              } else if (event === 'message') {
+                apply(body); // synchronous commit before reading the next page
+              }
+            }
+            data = []; event = 'message';
+          } else if (line.startsWith('data:')) data.push(line.slice(5).replace(/^ /, ''));
+          else if (line.startsWith('event:')) event = line.slice(6).trim();
+          // Ignore id: the database owns the reconnect position.
+        }
+      }
+    } finally {
+      connection.close();
+      await reader.cancel().catch(() => {});
+    }
+    await sleep(2000);
+  }
+}
+
+try {
+  if (process.argv[2] === 'poll') await polling();
+  else await sse();
+} catch {
+  // Avoid printing fetch errors that could expose the credential-bearing URL.
+  console.error('Consumer stopped. Check database, key, access, balance and request parameters privately.');
+  process.exitCode = 1;
+} finally { db.close(); }
+```
+
+Unlike EventSource's automatic reconnect, this loop uses only the checkpoint
+that SQLite committed. It discards partial pages, honors HTTP `Retry-After`,
+handles SSE error controls, and closes after 60 seconds without bytes. A 409
+clears only this source and rebuilds from `START_BLOCK`. Apply failures stop the
+process. Add derived model updates inside `apply`'s transaction.
+
+## Python: polling
+
+Save this as `streams.py`. It uses only Python's standard library and SQLite.
+Use the same environment variables as above; keep `START_BLOCK` numeric for a
+complete rebuild. Run `python3 streams.py` for polling.
+
+```python
+import json, os, sqlite3, time
+from http.client import IncompleteRead
+from urllib.error import HTTPError
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.request import Request, urlopen
+
+URL = os.environ["LASSO_STREAM_URL"]
+SOURCE = os.environ.get("STREAM_ID", "contract-logs")
+START = os.environ["START_BLOCK"]
+db = sqlite3.connect("streams.sqlite")
+db.executescript("""
+CREATE TABLE IF NOT EXISTS items (source TEXT, block INTEGER, payload TEXT);
+CREATE TABLE IF NOT EXISTS positions (source TEXT PRIMARY KEY, next TEXT);
+""")
+
+def request_url():
+    u = urlsplit(URL)
+    q = dict(parse_qsl(u.query))
+    row = db.execute("SELECT next FROM positions WHERE source=?", (SOURCE,)).fetchone()
+    q["from"] = row[0] if row else START
+    q["wait"] = "20"
+    return urlunsplit((u.scheme, u.netloc, u.path, urlencode(q), ""))
+
+def apply_page(page):
+    with db:
+        db.execute("DELETE FROM items WHERE source=? AND block>=?", (SOURCE, page["from"]))
+        db.executemany("INSERT INTO items VALUES (?,?,?)", [
+            (SOURCE, int(item.get("blockNumber", item.get("number")), 16), json.dumps(item))
+            for item in page["items"]
+        ])
+        db.execute("INSERT OR REPLACE INTO positions VALUES (?,?)", (SOURCE, page["next"]))
+
+def rebuild_source():
+    with db:
+        db.execute("DELETE FROM items WHERE source=?", (SOURCE,))
+        db.execute("DELETE FROM positions WHERE source=?", (SOURCE,))
+
+def handle_http(error):
+    if error.code in (401, 402, 403):
+        raise SystemExit(f"Streams HTTP {error.code}; inspect the response privately")
+    if error.code == 409:
+        rebuild_source()  # rebuild only this source from START
+    else:
+        time.sleep(int(error.headers.get("Retry-After", "2")))
+
+def handle_control(body):
+    error = body["error"]
+    code = error["code"] if isinstance(error, dict) else error
+    if code in ("unauthorized", "balance_exhausted", "not_entitled"):
+        raise SystemExit(f"Streams {code}; inspect the control body privately")
+    if code == "resync_required":
+        rebuild_source()
+    else:
+        time.sleep(body.get("retry_after", 2))  # keep the saved from
+
+def pull():
+    while True:
+        request = Request(request_url())
+        try:
+            with urlopen(request, timeout=40) as response:
+                page = json.load(response)
+        except HTTPError as error:
+            handle_http(error)
+            continue
+        except (OSError, IncompleteRead, json.JSONDecodeError):
+            time.sleep(2)
+            continue  # an incomplete page never reaches the transaction
+        apply_page(page)  # database and apply errors remain fatal
+
+if __name__ == "__main__":
+    pull()
+```
+
+## Python: SSE
+
+Save this beside `streams.py` as `streams_sse.py` and run
+`python3 streams_sse.py`. It reuses the same database transaction and checkpoint.
+Do not run it alongside the polling consumer for the same source.
+
+```python
+from streams import *
+
+def read_event(response):
+    data, event = [], "message"
+    for raw in response:
+        line = raw.decode().rstrip("\r\n")
+        if not line:
+            if data:
+                return event, json.loads("\n".join(data))
+            event = "message"
+        elif line.startswith("event:"):
+            event = line[6:].strip()
+        elif line.startswith("data:"):
+            data.append(line[5:].lstrip(" "))
+    return None  # discard an unfinished event on disconnect
+
+while True:
+    request = Request(request_url(), headers={"Accept": "text/event-stream"})
+    try:
+        response = urlopen(request, timeout=40)
+    except HTTPError as error:
+        handle_http(error)
+        continue
+    except (OSError, IncompleteRead):
+        time.sleep(2)
+        continue
+    with response:
+        while True:
+            try:
+                message = read_event(response)
+            except (OSError, IncompleteRead, json.JSONDecodeError, UnicodeDecodeError):
+                time.sleep(2)
+                break
+            if message is None:
+                time.sleep(2)
+                break
+            event, body = message
+            if event == "error":
+                handle_control(body)
+                break  # close, then retry/rebuild from the database position
+            if event == "message":
+                apply_page(body)  # outside transport recovery; failures close the connection
+
+```
+
+## Side effects at the tip
+
+Treat data near the tip as provisional. Replacing database rows can undo a reorg;
+it cannot undo an email, a payout or a webhook already sent.
+
+Use a finalized outbox for irreversible effects:
+
+1. In the page transaction, replace source rows from `page.from`, replace pending
+   outbox rows in that range, insert new items and pending effects, and save `next`.
+2. In that transaction, persist the highest `finalized.number` seen for this source.
+   Keep it across lower or null marks and process restarts. Do not substitute
+   `safe` or `tip` for finality.
+3. A separate worker sends pending effects whose block is at or below the stored
+   finalized mark. Give each effect a stable idempotency key, such as source,
+   transaction hash, log index and effect type.
+4. Record delivery. A crash after sending but before recording can send again,
+   so the receiver must deduplicate using that key.
+
+Keep delivered-effect deduplication records across a resync rebuild. Reconstruct
+pending effects from the rebuilt source without repeating delivered ones.
+These consumers store raw items only; add the outbox in your app's transaction.
+
+## Limits
+
+Use a durable local database volume. Keep source identities separate and serialize
+writers for each source. No cursor is a client acknowledgment to the server;
+[successful replay deliveries bill again](/cloud/streams/overview#pricing).
+
+## Next
+
+- [Page contract and errors](/cloud/streams/consuming-pages)
+- [API reference](/cloud/streams/api-reference)
