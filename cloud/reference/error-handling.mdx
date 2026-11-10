@@ -25,8 +25,12 @@ nonce too low or insufficient funds stops at the first and is returned to you.
 
 Lasso also [learns from these errors](/concepts/provider-learning): a provider that
 keeps refusing a method, history or span is moved behind alternatives for
-matching requests. Quota exhaustion and plan refusals take the affected
-credential out of rotation until revalidation succeeds, keeping the last route.
+matching requests, keeping the last route. Plan refusals take the affected
+credential out of rotation the same way, until revalidation succeeds. A quota
+exclusion also takes the credential out of rotation until revalidation succeeds
+or about 30 minutes pass, but is never kept as a last route: if every candidate
+is quota-excluded, Lasso falls through to profile fallback or the standard
+exhaustion response below instead of sending to an excluded credential.
 
 ## When no provider can serve the request
 

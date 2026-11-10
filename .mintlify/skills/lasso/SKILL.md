@@ -401,9 +401,19 @@ Content-Type: application/json
   "block_protection":true}}}
 ```
 
+Set a provider entry to `enabled: false` to keep its settings and credentials while stopping routing and background observations. GET includes `enabled`; PUT omission resets it to `true`. Re-enable with `enabled: true`. If all providers are disabled, the chain stays stored with no route.
+
 Start with the provider URLs and omit `limits` unless you know a provider
 policy to enforce; Lasso learns historical depth, refused methods and log-span
-limits from traffic. The dry run checks chain identity only.
+limits from traffic. Adding or changing a provider checks its chain identity.
+A wrong chain rejects the document; an endpoint that cannot answer is saved as
+verifying and stays out of routing until its chain is verified.
+
+Pasting a URL in the dashboard checks its chain identity. For unknown chains,
+the dashboard also estimates block cadence from recent blocks; document
+onboarding retains its existing defaults. A failed cadence check does not
+prevent adding a provider with the correct chain. The full capability sweep
+remains a separate manual action.
 
 Lasso tracks each provider's block height from the head reads routed through
 it and from background checks. A `ws_url` provides WebSocket capability;
@@ -431,14 +441,17 @@ polls and identity checks.
    saved as `verifying` and routes once a later check passes.
 4. Route the app over `https://lasso.sh/rpc/k/<key>/profile/prod-base/<strategy>/<chain>`.
    Replace the profile segment in an existing prefix rather than appending another.
-5. When all desired providers for a chain are unverified, its entire previous
-   verified configuration keeps serving, including its settings. A chain with
-   both verified and verifying providers publishes the verified subset and its
-   new settings immediately.
-   A new chain without a verified serving predecessor gets a retryable 503
-   `profile_config_unavailable` until an identity check verifies a provider.
-   For a newly created profile, honor `retry_after_seconds` and GET until `live`
-   before routing. `GET /api/v1/profiles/prod-base` shows the revision, each provider's status
+5. Poll `GET /api/v1/profiles/prod-base` while status is `activating` or
+   `verifying`: follow `status_detail` and honor `retry_after_seconds`.
+   Completion is `live` when every chain is ready, `off` when every chain is
+   intentionally off, or `partial` when its enabled chains are ready and other
+   chains are off. Stop polling on these completed states. Only an explicit
+   edit can turn a provider back on. Other states such as `failed`, `rejected`,
+   or `suspended` require action rather than activation polling.
+   RPC to an all-off chain returns non-retryable `no_enabled_providers`; turn
+   a provider on or use another chain. Pending configuration still returns
+   retryable `profile_config_unavailable`.
+   `GET /api/v1/profiles/prod-base` shows the revision, each provider's status
    and what Lasso has learned (`effect: on` changes routing; `shadow` is
    observed only). Provider URLs and header values are never returned.
 
