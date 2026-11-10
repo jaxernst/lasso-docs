@@ -9,6 +9,28 @@ explains it. To check what's serving right now, read `source_sha` from
 [`/api/health`](https://lasso.sh/api/health). RPC Core releases have their own
 notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
 
+<Update label="November 10, 2026, second release" description="Release 309" tags={["Streams", "Dashboard", "Reliability"]}>
+
+- **Dense log blocks no longer close your subscriptions.** Lasso now admits
+  WebSocket messages by size rather than by count, so a block with hundreds of
+  matching logs reaches your `eth_subscribe` stream intact instead of ending
+  it. [WebSocket continuity](/cloud/websocket-continuity-evidence)
+- **Your key stays off the screen.** Endpoint URLs on the dashboard show the
+  key as its prefix and an ellipsis. The Copy buttons still copy the full,
+  working URL.
+- **Accurate request rates on busy chains.** Dashboard request rates and
+  provider shares now count every request instead of a sample, so they stay
+  correct at high request rates.
+- **A fallback always says so.** When a fallback serves your request on another
+  profile, the response carries `x-lasso-fallback-profile` whether or not you
+  asked for metadata.
+  [Signals and errors](/cloud/reference/signals-and-errors)
+- **Adding a provider checks more.** When you add a provider on the dashboard,
+  its check now reports whether it returns block data and whether its WebSocket
+  URL accepts an upgrade.
+
+</Update>
+
 <Update label="November 10, 2026" description="Release 308" tags={["Custom profiles", "Dashboard"]}>
 
 - **Turn a provider off without removing it.** In a Custom profile, set a
