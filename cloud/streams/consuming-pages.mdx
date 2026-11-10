@@ -58,7 +58,7 @@ page at least every 30 seconds; reconnect after 60 seconds of silence.
 | 400 | `invalid_parameter` | Fix the request. Pass `next` as `from`, not `cursor`. Start fresh after changing filters. |
 | 401 | `unauthorized` | Stop; use an enabled current key. |
 | 402 | `balance_exhausted` | Stop; fund within your budget, then resume the saved position. |
-| 403 | `not_entitled` | Stop; use an account with beta access. |
+| 403 | `not_entitled` | Stop; request beta access from the dashboard's Streams page. |
 | 404 | `chain_not_served` | Choose a supported chain. |
 | 409 | `resync_required` | Clear this source's rows and checkpoint together, then rebuild from your own start block. |
 | 429 | `too_many_readers`, `rate_limit_exceeded` | Close extra readers and back off; honor `Retry-After` when present. |
@@ -81,8 +81,7 @@ privately and [top up](/cloud/balance-and-fallback#top-up) within your budget.
 ## Limits
 
 Keep `next` opaque. It is valid only for the same chain, source and filter.
-Pages span at most 10,000 whole blocks, targeting 1 MiB of items with a 4 MiB
-ceiling. An oversized block is delivered whole, alone, or returns 503.
+Page and reader limits are in the [API reference](/cloud/streams/api-reference#limits).
 
 ## Next
 

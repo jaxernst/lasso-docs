@@ -55,8 +55,8 @@ also sent. Quiet SSE waits after the first page have a one-second minimum.
 An unreached position returns `items: []`, `through: null` and unchanged `next`.
 Item quantities are JSON-RPC hex; page numbers are decimal. See
 [consuming pages](/cloud/streams/consuming-pages) for the required atomic apply
-rule, all error codes and reconnect behavior. A temporary handoff may return 307;
-follow the redirect using the same position.
+rule, all error codes and reconnect behavior. A temporary handoff may return 307 with no `Location`;
+retry the same request.
 
 ## Saved-stream management
 

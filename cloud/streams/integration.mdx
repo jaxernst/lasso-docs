@@ -222,22 +222,22 @@ def rebuild_source():
         db.execute("DELETE FROM positions WHERE source=?", (SOURCE,))
 
 def handle_http(error):
-    if error.code in (401, 402, 403):
-        raise SystemExit(f"Streams HTTP {error.code}; inspect the response privately")
     if error.code == 409:
         rebuild_source()  # rebuild only this source from START
-    else:
+    elif error.code in (307, 429) or error.code >= 500:
         time.sleep(int(error.headers.get("Retry-After", "2")))
+    else:
+        raise SystemExit(f"Streams HTTP {error.code}; inspect the response privately")
 
 def handle_control(body):
     error = body["error"]
     code = error["code"] if isinstance(error, dict) else error
-    if code in ("unauthorized", "balance_exhausted", "not_entitled"):
-        raise SystemExit(f"Streams {code}; inspect the control body privately")
     if code == "resync_required":
         rebuild_source()
-    else:
+    elif code in ("chain_unavailable", "too_many_readers", "rate_limit_exceeded"):
         time.sleep(body.get("retry_after", 2))  # keep the saved from
+    else:
+        raise SystemExit(f"Streams {code}; inspect the control body privately")
 
 def pull():
     while True:
@@ -334,8 +334,8 @@ These consumers store raw items only; add the outbox in your app's transaction.
 ## Limits
 
 Use a durable local database volume. Keep source identities separate and serialize
-writers for each source. No cursor is a client acknowledgment to the server;
-[successful replay deliveries bill again](/cloud/streams/overview#pricing).
+writers for each source. The server does not track your cursor, so replaying from an older position
+[bills those pages again](/cloud/streams/overview#pricing).
 
 ## Next
 

@@ -4,14 +4,16 @@ description: "Create a stream in the dashboard, read pages over SSE with curl, t
 ---
 
 Create a stream in the dashboard, then open its URL over SSE.
-You need an allowlisted account, an enabled account RPC API key and enough
-balance for [delivery](/cloud/streams/overview#pricing).
+Streams is an allowlisted beta: open **Streams** in the [dashboard](https://lasso.sh)
+and choose **Request access**. You also need an enabled account RPC API key
+([keys](/cloud/keys-and-profiles)) and enough balance for
+[delivery](/cloud/streams/overview#pricing).
 
 ## 1. Create a stream
 
 Sign in at [lasso.sh](https://lasso.sh) and open **Streams**. Choose a chain,
 enter your contract addresses, select events, and choose a starting block.
-Use `0` for genesis or `latest` to include the current published tip block.
+Leave **From block** blank to start at the latest block, or enter `0` for genesis.
 Save the stream, then copy its read URL with your account RPC key.
 
 Store the URL privately. This example selects all logs at one contract on Base:
@@ -21,6 +23,9 @@ export LASSO_KEY='YOUR_ACCOUNT_RPC_KEY'
 export CONTRACT='YOUR_CONTRACT_ADDRESS'
 export LASSO_STREAM_URL="https://lasso.sh/streams/k/$LASSO_KEY/base/logs?address=$CONTRACT"
 ```
+
+The examples append parameters with `&`. For a URL without filters, such as
+`.../base/blocks`, add the first one with `?` instead.
 
 If you use the copied dashboard URL, keep its filters. The examples below set
 `from` themselves; remove an existing `from` query parameter before appending it.
@@ -71,7 +76,7 @@ curl -sS --get "$LASSO_STREAM_URL" \
 Use `wait=0` to drain available pages in a scheduled job; stop when `next` stays
 unchanged. A `503` response means retry the same position after `Retry-After`.
 
-## Limits
+## Positions
 
 `from` is required. Use a decimal block number, `latest`, or the opaque `next`
 from a page. Never reuse a cursor with a changed chain, source or filter.
