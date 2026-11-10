@@ -9,6 +9,20 @@ explains it. To check what's serving right now, read `source_sha` from
 [`/api/health`](https://lasso.sh/api/health). RPC Core releases have their own
 notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
 
+<Update label="November 10, 2026" description="Release 308" tags={["Custom profiles", "Dashboard"]}>
+
+- **Turn a provider off without removing it.** In a Custom profile, set a
+  provider's `enabled` to `false`, or switch it off on the dashboard. Lasso
+  stops routing to it and stops its background checks, and keeps its URL,
+  headers and settings so you can turn it back on later.
+  [Custom profiles](/cloud/custom-profiles#the-document)
+- **See when a change is waiting on a provider.** If an applied change would
+  leave a chain without a reachable provider, Lasso keeps serving the previous
+  version until the new provider's address resolves. The dashboard now shows
+  that the change is waiting, and which routes can't connect yet and why.
+
+</Update>
+
 <Update label="November 9, 2026, second release" description="Release 307" tags={["Reliability"]}>
 
 - **A second opinion before blaming your request.** When a provider says a read
