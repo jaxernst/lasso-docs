@@ -1,0 +1,89 @@
+---
+title: "Consuming pages correctly"
+description: "Apply pages atomically, handle reorgs and errors, and resume SSE from the cursor your database committed."
+---
+
+A cursor belongs to your consumer's committed state. Apply pages serially and
+resume from the last saved `next`, whether you use SSE or polling.
+The [integration guides](/cloud/streams/integration) implement this contract.
+
+```text
+BEGIN
+  delete this source's rows where block_number >= page.from
+  insert page.items
+  save page.next
+COMMIT
+```
+
+Scope all three operations to the same local source identity: one fixed chain,
+source and filter. Put derived model updates in the same transaction. Update the
+in-memory position only after commit. A database failure must stop the consumer
+and close its connection; fix it before restarting.
+
+## Reorgs and empty pages
+
+A correction page starts lower and carries `reorg: true`. The same delete-and-insert
+rule replaces orphaned rows without special reorg logic. Corrections can rewind
+below your original start block. Do not clamp `page.from` to that start.
+
+A page with no items and unchanged `next` means nothing new yet; applying it is
+a no-op. Other empty pages can advance through blocks with no matching events.
+Do not skip their cursors.
+
+`through`, `safe` and `finalized` are block number/hash pairs and may be null.
+`tip` is a decimal block number or null. Page numbers are decimal; item quantities
+are JSON-RPC hex. Keep the highest finalized mark across lower or null marks and
+process restarts when gating [outbox effects](/cloud/streams/integration#side-effects-at-the-tip).
+
+## Resume from your own cursor
+
+SSE frames use `id: <page.next>` and `data: <JSON page>`, with no `event` field.
+Reconnect with `Last-Event-ID: <saved next>` or `from=<saved next>`. The header
+wins and accepts a block number or cursor, never `latest`.
+
+EventSource can remember a received event ID before your database commits that
+page. Its automatic reconnect can skip uncommitted work. Close it on disconnect,
+finish queued transactions, then reconnect yourself from the committed cursor.
+The dashboard's example follows this pattern. The fetch consumer in the guide
+instead reads and commits one page at a time.
+
+Apply only complete pages. On a truncated body, incomplete SSE frame or network
+failure, discard the partial page and retry the saved position. SSE writes a
+page at least every 30 seconds; reconnect after 60 seconds of silence.
+
+## Handle refusals
+
+| Status | Code | Action |
+|---|---|---|
+| 400 | `invalid_parameter` | Fix the request. Pass `next` as `from`, not `cursor`. Start fresh after changing filters. |
+| 401 | `unauthorized` | Stop; use an enabled current key. |
+| 402 | `balance_exhausted` | Stop; fund within your budget, then resume the saved position. |
+| 403 | `not_entitled` | Stop; request beta access from the dashboard's Streams page. |
+| 404 | `chain_not_served` | Choose a supported chain. |
+| 409 | `resync_required` | Clear this source's rows and checkpoint together, then rebuild from your own start block. |
+| 429 | `too_many_readers`, `rate_limit_exceeded` | Close extra readers and back off; honor `Retry-After` when present. |
+| 503 | `chain_unavailable` | Retry the same position after `Retry-After`, always 1 to 30 seconds. |
+
+A 409 is not a transient failure. For a durable rebuild, keep a numeric start
+block; restarting from `latest` cannot reconstruct earlier materialized history.
+Refusals do not advance your position.
+
+Before the first SSE page, failures return HTTP status and JSON. After SSE has
+started, failures arrive as `event: error` controls with no ID, then the connection
+closes. Controls are not pages. Retry `chain_unavailable` from your saved position,
+using `retry_after`; rebuild on `resync_required` and stop on auth or funding errors.
+
+Errors normally use `{"error":"code"}` with optional details. A 402 instead nests
+`code`, `message`, `challenges`, `credit` and `next_action` inside `error`.
+Its SSE control includes `retry: 60000`. Inspect the returned funding action
+privately and [top up](/cloud/balance-and-fallback#top-up) within your budget.
+
+## Limits
+
+Keep `next` opaque. It is valid only for the same chain, source and filter.
+Page and reader limits are in the [API reference](/cloud/streams/api-reference#limits).
+
+## Next
+
+- [Integration guides](/cloud/streams/integration)
+- [API reference](/cloud/streams/api-reference)

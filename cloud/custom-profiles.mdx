@@ -43,6 +43,7 @@ other field is optional:
 | Field | Level | Use it when |
 |---|---|---|
 | `url`, `ws_url` | provider | Always; add `ws_url` when the app subscribes |
+| `enabled` | provider | `false` turns a provider off without removing it: Lasso stops routing to it and stops its background checks, and keeps its URL, headers and settings for when you turn it back on. Defaults to `true`, and omitting it resets it to `true` |
 | `headers` | provider | The provider authenticates with secret request headers, shared by its HTTP and WebSocket endpoints |
 | List order | provider | You use the `priority` strategy; first is preferred |
 | `block_protection` | chain | The app polls the latest block and shouldn't see it go backwards |

@@ -1,0 +1,102 @@
+---
+title: "Streams API reference"
+description: "Streams read and management endpoints, filters, page fields, authentication, limits, and error behavior."
+---
+
+Read contract logs or block headers over SSE or JSON polling. Read endpoints use
+an account RPC key; saved-stream management uses an account management Bearer token.
+Start with the [quickstart](/cloud/streams/quickstart) for a working request.
+
+```bash
+curl -N -sS -H 'Accept: text/event-stream' \
+  "https://lasso.sh/streams/k/$LASSO_KEY/base/logs?address=$CONTRACT&from=0&wait=20"
+```
+
+The full machine-readable contract is in [OpenAPI](https://lasso.sh/openapi.json).
+
+## Read endpoints
+
+| Method | Path | Items |
+|---|---|---|
+| GET | `/streams/k/{key}/{chain}/logs` | `eth_getLogs` objects plus validated-header `blockTimestamp`, without `removed` |
+| GET | `/streams/k/{key}/{chain}/blocks` | Block headers without transaction, uncle or withdrawal lists |
+
+| Parameter | Location | Contract |
+|---|---|---|
+| `key` | Path | Enabled account RPC API key. Keep the URL private. |
+| `chain` | Path | `ethereum` / `1`, `base` / `8453`, `arbitrum` / `42161` in the beta. |
+| `from` | Query, required | `latest`, unsigned 64-bit decimal block number, or opaque `next` from a page. Maximum 512 characters. |
+| `wait` | Query | Integer seconds, 0 to 30, default 20. Use 0 to drain available pages. |
+| `label` | Query | 1 to 100 characters; dashboard display name only. Does not affect data, billing identity or position. |
+| `address` | Query, logs only | Up to 100 comma-separated addresses, matched as alternatives. |
+| `topic0` through `topic3` | Query, logs only | Comma-separated alternatives at each position. Positions are ANDed. Omitted filters match anything. |
+| `Accept` | Header | `text/event-stream` for SSE; `application/json` for polling. |
+| `Last-Event-ID` | Header | SSE resume position, at most 512 characters. Block number or `next`, never `latest`. Wins over `from`. |
+
+Block headers accept no address or topic filters. `latest` includes the current
+published tip block. `cursor=` is invalid; send `next` as `from`.
+
+## Page response
+
+Polling returns one page with status 200, never 204. SSE returns a sequence of
+frames with `id: <next>` and `data: <JSON page>`, no `event` field. Empty pages are
+also sent. Quiet SSE waits after the first page have a one-second minimum.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `from` | Integer | First block to replace in this source. |
+| `through` | Block mark or null | Last covered block: `{number, hash}`. |
+| `tip` | Integer or null | Published tip block number. |
+| `safe`, `finalized` | Block marks or null | Chain block tags, each `{number, hash}` when available. |
+| `next` | String | Opaque position for the next request. |
+| `items` | Array | Complete-block items ordered by block number, then log index for logs. |
+| `reorg` | Optional boolean | `true` on correction pages. The apply rule does not branch on it. |
+
+An unreached position returns `items: []`, `through: null` and unchanged `next`.
+Item quantities are JSON-RPC hex; page numbers are decimal. See
+[consuming pages](/cloud/streams/consuming-pages) for the required atomic apply
+rule, all error codes and reconnect behavior. A temporary handoff may return 307 with no `Location`;
+retry the same request.
+
+## Saved-stream management
+
+Send `Authorization: Bearer <account-management-token>` and JSON bodies with
+`Content-Type: application/json`. RPC keys cannot manage streams. Profile-scoped
+agents cannot manage streams; read-only agents can read but cannot mutate.
+All management routes require beta access (`403 not_in_beta` otherwise).
+
+| Method | Path | Body or result |
+|---|---|---|
+| GET | `/api/v1/streams` | `{streams, limits}` |
+| POST | `/api/v1/streams` | `{name, chain_id, source, parameters}`; returns 201 recipe |
+| GET | `/api/v1/streams/{id}` | Saved recipe |
+| PATCH | `/api/v1/streams/{id}` | `{name}`; only the name is editable |
+| DELETE | `/api/v1/streams/{id}` | 204; does not revoke a key or erase a consumer checkpoint |
+| GET | `/api/v1/streams/usage` | Account `days` and attributed `sources` |
+| GET | `/api/v1/streams/{id}/usage` | Account `days` and sources matching this recipe |
+
+A recipe has `id`, `name` (1 to 100 characters), integer `chain_id`, `source`
+(`logs` or `blocks`), `parameters`, credential-free `url_template`, `inserted_at`
+and `updated_at`. Substitute your key into the template locally.
+
+Recipe `parameters` accepts `address` and `topic0` through `topic3` as strings or
+arrays of strings; `from` as a block number or `latest`; `wait` as 0 to 30; and
+`label`. A recipe never stores a consumer cursor. Create a new recipe to change
+its source. Duplicate names are allowed.
+
+Usage endpoints accept inclusive `from_day` and `through_day` UTC dates, defaulting
+to seven days with a maximum range of 31 days. Totals are flushed in the background.
+Identical normalized filters share source attribution. Account-day minimums belong
+to the account: never sum the repeated `days` charges across saved recipes.
+
+## Limits
+
+At most 100 saved recipes per account; exceeding the cap returns
+`409 stream_limit`. Read limits are 10 concurrent readers and two history builds
+per key. Page boundaries are at most 10,000 whole blocks, targeting 1 MiB of items
+with a 4 MiB ceiling; a larger single block is served alone or returns 503.
+
+## Next
+
+- [Consuming pages correctly](/cloud/streams/consuming-pages)
+- [Integration guides](/cloud/streams/integration)
