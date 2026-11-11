@@ -18,7 +18,7 @@ curl 'http://localhost:4000/rpc/ethereum?include_meta=body' \
 
 ## What it learns
 
-| Limit | RPC Core v0.7.0 | Lasso Cloud |
+| Limit | RPC Core v0.8.0 | Lasso Cloud |
 | --- | --- | --- |
 | Method refusals | On by default; matching providers are moved behind alternatives | On for managed pools and Custom profiles |
 | Historical depth | On by default; matching providers are moved behind alternatives | On for managed pools and Custom profiles |
@@ -74,8 +74,8 @@ Prometheus exposes two node-local counters:
 
 Kinds are `method_refusal`, `historical_depth` and `span_limit`. Counters reset
 on restart. An order change does not prove that a failure was avoided. See the
-released [configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.7.0/docs/CONFIGURATION.md#learned-routing)
-and [metric contract](https://github.com/jaxernst/lasso-rpc/blob/v0.7.0/docs/PROMETHEUS.md#learned-routing-counters).
+released [configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/docs/CONFIGURATION.md#learned-routing)
+and [metric contract](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/docs/PROMETHEUS.md#learned-routing-counters).
 
 ## Control Cloud learning on a Custom profile
 
