@@ -143,7 +143,11 @@ Custom profile coverage comes from that profile document.
 
 JSON-RPC batches accept 1–50 items. An empty batch returns Invalid Request
 (`-32600`); larger batches return `batch_too_large` with `max_batch_size: 50`.
-Rate limits count each batch item, including notifications. With
+Rate limits count each batch item, including notifications. A batch's
+`x-lasso-cu` and `x-lasso-usd` add up its successful routed results, each at
+its single-request price. Items answered without an upstream (`eth_chainId`),
+invalid items and items ending in a JSON-RPC error count zero, so a batch of
+only those reports `x-lasso-cu: 0`. With
 `include_meta=body`, each routed response item carries its own `lasso_meta`;
 notifications have no response item.
 
@@ -158,8 +162,7 @@ notifications have no response item.
   including all slices when chunking is enabled), and upstream and overhead latency.
   `fallback_profile` names the serving profile when it differs from
   `service_profile_id` and is absent otherwise.
-  `include_meta=headers` leaves the body unchanged and adds `x-lasso-meta`
-  plus `x-lasso-fallback-profile` when a routing fallback served the request.
+  `include_meta=headers` leaves the body unchanged and adds `x-lasso-meta`.
   Range refusals stay within the current profile. When chunking is enabled,
   range children also keep timeouts and provider failures within their serving
   profile. Ordinary calls, including block-hash `eth_getLogs`, can use configured
@@ -177,6 +180,11 @@ notifications have no response item.
   `x-lasso-balance-usd` and standard `RateLimit` headers.
 - `x-lasso-fallback` appears when a request was served somewhere other than
   the profile it named: `payment`, `free` or `profile`.
+- `x-lasso-fallback-profile` names the profile that answered when routing left
+  the named profile, for example Public answering a Premium request during an
+  outage; on a batch it lists every such profile, comma-separated. It appears with or without
+  `include_meta`. The request keeps the named profile's price. A provider name
+  alone does not show fallback: Premium and Public can use the same upstream.
 - `eth_chainId` can be answered without an upstream; use `eth_blockNumber` to
   show routing.
 
@@ -305,8 +313,10 @@ Lasso charges only successful results. Every final JSON-RPC error is free,
 including execution reverts and provider rate-limit errors after failover.
 Subscription notification pricing is unchanged. Charges settle to the account
 in the background, normally within a minute. `x-lasso-balance-usd` is an
-estimate after this charge, so consecutive responses can differ and a balance
-can dip a few cents below zero; the next purchase repays it first.
+estimate after this charge on every access, Public included: the last settled
+balance less charges the answering server has not yet settled. Charges another
+server took appear once they settle, so consecutive responses can differ and a
+balance can dip a few cents below zero; the next purchase repays it first.
 `GET /api/v1/accounts/current` returns the settled balance.
 
 ## Hand the account to its owner

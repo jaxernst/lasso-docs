@@ -11,6 +11,7 @@
 | `not_in_beta` | 403 | Request access to the Streams beta. |
 | `not_found` | 404 | Check the resource ID and credential scope. |
 | `unknown_profile` | 404 | Use a profile listed by GET /api/v1/profiles. |
+| `method_not_allowed` | 405 | Send POST /api/v1/accounts/current/claim-link with the same Bearer credential, then give the returned claim_url to the person. |
 | `account_merged` | 409 | Create the profile from the account it was merged into. |
 | `already_claimed` | 409 | Manage the account through its members. |
 | `already_subscribed` | 409 | Use Custom profiles directly; no purchase is needed. |
