@@ -9,6 +9,37 @@ explains it. To check what's serving right now, read `source_sha` from
 [`/api/health`](https://lasso.sh/api/health). RPC Core releases have their own
 notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
 
+<Update label="November 12, 2026" description="Release 310" tags={["Custom profiles", "Dashboard", "Reliability"]}>
+
+- **Add providers from one box.** On the dashboard canvas, paste provider URLs
+  into a single add box. Lasso checks each one and tells you why it refused a
+  provider, instead of reporting every refusal as a timeout. Custom setup also
+  offers Ankr and Tenderly keys, and shows each vendor's logo.
+  [Custom profiles](/cloud/custom-profiles#onboarding-what-lasso-checks)
+- **Paid Custom requests stay on your providers.** After you pay for Custom
+  through Checkout, Custom WebSocket requests are served by your own providers
+  instead of Lasso's Public providers, and Custom responses no longer carry
+  `x-lasso-fallback: payment`.
+  [Signals and errors](/cloud/reference/signals-and-errors#response-headers)
+- **Provider URLs with credentials work.** A provider URL that carries a
+  username and password (`https://user:pass@host/...`) now authenticates on
+  both HTTP and WebSocket.
+- **Shared providers say so.** Shared providers are labeled "Public shared" on
+  the dashboard, and their rows show the block poll interval Lasso gives them.
+- **A provider's billing problem isn't your error.** When a provider refuses a
+  request because its own credits or quota ran out, Lasso tries another
+  provider. Before, wording like "insufficient funds" could come back to you as
+  a revert, or as a sender balance error on `eth_sendRawTransaction`.
+- **Smarter retries after a refusal.** When a provider says it can't serve a
+  method or an archive read, Lasso tries endpoints from other companies before
+  other endpoints of the same company.
+- **One error shape across the management API.** Unknown `/api/v1` paths now
+  answer with the same `error` object as every other management error, and
+  each error's `next_action` matches the operation you tried.
+  [Signals and errors](/cloud/reference/signals-and-errors#management-api-errors)
+
+</Update>
+
 <Update label="November 10, 2026, second release" description="Release 309" tags={["Streams", "Dashboard", "Reliability"]}>
 
 - **Dense log blocks no longer close your subscriptions.** Lasso now admits
