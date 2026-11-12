@@ -13,7 +13,7 @@ compatibility: >
   for an enabled rail.
 metadata:
   author: Lasso
-  version: "14.5"
+  version: "14.6"
   website: https://lasso.sh
   routing_core: https://github.com/jaxernst/lasso-rpc
 ---
@@ -151,12 +151,6 @@ only those reports `x-lasso-cu: 0`. With
 `include_meta=body`, each routed response item carries its own `lasso_meta`;
 notifications have no response item.
 
-JSON-RPC batches accept 1–50 items. An empty batch returns Invalid Request
-(`-32600`); larger batches return `batch_too_large` with `max_batch_size: 50`.
-Rate limits count each batch item, including notifications. With
-`include_meta=body`, each routed response item carries its own `lasso_meta`;
-notifications have no response item.
-
 - `include_meta=body` adds `lasso_meta`: strategy used, candidates,
   `selected_provider`, retries (candidate advances), dispatches (physical upstream sends of the request's own method, excluding auxiliary lookups,
   including all slices when chunking is enabled), and upstream and overhead latency.
@@ -192,6 +186,16 @@ WebSocket requests with `lasso_meta: "notify"`
 receive the existing metadata frame with `cu`, `usd`, `balance_usd`, `access`
 and any `fallback`. CU/USD reflect the selected outcome; balance is the local
 post-charge estimate. Delivery never waits for settlement.
+
+`lasso_meta` timings measure work inside Lasso, including upstream calls. They
+exclude client network RTT, TCP/TLS setup, edge routing, and response delivery.
+Reuse connections with HTTP keep-alive or HTTP/2. In a production Base
+`eth_blockNumber` measurement on October 29, 2026, median client latency was
+119 ms with a fresh connection versus 42 ms reused; metadata reported 13 ms.
+
+`X-Lasso-Region` identifies the serving node on HTTP responses and WebSocket
+upgrades. Opt-in metadata includes the same `region` in body, header, and
+WebSocket notification forms. The serving region can differ from the edge POP.
 
 Report the result, serving provider, latency and request ID. For diagnostics,
 `GET /api/v1/keys/<id>` with your management token, or `GET /api/v1/keys/current`
@@ -558,7 +562,7 @@ Both transports deliver the same pages. To read one:
 | 403 | `not_entitled` | An allowlisted account with Streams access |
 | 404 | `chain_not_served` | A chain supported by Streams |
 | 409 | `resync_required` | Rebuild this source from your own start block; this is not a transient upstream failure |
-| 429 | `too_many_readers`, `rate_limit_exceeded` | Back off, honoring `Retry-After` when present; close extra readers |
+| 429 | `too_many_readers`, `rate_limit_exceeded` | Back off, honoring `Retry-After`; close extra readers for the per-key limit. Reason `node_capacity` means the node reached 300 in-flight Streams requests; retry after 5 seconds |
 | 503 | `chain_unavailable` | Retry the same `from` after `Retry-After` (always 1–30 s) |
 
 `through`, `safe` and `finalized` identify blocks by number and hash; marks may
@@ -749,8 +753,13 @@ when `from=latest` meets a cold chain). The action is always the same: retry the
 same `from` after `Retry-After`. Refusals carry no items and never move your
 position.
 
-A key has at most 10 concurrent readers (`429 too_many_readers`) and 2 concurrent
-history builds. Account request-rate limits and key revocation also apply.
+A key has at most 10 concurrent readers (`429 too_many_readers`). An account
+can read 10 distinct streams at once, including live tip reads.
+A stream is one key, chain, source and filter; its slot frees 60 seconds after its last read.
+The node holds at most 16 distinct streams. These stream limits return `429 rate_limit_exceeded`
+with reason `busy`. The node also caps in-flight Streams requests at 300.
+At that cap, `429 too_many_readers` has reason `node_capacity` and `Retry-After: 5`;
+retry after five seconds. Account request-rate limits and key revocation also apply.
 Delivery costs **$0.10 per million events**, with a **$0.10 minimum per account
 per active UTC day**, charged from the same USD balance as RPC. Live, history,
 replay and reorg correction items count; each block header is one event. A page
@@ -760,6 +769,13 @@ activate a day. The dashboard Test reader delivers through the public key
 endpoint and is billed like every reader.
 The beta does not offer free interactive reads. Pro included usage
 does not pay for Streams. `/agent.json` publishes the versioned UTC-day tariff.
+
+### Streams billing delivery boundary
+
+Streams bills complete pages successfully written to the connection by the
+server, not client acknowledgments. A fully written SSE frame can be billable
+even if a disconnect prevents the client from consuming it. Truncated or failed
+page writes are free; successful replay deliveries bill again.
 
 ### Saved streams and usage
 
@@ -838,10 +854,10 @@ Streams read errors use the shapes in [Errors and funding](#errors-and-funding).
 |---|---|
 | 402 `balance_exhausted` | POST to `error.data.credit_url` to credit the account, or subscribe |
 | 403 `forbidden` on RPC | The key is scoped; use a profile `next_action` lists |
-| 404 `unknown_profile` | Use a profile `next_action` lists |
+| 404 `unknown_profile` | Use `public`, `premium` or a slug from `GET /api/v1/profiles` |
 | 401 `key_revoked` | The key was revoked or rotated past its overlap; use the current key |
 | 422 `rpc_route_required` | Add `/<chain>` or `/<strategy>/<chain>` to the URL |
-| 422 `unknown_chain`, `unknown_strategy` | Use a value from `/agent.json` (`ethereum`, not `mainnet`) |
+| 400 `unknown_chain`, `unknown_strategy` on RPC | Use a value from `/agent.json` (`ethereum`, not `mainnet`) |
 | `-32602` `log_range_limit`, or `timeout` on `eth_getLogs` | Narrow the `eth_getLogs` block range |
 | `-32602` `log_filter_refused` on `eth_getLogs` | Add an address filter |
 | `custom_access_required` | Buy Custom access or have the owner subscribe |
@@ -881,21 +897,3 @@ management routes answer gone (HTTP 410) with a `next_action` naming the
 - Open-source routing core (Apache-2.0): https://github.com/jaxernst/lasso-rpc
 
 Lasso Cloud is the managed service on lasso.sh; the routing core is open source.
-
-### Streams billing delivery boundary
-
-Streams bills complete pages successfully written to the connection by the
-server, not client acknowledgments. A fully written SSE frame can be billable
-even if a disconnect prevents the client from consuming it. Truncated or failed
-page writes are free; successful replay deliveries bill again.
-
-
-`lasso_meta` timings measure work inside Lasso, including upstream calls. They
-exclude client network RTT, TCP/TLS setup, edge routing, and response delivery.
-Reuse connections with HTTP keep-alive or HTTP/2. In a production Base
-`eth_blockNumber` measurement on October 29, 2026, median client latency was
-119 ms with a fresh connection versus 42 ms reused; metadata reported 13 ms.
-
-`X-Lasso-Region` identifies the serving node on HTTP responses and WebSocket
-upgrades. Opt-in metadata includes the same `region` in body, header, and
-WebSocket notification forms. The serving region can differ from the edge POP.

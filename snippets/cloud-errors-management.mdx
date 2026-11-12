@@ -7,7 +7,7 @@
 | `payment_invalid` | 402 | Repeat the request without payment for a fresh challenge, sign it, and send the same body with the signature. |
 | `payment_required` | 402 | Sign one challenge with an x402 or MPP client and repeat this request with PAYMENT-SIGNATURE or Authorization: Payment. |
 | `custom_access_required` | 403 | Buy access with POST /api/v1/accounts/current/custom-access or subscribe. |
-| `forbidden` | 403 | Request claim links with an unrestricted agent's management token; a key created before agents existed can use its own RPC key. |
+| `forbidden` | 403 | Use an unrestricted agent's management token. An RPC key reads only /api/v1/accounts/current and /api/v1/keys/current; a key created before agents existed can also request its claim link. |
 | `not_in_beta` | 403 | Request access to the Streams beta. |
 | `not_found` | 404 | Check the resource ID and credential scope. |
 | `unknown_profile` | 404 | Use a profile listed by GET /api/v1/profiles. |
