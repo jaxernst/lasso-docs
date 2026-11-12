@@ -9,6 +9,42 @@ explains it. To check what's serving right now, read `source_sha` from
 [`/api/health`](https://lasso.sh/api/health). RPC Core releases have their own
 notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
 
+<Update label="November 12, 2026, second release" description="Release 311" tags={["Custom profiles", "Dashboard", "Billing", "Reliability"]}>
+
+- **Seven free Custom days, no card.** An account that has never had Custom
+  gets seven free days the first time it activates a profile, from the
+  dashboard or with `PUT /api/v1/profiles/{slug}`. There's no Checkout step.
+  The dashboard shows when the trial ends, and the agent API returns
+  `trial_ends_at`. Subscribe from the trial pill, the profile panel or the
+  account page.
+  [Custom profiles](/cloud/custom-profiles#limits)
+- **A lapsed Custom profile says so.** When a trial, grant or ended
+  subscription runs out, requests to that profile's URL return HTTP 402
+  `custom_access_expired`, with a `next_action` that says how to buy Custom.
+  Before, they were served and charged as `premium`. Your profile and
+  its configuration are kept, and buying Custom puts it back on your
+  providers. A subscription whose payment is past due still serves as
+  `premium`, marked `x-lasso-fallback: profile`, while Stripe retries.
+  [Keys and profiles](/cloud/keys-and-profiles#how-a-profile-segment-resolves)
+- **Checkout works for every new account.** Subscribing to Custom from the
+  dashboard no longer fails with "Stripe rejected the request" for accounts
+  created at sign-up.
+- **Trial links work right after sign-up.** A person who signs up from a Custom
+  trial link can accept it straight away, without visiting the dashboard
+  first.
+- **The editor names a provider's credential conflict.** A provider whose URL
+  carries a username and password and also has an `authorization` header or
+  API key now shows that conflict, instead of a passing check.
+- **Streams reads wait through a cold start.** A Streams read with `wait` that
+  lands on a feed that hasn't loaded yet now waits for it, instead of
+  answering `503 cold_start`.
+- **Steadier failover.** A log subscription keeps its replacement provider
+  eligible to fill a gap during failover, and HTTP failover still works after a
+  stalled WebSocket. Lasso also recognizes Arbitrum's `eth_getLogs` range
+  refusals.
+
+</Update>
+
 <Update label="November 12, 2026" description="Release 310" tags={["Custom profiles", "Dashboard", "Reliability"]}>
 
 - **Add providers from one box.** On the dashboard canvas, paste provider URLs
