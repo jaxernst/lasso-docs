@@ -253,9 +253,7 @@ Subscriptions use that complete URL. Run the app's real methods and
 block ranges through the new URL before moving traffic.
 
 A URL that ships to a browser or mobile app is public. Give it its own key
-scoped to `public`, so a copied key can't spend the balance. A key scoped to a
-Custom profile isn't safe to expose: when Custom access lapses, it is served
-and charged as `premium`.
+scoped to `public`, so a copied key can't spend the balance.
 
 ```json
 {"name":"web","allowed_profiles":["public"]}
@@ -445,9 +443,12 @@ polls and identity checks.
 1. `?dry_run=true` returns the changes and each provider's chain check without
    storing anything, and needs no Custom access.
 2. Holding a profile needs Custom access. An account that has never had Custom
-   access gets five free days when it saves its first profile;
-   `GET /api/v1/accounts/<id>` shows when they end under `subscriptions`.
-   Otherwise, buy days with the same 402 exchange as a top-up: `POST /api/v1/accounts/<id>/custom-access` with
+   access gets seven free days, with no payment, when it saves its first profile;
+   the `PUT` and `GET` responses' `trial_ends_at` says when they end. After that,
+   requests to the profile return 402 `custom_access_expired`, whose `next_action`
+   says how to pay. The configuration is kept, and the profile serves again once the
+   account has Custom.
+   To keep it, or after the free days, buy days with the same 402 exchange as a top-up: `POST /api/v1/accounts/<id>/custom-access` with
    `{"days":7}`, at `account_payments.custom_access.day_usd` in `/agent.json`.
    A signed offer keeps its price even if the tariff changes.
 3. The same `PUT` without `dry_run` stores it. `provider_check_failed` names a
@@ -485,8 +486,8 @@ gets a post-error hash lookup.
 Core. A provider with `heads: standby` returns 422 `invalid_config` with its field
 path because the target Core YAML cannot represent elected fallback; the stored
 profile is unchanged. Chain-level `transactions` policies are included in the Core YAML export. `DELETE` removes it; URLs naming it then serve as `premium`. When Custom
-access lapses, the profile is kept and its URLs serve from `premium`, charged
-at request prices, until renewed.
+access lapses, the profile is kept and its URLs return 402
+`custom_access_expired` until access is renewed.
 
 ## Streams: ordered contract events (allowlisted beta)
 
