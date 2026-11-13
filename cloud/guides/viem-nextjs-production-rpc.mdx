@@ -1,0 +1,79 @@
+---
+title: "Production RPC for a viem and Next.js app on Ethereum and Base"
+description: "Replace viem's default public RPC URLs with one Lasso endpoint per chain before launch, wire it into env config, and estimate the monthly cost."
+---
+
+# Production RPC for a viem and Next.js app on Ethereum and Base
+
+viem's chain configs ship with public RPC URLs. They rate limit, they come from one provider each, and they are not meant for production traffic. Before launch, give each chain an endpoint that routes across several providers and keeps answering when one of them doesn't.
+
+Lasso gives you that as one standard JSON-RPC URL per chain. The app keeps plain viem; nothing else changes.
+
+## 1. Get a key
+
+```bash
+curl -fsS https://lasso.sh/api/v1/keys \
+  -H 'content-type: application/json' -d '{"name":"vault-dashboard"}'
+```
+
+The response holds `key`, `rpc_url_template`, a `management_token` and a `claim_url`. There is no signup: open `claim_url` within 24 hours to attach the account to your login, and every URL keeps working. Store the key and token in your secret store, not in the repo.
+
+`rpc_url_template` contains `{chain}`. Replace it with `ethereum` and `base`. These URLs use `balanced-fast`, the Premium default for user-facing reads: it spreads traffic across providers, favoring the recently fast ones.
+
+## 2. Wire it into env config
+
+The URL carries the key, so keep it server-side: no `NEXT_PUBLIC_` prefix.
+
+```bash
+# .env.production
+LASSO_RPC_URL_ETHEREUM=<rpc_url_template with {chain} = ethereum>
+LASSO_RPC_URL_BASE=<rpc_url_template with {chain} = base>
+```
+
+```ts
+// lib/clients.ts (server only)
+import { createPublicClient, http } from "viem";
+import { base, mainnet } from "viem/chains";
+
+export const ethereumClient = createPublicClient({
+  chain: mainnet,
+  transport: http(process.env.LASSO_RPC_URL_ETHEREUM),
+});
+
+export const baseClient = createPublicClient({
+  chain: base,
+  transport: http(process.env.LASSO_RPC_URL_BASE),
+});
+```
+
+Use these clients in server components and route handlers. Browser code calls your route handlers instead of RPC directly, so the key never ships in the bundle.
+
+## 3. What it does behind the URL
+
+- Routes every request across several providers per chain, chosen by latency and health that Lasso measures live in each region.
+- Moves a replay-safe read to the next provider within the same request when one fails or rate limits.
+- Resends a signed transaction as the same bytes to the next provider, and returns the hash if the transaction turns out to be pending or mined.
+- Reports which provider served a request when you add `?include_meta=body`.
+
+When you want your own provider accounts or nodes in the mix, a Custom profile lists providers per chain in preference order, under the same key and a new path segment.
+
+## 4. Estimate the cost
+
+Each method has a flat compute-unit (CU) rate at $0.000005 per CU, multiplied by the strategy: load-balanced 1×, balanced-fast 1.5×, fastest 2×. `eth_call` is 3 CU.
+
+| 2M `eth_call` a month | CU | From a balance | On Pro |
+| --- | --- | --- | --- |
+| load-balanced | 6M | $30 | inside Pro's 10M included CU, $20 a month |
+| balanced-fast | 9M | $45 | inside Pro's 10M included CU, $20 a month |
+
+A new key starts with a $0.025 balance. To fund it, subscribe to Pro from the dashboard after claiming, or add credit with `POST /api/v1/accounts/<id>/credit`, which any x402 or MPP client can pay. Other methods have their own rates; every method's price per strategy is in [agent.json](https://lasso.sh/agent.json). A paid account keeps serving on public providers for 30 days if its balance runs out, so the app doesn't go dark on an empty balance.
+
+## 5. Check it
+
+```bash
+curl -fsS "$LASSO_RPC_URL_BASE?include_meta=body" \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
+```
+
+`lasso_meta.selected_provider` names the provider that answered, and `upstream_latency_ms` its latency.

@@ -100,6 +100,8 @@
             "pages": [
               "cloud/guides/rpc-outages-and-rate-limits",
               "cloud/guides/production-rpc-with-an-agent",
+              "cloud/guides/viem-nextjs-production-rpc",
+              "cloud/guides/getlogs-rate-limits-pay-with-x402",
               "cloud/bring-your-own-rpc",
               "cloud/indexer-backfills",
               "cloud/guides/rotate-a-key"
