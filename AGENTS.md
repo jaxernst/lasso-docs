@@ -43,6 +43,13 @@
 - Use sentence case for headings
 - Bold for UI elements: Click **Settings**
 - Code formatting for file names, commands, paths, and code references
+- Say what Lasso does and how to use it, not what it doesn't support. Describe
+  the behavior a reader meets and the action to take, for example "a range
+  wider than the providers accept returns `log_range_limit` with
+  `max_block_range`; split to that size".
+- Skip defensive hedges such as "not a guarantee" or "not a benchmark". State
+  limits as numbers and actions.
+- Document a feature only once it is live on lasso.sh.
 
 ## Content boundaries
 

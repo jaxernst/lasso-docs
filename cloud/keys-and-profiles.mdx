@@ -69,7 +69,8 @@ Content-Type: application/json
 Its `rpc_url_template` ends in `/profile/public/{chain}`. A scoped key that names another
 profile, or a URL without a profile segment when `premium` isn't allowed, gets
 `forbidden`, listing what it can use. A key scoped to a Custom profile isn't
-safe to expose: if Custom access lapses, it's served and charged as `premium`.
+safe to expose: it serves your providers to whoever holds it, and while a
+Stripe subscription is past due it's served and charged as `premium`.
 `PATCH /api/v1/keys/{id}` changes a key's scope.
 
 ## How a profile segment resolves
@@ -80,7 +81,9 @@ safe to expose: if Custom access lapses, it's served and charged as `premium`.
 | A profile the key is allowed | That profile |
 | A profile outside a scoped key's allowed set | 403 `forbidden`, naming the allowed profiles |
 | A slug the account has never had | 404 `unknown_profile`, listing the account's profiles |
-| A Custom profile that was deleted, or whose Custom access lapsed | Served as `premium`, with `x-lasso-fallback: profile` |
+| A Custom profile that was deleted | Served as `premium`, with `x-lasso-fallback: profile` |
+| A Custom profile whose Custom access lapsed | 402 `custom_access_expired`, with a `next_action` that says how to buy Custom |
+| A Custom profile whose Stripe subscription is past due | Served as `premium`, with `x-lasso-fallback: profile` |
 
 Whether `premium` is served by premium providers depends on the account's
 payment state, not the URL. See

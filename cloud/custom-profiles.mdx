@@ -22,8 +22,8 @@ Content-Type: application/json
 ```
 
 The dry run checks every new provider, changes nothing, and needs no Custom
-access. Saving needs Custom access: an account that has never had it gets five
-free days on its first saved profile; otherwise subscribe, or buy days with a
+access. Saving needs Custom access: an account that has never had it gets seven
+free days on its first saved profile, with no payment; otherwise subscribe, or buy days with a
 wallet ([trial your own providers](/cloud/bring-your-own-rpc)). Then repeat
 the `PUT` without `dry_run` and call it:
 
@@ -198,13 +198,16 @@ instead; it works without protection.
 ## Limits
 
 - Holding a Custom profile needs Custom access; a dry run doesn't. An account
-  that has never had Custom access gets five free days on its first saved
-  profile; provisional accounts can also buy Custom access with a wallet. See
+  that has never had Custom access gets seven free days on its first saved
+  profile, and `trial_ends_at` on the profile says when they end; provisional accounts can also buy Custom access with a wallet. See
   [trial your own providers](/cloud/bring-your-own-rpc).
 - An account holds up to five Custom profiles.
-- If Custom access lapses, the profile is kept and its URLs are served as
-  `premium` until you renew. Open WebSocket connections on it close with
-  `custom_access_expired`.
+- If Custom access lapses, the profile is kept and its URLs return HTTP 402
+  `custom_access_expired` until you renew; its `next_action` says how to buy
+  Custom. Nothing is served or charged as `premium`. Open WebSocket connections
+  on it close with `custom_access_expired`, and reconnects get the same refusal.
+  A Stripe subscription whose payment is past due still serves as `premium`,
+  marked `x-lasso-fallback: profile`, while Stripe retries the payment.
 - `block_protection` holds per Lasso server.
 - Onboarding checks chain identity only. Test your exact archive queries
   through the profile.

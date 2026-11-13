@@ -1,0 +1,62 @@
+---
+title: "eth_getLogs failing with 429 or \"block range too large\": pay with x402, no signup"
+description: "Finish an eth_getLogs scan today: buy a funded Lasso key in one paid request over x402 or MPP, point the script at it, and split ranges on Lasso's standard range error."
+---
+
+# eth_getLogs failing with 429 or "block range too large": pay with x402, no signup
+
+A free public RPC fails a log scan in two ways: `429 Too Many Requests` once you go faster than its shared limit, and "block range too large" once a query spans more blocks than that one provider accepts.
+
+The fix that finishes today: point the script at an endpoint that spreads requests across several providers, with a rate limit of your own, and split ranges when it tells you to. Lasso sells that endpoint for a few cents over x402 or MPP, with no account to create.
+
+## 1. Buy a funded key in one paid request
+
+```bash
+curl -i -X POST https://lasso.sh/api/v1/credit \
+  -H 'content-type: application/json' -d '{"usd":"1"}'
+```
+
+The first response is `402 Payment Required`, with an x402 challenge in `PAYMENT-REQUIRED` and an MPP challenge in `WWW-Authenticate`. Pay it with any x402 client (USDC on Base) or MPP client (Tempo) by repeating the same request with the signed payment. One purchase buys $0.05 to $100.
+
+The paid response returns `key.rpc_url_template`. Replace `{chain}` with `load-balanced/ethereum`, the strategy meant for bulk reads, and keep the URL secret: it carries the key. Resubmitting the same signed payment shows the same key again, so a lost response loses nothing.
+
+## 2. Point the script at it
+
+```bash
+export RPC_URL='<rpc_url_template with {chain} = load-balanced/ethereum>'
+```
+
+A funded key gets its own rate limit of 100 requests per second, with bursts to 200, instead of a public endpoint's shared one. Lasso routes each request across several Ethereum providers by measured latency and health, and moves a failed or rate-limited read to the next provider within the same request.
+
+## 3. Split ranges on Lasso's range error
+
+Each provider caps how many blocks one `eth_getLogs` may span, and Lasso learns those caps from live traffic. When a range is still too large, Lasso answers with a standard JSON-RPC error your loop can act on:
+
+- `code: -32602`, `error.data.code: "log_range_limit"`;
+- `error.data.max_block_range` with a size that fits, or `null` when unknown.
+
+```ts
+async function getLogs(from: bigint, to: bigint, filter: object): Promise<unknown[]> {
+  const res = await fetch(process.env.RPC_URL!, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0", id: 1, method: "eth_getLogs",
+      params: [{ ...filter, fromBlock: `0x${from.toString(16)}`, toBlock: `0x${to.toString(16)}` }],
+    }),
+  });
+  const body = await res.json();
+  if (!body.error) return body.result;
+  if (body.error.data?.code !== "log_range_limit" || from === to) throw new Error(body.error.message);
+
+  const fits = body.error.data.max_block_range;
+  const mid = fits && BigInt(fits) <= to - from ? from + BigInt(fits) - 1n : from + (to - from) / 2n;
+  return [...(await getLogs(from, mid, filter)), ...(await getLogs(mid + 1n, to, filter))];
+}
+```
+
+Add an `address` to the filter when you can: when every provider refuses an address-less query, Lasso reports `log_filter_refused`. Each successful response is one provider's answer; if you need every log, reconcile against a second source.
+
+## 4. What it costs
+
+`eth_getLogs` is $0.000075 a call on load-balanced. $1 covers about 13,000 calls. An address-less query that every provider refuses is free. If the balance runs out mid-scan, the error carries `error.data.credit_url`; pay it the same way to top up, and the key keeps working.

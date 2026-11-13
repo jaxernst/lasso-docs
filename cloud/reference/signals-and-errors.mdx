@@ -38,7 +38,7 @@ to use these signals together, read [routing evidence](/cloud/observability).
 |---|---|
 | `payment` | The account's paid spending ran out within its grace window; served on public providers, uncharged |
 | `free` | Served on public providers under the account's free monthly allowance |
-| `profile` | The named Custom profile was deleted or its Custom access lapsed; served as `premium` |
+| `profile` | The named Custom profile was deleted, or its Stripe subscription is past due; served as `premium` |
 
 ## `lasso_meta`
 
@@ -116,7 +116,7 @@ receipt before signing a new one. See
 | Close reason | Cause | Fix |
 |---|---|---|
 | `balance_exhausted` | The account stopped being served | Credit the account, then reconnect |
-| `custom_access_expired` | Custom access lapsed on this profile | Reconnect; the managed pool serves you until access is renewed |
+| `custom_access_expired` | Custom access lapsed on this profile | Renew Custom access; reconnects are refused with the same reason until then |
 | Code 1011 | Subscription recovery after a provider failure exceeded its bounds | Reconnect and resubscribe |
 | Code 1012 | The node serving you is restarting | Reconnect and resubscribe; another node serves you |
 
