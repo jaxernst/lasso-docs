@@ -9,6 +9,34 @@ explains it. To check what's serving right now, read `source_sha` from
 [`/api/health`](https://lasso.sh/api/health). RPC Core releases have their own
 notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
 
+<Update label="November 14, 2026" description="Release 312" tags={["Custom profiles", "Dashboard", "Pricing", "Accounts"]}>
+
+- **Test a Custom endpoint as soon as it's live.** After you activate a Custom
+  profile, its overview lists each chain's endpoint with a copy button and
+  **Send test request**. One click sends `eth_blockNumber` from your browser
+  and shows the round-trip time and the provider that answered.
+  [Custom profiles](/cloud/custom-profiles)
+- **One Custom payment activates every waiting profile.** Starting Checkout
+  from a profile or from Subscribe opens the same Custom subscription. Once
+  it's paid, every profile waiting on it activates, up to your plan's profile
+  limit. A profile past the limit stays pending, and the agent API answers
+  `409 profile_limit`.
+  [Custom profiles](/cloud/custom-profiles#limits)
+- **See a month's price before you start.** The pricing page and `llms.txt`
+  work through one month of Premium: 2M `eth_call` requests on load balanced
+  use 6M CU, which costs $30 from a balance. `llms.txt` also opens its funding
+  step with the no-account path: `POST /api/v1/credit` returns a funded key
+  for $0.05 or more, paid with any x402 or MPP client.
+  [Serving access and pricing](/cloud/serving-access-and-pricing)
+- **Unused provisional accounts close after 24 hours.** A provisional account
+  that nothing has used closes 24 hours after it was created. Sending a
+  request, funding it, saving a Custom profile or holding an unexpired claim
+  link keeps it open. A closed account's key answers `401 account_closed`;
+  create a new one with `POST /api/v1/keys`.
+  [Accounts and agents](/cloud/accounts-and-agents#limits)
+
+</Update>
+
 <Update label="November 12, 2026, second release" description="Release 311" tags={["Custom profiles", "Dashboard", "Billing", "Reliability"]}>
 
 - **Seven free Custom days, no card.** An account that has never had Custom

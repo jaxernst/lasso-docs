@@ -113,6 +113,11 @@ and any admin can revoke any agent.
   revoked or restricted before confirmation claims nothing.
 - If an agent loses its token, the account's keys keep serving, and Lasso
   support can recover the account.
+- A provisional account that nothing has used closes 24 hours after it was
+  created. An account is in use once it has sent a request, been funded, saved
+  a Custom profile or issued a claim link that hasn't expired. A closed
+  account's key answers `401 account_closed`; create a new one with
+  `POST /api/v1/keys`.
 
 ## Next
 
