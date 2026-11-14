@@ -92,8 +92,13 @@ to the account: never sum the repeated `days` charges across saved recipes.
 ## Limits
 
 At most 100 saved recipes per account; exceeding the cap returns
-`409 stream_limit`. Read limits are 10 concurrent readers and two history builds
-per key. Page boundaries are at most 10,000 whole blocks, targeting 1 MiB of items
+`409 stream_limit`. A key admits 10 concurrent readers (`429 too_many_readers`).
+An account can read 10 distinct streams at once, including live tip reads; a
+stream is one key, chain, source and filter, and its slot frees 60 seconds
+after its last read — exceeding it returns `429 rate_limit_exceeded` with
+reason `busy`. The node also caps in-flight Streams requests at 300; at that
+cap, `429 too_many_readers` carries reason `node_capacity` and `Retry-After: 5`.
+Page boundaries are at most 10,000 whole blocks, targeting 1 MiB of items
 with a 4 MiB ceiling; a larger single block is served alone or returns 503.
 
 ## Next

@@ -12,27 +12,25 @@ your request or to that provider, and acts on that.
 
 If the request itself is wrong, such as invalid parameters, a malformed
 envelope or a reverted contract call, every provider would give the same answer.
-Lasso returns the error to you as-is.
-
-A provider can be wrong about that. When one says a read that is safe to repeat
-had invalid parameters or was malformed, Lasso asks one other provider before
-returning the error. If that provider answers, you get its result; otherwise
-you get the original error. Reverted calls and signed transactions are never
-re-sent this way.
+Lasso returns the error to you as-is and doesn't try other providers.
 
 ## Errors caused by the provider
 
 If the provider is the problem, such as being rate limited, missing the data,
 not supporting the method, rejecting the range, timing out or failing
 internally, Lasso tries the next provider. This applies to reads that are safe
-to repeat. A signed transaction goes to up to three providers in turn, and only
-provider faults move it on; a sender fault such as nonce too low or insufficient
-funds stops at the first and is returned to you.
+to repeat. A signed transaction goes to the next provider, within an allowance
+of three sends, and only provider faults move it on; a sender fault such as
+nonce too low or insufficient funds stops at the first and is returned to you.
 
 Lasso also [learns from these errors](/concepts/provider-learning): a provider that
 keeps refusing a method, history or span is moved behind alternatives for
-matching requests. Quota exhaustion and plan refusals take the affected
-credential out of rotation until revalidation succeeds, keeping the last route.
+matching requests, keeping the last route. Plan refusals take the affected
+credential out of rotation the same way, until revalidation succeeds. A quota
+exclusion also takes the credential out of rotation until revalidation succeeds
+or about 30 minutes pass, but is never kept as a last route: if every candidate
+is quota-excluded, Lasso falls through to profile fallback or the standard
+exhaustion response below instead of sending to an excluded credential.
 
 ## When no provider can serve the request
 

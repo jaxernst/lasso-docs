@@ -54,6 +54,7 @@ other field is optional:
 | `error_interpretation` | profile | You opt in to Lasso interpreting your providers' error messages |
 | `limits`: `archival`, `logs_span`, `methods_blocked` | provider | You know a limit Lasso hasn't learned, such as your plan's log-span cap |
 | `transactions`: `{providers, fallback}` | chain | Signed transactions on this chain should only reach specific providers |
+| `enabled` | provider | You want to stop routing and background observation on a provider while keeping its settings and credentials; defaults to `true`. Omitting it on `PUT` resets it to `true` |
 
 Chains are keyed by name or decimal ID. The live field list, limits and
 workload recipes are in the
@@ -104,6 +105,15 @@ verified and `verifying` providers publishes the verified subset and its new
 settings immediately. Only a new chain with no previously verified
 configuration returns a retryable 503 (`profile_config_unavailable`) until a
 provider verifies; other chains on the same profile keep serving.
+
+Set a provider to `enabled: false` to stop routing and background observation
+on it while keeping its settings and credentials; re-enable it with
+`enabled: true`. A chain with every provider disabled stays stored with no
+route and reports `off`; RPC to it refuses with a non-retryable 400
+(`no_enabled_providers`) rather than retrying. A profile reports `partial`
+once its enabled chains are published and connectable while other chains are
+`off`, and `live` once every chain is. Only an explicit edit re-enables a
+provider; Lasso never turns one back on for you.
 
 ## Head tracking
 

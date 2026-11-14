@@ -13,7 +13,7 @@ compatibility: >
   for an enabled rail.
 metadata:
   author: Lasso
-  version: "14.5"
+  version: "14.6"
   website: https://lasso.sh
   routing_core: https://github.com/jaxernst/lasso-rpc
 ---
@@ -143,13 +143,11 @@ Custom profile coverage comes from that profile document.
 
 JSON-RPC batches accept 1–50 items. An empty batch returns Invalid Request
 (`-32600`); larger batches return `batch_too_large` with `max_batch_size: 50`.
-Rate limits count each batch item, including notifications. With
-`include_meta=body`, each routed response item carries its own `lasso_meta`;
-notifications have no response item.
-
-JSON-RPC batches accept 1–50 items. An empty batch returns Invalid Request
-(`-32600`); larger batches return `batch_too_large` with `max_batch_size: 50`.
-Rate limits count each batch item, including notifications. With
+Rate limits count each batch item, including notifications. A batch's
+`x-lasso-cu` and `x-lasso-usd` add up its successful routed results, each at
+its single-request price. Items answered without an upstream (`eth_chainId`),
+invalid items and items ending in a JSON-RPC error count zero, so a batch of
+only those reports `x-lasso-cu: 0`. With
 `include_meta=body`, each routed response item carries its own `lasso_meta`;
 notifications have no response item.
 
@@ -158,8 +156,7 @@ notifications have no response item.
   including all slices when chunking is enabled), and upstream and overhead latency.
   `fallback_profile` names the serving profile when it differs from
   `service_profile_id` and is absent otherwise.
-  `include_meta=headers` leaves the body unchanged and adds `x-lasso-meta`
-  plus `x-lasso-fallback-profile` when a routing fallback served the request.
+  `include_meta=headers` leaves the body unchanged and adds `x-lasso-meta`.
   Range refusals stay within the current profile. When chunking is enabled,
   range children also keep timeouts and provider failures within their serving
   profile. Ordinary calls, including block-hash `eth_getLogs`, can use configured
@@ -177,6 +174,11 @@ notifications have no response item.
   `x-lasso-balance-usd` and standard `RateLimit` headers.
 - `x-lasso-fallback` appears when a request was served somewhere other than
   the profile it named: `payment`, `free` or `profile`.
+- `x-lasso-fallback-profile` names the profile that answered when routing left
+  the named profile, for example Public answering a Premium request during an
+  outage; on a batch it lists every such profile, comma-separated. It appears with or without
+  `include_meta`. The request keeps the named profile's price. A provider name
+  alone does not show fallback: Premium and Public can use the same upstream.
 - `eth_chainId` can be answered without an upstream; use `eth_blockNumber` to
   show routing.
 
@@ -184,6 +186,16 @@ WebSocket requests with `lasso_meta: "notify"`
 receive the existing metadata frame with `cu`, `usd`, `balance_usd`, `access`
 and any `fallback`. CU/USD reflect the selected outcome; balance is the local
 post-charge estimate. Delivery never waits for settlement.
+
+`lasso_meta` timings measure work inside Lasso, including upstream calls. They
+exclude client network RTT, TCP/TLS setup, edge routing, and response delivery.
+Reuse connections with HTTP keep-alive or HTTP/2. In a production Base
+`eth_blockNumber` measurement on October 29, 2026, median client latency was
+119 ms with a fresh connection versus 42 ms reused; metadata reported 13 ms.
+
+`X-Lasso-Region` identifies the serving node on HTTP responses and WebSocket
+upgrades. Opt-in metadata includes the same `region` in body, header, and
+WebSocket notification forms. The serving region can differ from the edge POP.
 
 Report the result, serving provider, latency and request ID. For diagnostics,
 `GET /api/v1/keys/<id>` with your management token, or `GET /api/v1/keys/current`
@@ -241,9 +253,7 @@ Subscriptions use that complete URL. Run the app's real methods and
 block ranges through the new URL before moving traffic.
 
 A URL that ships to a browser or mobile app is public. Give it its own key
-scoped to `public`, so a copied key can't spend the balance. A key scoped to a
-Custom profile isn't safe to expose: when Custom access lapses, it is served
-and charged as `premium`.
+scoped to `public`, so a copied key can't spend the balance.
 
 ```json
 {"name":"web","allowed_profiles":["public"]}
@@ -305,8 +315,10 @@ Lasso charges only successful results. Every final JSON-RPC error is free,
 including execution reverts and provider rate-limit errors after failover.
 Subscription notification pricing is unchanged. Charges settle to the account
 in the background, normally within a minute. `x-lasso-balance-usd` is an
-estimate after this charge, so consecutive responses can differ and a balance
-can dip a few cents below zero; the next purchase repays it first.
+estimate after this charge on every access, Public included: the last settled
+balance less charges the answering server has not yet settled. Charges another
+server took appear once they settle, so consecutive responses can differ and a
+balance can dip a few cents below zero; the next purchase repays it first.
 `GET /api/v1/accounts/current` returns the settled balance.
 
 ## Hand the account to its owner
@@ -401,9 +413,19 @@ Content-Type: application/json
   "block_protection":true}}}
 ```
 
+Set a provider entry to `enabled: false` to keep its settings and credentials while stopping routing and background observations. GET includes `enabled`; PUT omission resets it to `true`. Re-enable with `enabled: true`. If all providers are disabled, the chain stays stored with no route.
+
 Start with the provider URLs and omit `limits` unless you know a provider
 policy to enforce; Lasso learns historical depth, refused methods and log-span
-limits from traffic. The dry run checks chain identity only.
+limits from traffic. Adding or changing a provider checks its chain identity.
+A wrong chain rejects the document; an endpoint that cannot answer is saved as
+verifying and stays out of routing until its chain is verified.
+
+Pasting a URL in the dashboard checks its chain identity. For unknown chains,
+the dashboard also estimates block cadence from recent blocks; document
+onboarding retains its existing defaults. A failed cadence check does not
+prevent adding a provider with the correct chain. The full capability sweep
+remains a separate manual action.
 
 Lasso tracks each provider's block height from the head reads routed through
 it and from background checks. A `ws_url` provides WebSocket capability;
@@ -421,9 +443,12 @@ polls and identity checks.
 1. `?dry_run=true` returns the changes and each provider's chain check without
    storing anything, and needs no Custom access.
 2. Holding a profile needs Custom access. An account that has never had Custom
-   access gets five free days when it saves its first profile;
-   `GET /api/v1/accounts/<id>` shows when they end under `subscriptions`.
-   Otherwise, buy days with the same 402 exchange as a top-up: `POST /api/v1/accounts/<id>/custom-access` with
+   access gets seven free days, with no payment, when it saves its first profile;
+   the `PUT` and `GET` responses' `trial_ends_at` says when they end. After that,
+   requests to the profile return 402 `custom_access_expired`, whose `next_action`
+   says how to pay. The configuration is kept, and the profile serves again once the
+   account has Custom.
+   To keep it, or after the free days, buy days with the same 402 exchange as a top-up: `POST /api/v1/accounts/<id>/custom-access` with
    `{"days":7}`, at `account_payments.custom_access.day_usd` in `/agent.json`.
    A signed offer keeps its price even if the tariff changes.
 3. The same `PUT` without `dry_run` stores it. `provider_check_failed` names a
@@ -431,14 +456,17 @@ polls and identity checks.
    saved as `verifying` and routes once a later check passes.
 4. Route the app over `https://lasso.sh/rpc/k/<key>/profile/prod-base/<strategy>/<chain>`.
    Replace the profile segment in an existing prefix rather than appending another.
-5. When all desired providers for a chain are unverified, its entire previous
-   verified configuration keeps serving, including its settings. A chain with
-   both verified and verifying providers publishes the verified subset and its
-   new settings immediately.
-   A new chain without a verified serving predecessor gets a retryable 503
-   `profile_config_unavailable` until an identity check verifies a provider.
-   For a newly created profile, honor `retry_after_seconds` and GET until `live`
-   before routing. `GET /api/v1/profiles/prod-base` shows the revision, each provider's status
+5. Poll `GET /api/v1/profiles/prod-base` while status is `activating` or
+   `verifying`: follow `status_detail` and honor `retry_after_seconds`.
+   Completion is `live` when every chain is ready, `off` when every chain is
+   intentionally off, or `partial` when its enabled chains are ready and other
+   chains are off. Stop polling on these completed states. Only an explicit
+   edit can turn a provider back on. Other states such as `failed`, `rejected`,
+   or `suspended` require action rather than activation polling.
+   RPC to an all-off chain returns non-retryable `no_enabled_providers`; turn
+   a provider on or use another chain. Pending configuration still returns
+   retryable `profile_config_unavailable`.
+   `GET /api/v1/profiles/prod-base` shows the revision, each provider's status
    and what Lasso has learned (`effect: on` changes routing; `shadow` is
    observed only). Provider URLs and header values are never returned.
 
@@ -447,7 +475,9 @@ one. Omitted `heads` in a whole replacement resets that provider to passive.
 Set `transactions: {providers: [provider_name], fallback: none}` on a chain to send
 signed transactions only to those providers; reads and subscriptions use the
 others. `fallback: read_providers` allows a second send phase over the other
-providers. While a transaction is private, ordinary providers return null for it
+providers, which normally broadcast to the public mempool. Those transaction
+providers and their builders still see each transaction, and read providers see the
+calldata of any `eth_call` or `eth_estimateGas`. While a transaction is private, ordinary providers return null for it
 and their pending nonce excludes it, so manage nonces client-side. Caller headers
 such as `X-Flashbots-Signature` are not forwarded. Only `eth_sendRawTransaction`
 gets a post-error hash lookup.
@@ -455,9 +485,9 @@ gets a post-error hash lookup.
 `Accept: application/yaml` exports compatible head policies for self-hosted Lasso RPC
 Core. A provider with `heads: standby` returns 422 `invalid_config` with its field
 path because the target Core YAML cannot represent elected fallback; the stored
-profile is unchanged. A chain with `transactions` also returns 422 at that field; Cloud's exporter does not carry transaction relay policies into self-hosted Core profiles yet. `DELETE` removes it; URLs naming it then serve as `premium`. When Custom
-access lapses, the profile is kept and its URLs serve from `premium`, charged
-at request prices, until renewed.
+profile is unchanged. Chain-level `transactions` policies are included in the Core YAML export. `DELETE` removes it; URLs naming it then serve as `premium`. When Custom
+access lapses, the profile is kept and its URLs return 402
+`custom_access_expired` until access is renewed.
 
 ## Streams: ordered contract events (allowlisted beta)
 
@@ -533,7 +563,7 @@ Both transports deliver the same pages. To read one:
 | 403 | `not_entitled` | An allowlisted account with Streams access |
 | 404 | `chain_not_served` | A chain supported by Streams |
 | 409 | `resync_required` | Rebuild this source from your own start block; this is not a transient upstream failure |
-| 429 | `too_many_readers`, `rate_limit_exceeded` | Back off, honoring `Retry-After` when present; close extra readers |
+| 429 | `too_many_readers`, `rate_limit_exceeded` | Back off, honoring `Retry-After`; close extra readers for the per-key limit. Reason `node_capacity` means the node reached 300 in-flight Streams requests; retry after 5 seconds |
 | 503 | `chain_unavailable` | Retry the same `from` after `Retry-After` (always 1–30 s) |
 
 `through`, `safe` and `finalized` identify blocks by number and hash; marks may
@@ -724,8 +754,13 @@ when `from=latest` meets a cold chain). The action is always the same: retry the
 same `from` after `Retry-After`. Refusals carry no items and never move your
 position.
 
-A key has at most 10 concurrent readers (`429 too_many_readers`) and 2 concurrent
-history builds. Account request-rate limits and key revocation also apply.
+A key has at most 10 concurrent readers (`429 too_many_readers`). An account
+can read 10 distinct streams at once, including live tip reads.
+A stream is one key, chain, source and filter; its slot frees 60 seconds after its last read.
+The node holds at most 16 distinct streams. These stream limits return `429 rate_limit_exceeded`
+with reason `busy`. The node also caps in-flight Streams requests at 300.
+At that cap, `429 too_many_readers` has reason `node_capacity` and `Retry-After: 5`;
+retry after five seconds. Account request-rate limits and key revocation also apply.
 Delivery costs **$0.10 per million events**, with a **$0.10 minimum per account
 per active UTC day**, charged from the same USD balance as RPC. Live, history,
 replay and reorg correction items count; each block header is one event. A page
@@ -735,6 +770,13 @@ activate a day. The dashboard Test reader delivers through the public key
 endpoint and is billed like every reader.
 The beta does not offer free interactive reads. Pro included usage
 does not pay for Streams. `/agent.json` publishes the versioned UTC-day tariff.
+
+### Streams billing delivery boundary
+
+Streams bills complete pages successfully written to the connection by the
+server, not client acknowledgments. A fully written SSE frame can be billable
+even if a disconnect prevents the client from consuming it. Truncated or failed
+page writes are free; successful replay deliveries bill again.
 
 ### Saved streams and usage
 
@@ -813,10 +855,10 @@ Streams read errors use the shapes in [Errors and funding](#errors-and-funding).
 |---|---|
 | 402 `balance_exhausted` | POST to `error.data.credit_url` to credit the account, or subscribe |
 | 403 `forbidden` on RPC | The key is scoped; use a profile `next_action` lists |
-| 404 `unknown_profile` | Use a profile `next_action` lists |
+| 404 `unknown_profile` | Use `public`, `premium` or a slug from `GET /api/v1/profiles` |
 | 401 `key_revoked` | The key was revoked or rotated past its overlap; use the current key |
 | 422 `rpc_route_required` | Add `/<chain>` or `/<strategy>/<chain>` to the URL |
-| 422 `unknown_chain`, `unknown_strategy` | Use a value from `/agent.json` (`ethereum`, not `mainnet`) |
+| 400 `unknown_chain`, `unknown_strategy` on RPC | Use a value from `/agent.json` (`ethereum`, not `mainnet`) |
 | `-32602` `log_range_limit`, or `timeout` on `eth_getLogs` | Narrow the `eth_getLogs` block range |
 | `-32602` `log_filter_refused` on `eth_getLogs` | Add an address filter |
 | `custom_access_required` | Buy Custom access or have the owner subscribe |
@@ -856,21 +898,3 @@ management routes answer gone (HTTP 410) with a `next_action` naming the
 - Open-source routing core (Apache-2.0): https://github.com/jaxernst/lasso-rpc
 
 Lasso Cloud is the managed service on lasso.sh; the routing core is open source.
-
-### Streams billing delivery boundary
-
-Streams bills complete pages successfully written to the connection by the
-server, not client acknowledgments. A fully written SSE frame can be billable
-even if a disconnect prevents the client from consuming it. Truncated or failed
-page writes are free; successful replay deliveries bill again.
-
-
-`lasso_meta` timings measure work inside Lasso, including upstream calls. They
-exclude client network RTT, TCP/TLS setup, edge routing, and response delivery.
-Reuse connections with HTTP keep-alive or HTTP/2. In a production Base
-`eth_blockNumber` measurement on October 29, 2026, median client latency was
-119 ms with a fresh connection versus 42 ms reused; metadata reported 13 ms.
-
-`X-Lasso-Region` identifies the serving node on HTTP responses and WebSocket
-upgrades. Opt-in metadata includes the same `region` in body, header, and
-WebSocket notification forms. The serving region can differ from the edge POP.

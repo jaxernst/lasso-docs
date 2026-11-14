@@ -18,12 +18,13 @@ curl 'http://localhost:4000/rpc/ethereum?include_meta=body' \
 
 ## What it learns
 
-| Limit | RPC Core v0.7.0 | Lasso Cloud |
+| Limit | RPC Core v0.8.0 | Lasso Cloud |
 | --- | --- | --- |
 | Method refusals | On by default; matching providers are moved behind alternatives | On for managed pools and Custom profiles |
 | Historical depth | On by default; matching providers are moved behind alternatives | On for managed pools and Custom profiles |
 | Numeric `eth_getLogs` span | On by default; matching providers are moved behind alternatives | On for managed pools and Custom profiles |
-| Quota exhaustion and plan refusals | No quota or plan-refusal exclusion | A credential is taken out of rotation until revalidation succeeds, keeping the last route |
+| Plan refusals | No plan-refusal exclusion | A credential is taken out of rotation until revalidation succeeds, keeping the last route |
+| Quota exhaustion | No quota exclusion | A credential is taken out of rotation until revalidation succeeds or about 30 minutes pass; never kept as a last route |
 
 ## How ordering stays correct
 
@@ -73,14 +74,18 @@ Prometheus exposes two node-local counters:
 
 Kinds are `method_refusal`, `historical_depth` and `span_limit`. Counters reset
 on restart. An order change does not prove that a failure was avoided. See the
-released [configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.7.0/docs/CONFIGURATION.md#learned-routing)
-and [metric contract](https://github.com/jaxernst/lasso-rpc/blob/v0.7.0/docs/PROMETHEUS.md#learned-routing-counters).
+released [configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/docs/CONFIGURATION.md#learned-routing)
+and [metric contract](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/docs/PROMETHEUS.md#learned-routing-counters).
 
 ## Control Cloud learning on a Custom profile
 
 Cloud restores its learned knowledge after restarts. Since October 29, 2026,
-quota exhaustion and plan refusals take the affected credential out of rotation
-until revalidation succeeds, while keeping the last route.
+plan refusals take the affected credential out of rotation until revalidation
+succeeds, keeping the last route. Quota exhaustion does the same but is never
+kept as a last route: once every candidate is quota-excluded, the request
+falls through to profile fallback or the standard exhaustion response instead
+of sending to an excluded credential. Quota exclusions clear on revalidation
+or after about 30 minutes.
 
 - **See it.** Inspect each provider's knowledge and source in the profile; see
   [Custom profiles](/cloud/custom-profiles#lasso-learns-your-providers).

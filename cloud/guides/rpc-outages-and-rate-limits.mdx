@@ -52,7 +52,7 @@ The strategy goes in the URL, so one app can use several. See
 | Times out or fails internally on a read | Retries the read on the next provider, within the request deadline |
 | Keeps failing | Opens its [circuit](/concepts/circuit-breakers); after a cooldown, a trial request decides whether it returns |
 | Refuses a method, history depth or `eth_getLogs` span | Tries the next provider and [learns the limit](/concepts/provider-learning), moving it behind alternatives for matching requests |
-| Exhausts its quota | Skips that credential until revalidation succeeds, keeping one last route if every candidate is excluded |
+| Exhausts its quota | Skips that credential until revalidation succeeds or about 30 minutes pass. Unlike other exclusions, a quota exclusion is never kept as a last route: if every candidate is quota-excluded, the request falls through to profile fallback or the standard exhaustion error |
 
 Lasso also moves live WebSocket `newHeads` and `logs` subscriptions to another
 provider and backfills missed blocks.
@@ -74,8 +74,8 @@ retries. See [routing evidence](/cloud/observability).
 ## Limits
 
 - Failover covers reads that are safe to repeat. `eth_sendRawTransaction` sends
-  the same signed bytes to up to three providers in turn, and a sender fault
-  such as nonce too low stops at the first. See
+  the same signed bytes to the next provider, within an allowance of three
+  sends, and a sender fault such as nonce too low stops at the first. See
   [transactions](/cloud/rpc-behavior#transactions).
 - Lasso tries a bounded number of providers. If every one fails, you get one
   JSON-RPC error inside an HTTP 200, so check the body's `error`, not only the

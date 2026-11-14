@@ -60,8 +60,13 @@ before consuming it. Failed or truncated writes are free; replay deliveries bill
 ## Limits
 
 The beta serves Ethereum (`ethereum` or `1`), Base (`base` or `8453`), and
-Arbitrum (`arbitrum` or `42161`). Each key allows 10 concurrent readers and two
-concurrent history builds. Account request-rate limits also apply.
+Arbitrum (`arbitrum` or `42161`). Each key allows 10 concurrent readers
+(`429 too_many_readers`). An account can read 10 distinct streams at once,
+including live tip reads; a stream is one key, chain, source and filter, and
+its slot frees 60 seconds after its last read. The node holds at most 16
+distinct streams and caps in-flight Streams requests at 300 — at that cap,
+`429 too_many_readers` carries reason `node_capacity` and `Retry-After: 5`.
+Account request-rate limits also apply.
 
 ## Next
 
