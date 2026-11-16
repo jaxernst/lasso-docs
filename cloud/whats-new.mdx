@@ -9,6 +9,29 @@ explains it. To check what's serving right now, read `source_sha` from
 [`/api/health`](https://lasso.sh/api/health). RPC Core releases have their own
 notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
 
+<Update label="November 16, 2026" description="Release 316" tags={["Custom profiles", "Dashboard", "Reliability", "Performance"]}>
+
+- **See all your provider evidence in one place.** Each provider's panel brings
+  together declared settings, light checks, deep checks and observations from
+  traffic. See where each finding came from, when it expires and how it affects
+  routing. Conflicting declared and observed log ranges appear side by side.
+  [Custom profiles](/cloud/custom-profiles#lasso-learns-your-providers)
+- **Know the cost before checking a provider's limits.** **Run deep check**
+  measures history depth and log range with up to eight requests per provider.
+  Run it for one provider or across a profile, then read the findings in its
+  evidence list. Fresh light-check results stay with saved providers across
+  reloads and refresh when you change their endpoints or credentials.
+  [Custom profiles](/cloud/custom-profiles#onboarding-what-lasso-checks)
+- **Keep requests moving when a provider rate-limits.** Lasso recognizes an
+  upstream HTTP 429 as a rate limit across response body formats, so it can
+  route around the busy provider and respect its retry timing.
+  [Rate limits and failover](/cloud/guides/rpc-outages-and-rate-limits)
+- **Less routing overhead per request.** Provider selection, response handling
+  and request metrics use less CPU, leaving more capacity for your RPC traffic.
+  [RPC behavior](/cloud/rpc-behavior)
+
+</Update>
+
 <Update label="November 14, 2026" description="Release 312" tags={["Custom profiles", "Dashboard", "Pricing", "Accounts"]}>
 
 - **Test a Custom endpoint as soon as it's live.** After you activate a Custom
