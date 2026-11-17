@@ -9,6 +9,32 @@ explains it. To check what's serving right now, read `source_sha` from
 [`/api/health`](https://lasso.sh/api/health). RPC Core releases have their own
 notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
 
+<Update label="November 17, 2026" description="Release 317" tags={["Custom profiles", "Dashboard", "Reliability"]}>
+
+- **Know when your Custom endpoints are ready.** The dashboard keeps
+  **Activating…** visible while it checks that your profile is ready to serve.
+  If that check is still pending, it tells you activation is still finishing.
+  When your free Custom days are used, **Subscribe & activate** now explains
+  why the next step is Checkout.
+  [Custom profiles](/cloud/custom-profiles#onboarding-what-lasso-checks)
+- **Keep providers without blocks out of your Custom routes.** A provider
+  whose light check finds no usable latest block stays out of routing, whether
+  you activate from the dashboard or the API. A later light check that reads a
+  block clears that finding so the provider can route again.
+  [Provider checks](/cloud/custom-profiles#onboarding-what-lasso-checks)
+- **Keep other traffic moving when a subscription overloads.** An overloaded
+  WebSocket subscription ends explicitly while unrelated RPC responses and
+  healthy subscriptions on the shared connection keep flowing. Reconnect and
+  resubscribe the affected client.
+  [WebSocket subscriptions](/cloud/rpc-behavior#websocket-subscriptions)
+- **Route around expired provider credentials.** Reads can now fail over when
+  an upstream HTTP 401 or 403 describes a credential refusal as an invalid
+  request or parse error. Fix the provider credential while Lasso uses an
+  eligible alternative.
+  [Rate limits and failover](/cloud/guides/rpc-outages-and-rate-limits)
+
+</Update>
+
 <Update label="November 16, 2026" description="Release 316" tags={["Custom profiles", "Dashboard", "Reliability", "Performance"]}>
 
 - **See all your provider evidence in one place.** Each provider's panel brings
