@@ -491,8 +491,7 @@ access lapses, the profile is kept and its URLs return 402
 Streams delivers ordered contract logs or block headers with reorg corrections
 from one URL. Access belongs to the account: an existing Streams entitlement or
 granted beta access authorizes its enabled RPC keys. Ordinary RPC funding does
-not grant Streams access. Public Streams sales are not open. The management
-Bearer token manages saved recipes. A saved stream is optional and
+not grant Streams access. The management Bearer token manages saved recipes. A saved stream is optional and
 holds no key or consumer position. RPC profile/strategy URL segments do not apply to Streams.
 
 ```bash
