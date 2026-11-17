@@ -11,26 +11,27 @@ notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
 
 <Update label="November 17, 2026" description="Release 317" tags={["Custom profiles", "Dashboard", "Reliability"]}>
 
-- **Know when your Custom endpoints are ready.** The dashboard keeps
-  **Activating…** visible while it checks that your profile is ready to serve.
-  If that check is still pending, it tells you activation is still finishing.
-  When your free Custom days are used, **Subscribe & activate** now explains
-  why the next step is Checkout.
+- **Your Custom endpoint routes to your providers from its first request.**
+  Activate now finishes once Lasso is serving the profile, so the URL you copy
+  goes straight to your providers. If serving takes longer than a few seconds,
+  the dashboard says **Profile activated. Publication is still finishing.**
+  When your free Custom days are used, the footer says so before
+  **Subscribe & activate** opens Checkout.
   [Custom profiles](/cloud/custom-profiles#onboarding-what-lasso-checks)
-- **Keep providers without blocks out of your Custom routes.** A provider
-  whose light check finds no usable latest block stays out of routing, whether
-  you activate from the dashboard or the API. A later light check that reads a
-  block clears that finding so the provider can route again.
+- **A provider that returns no usable block stays out of routing.** If a light
+  check reads an empty or malformed latest block, Lasso withholds that
+  provider whether you activate from the dashboard or the API. Run the light
+  check again once the endpoint recovers and it routes again.
   [Provider checks](/cloud/custom-profiles#onboarding-what-lasso-checks)
-- **Keep other traffic moving when a subscription overloads.** An overloaded
-  WebSocket subscription ends explicitly while unrelated RPC responses and
-  healthy subscriptions on the shared connection keep flowing. Reconnect and
-  resubscribe the affected client.
+- **One overloaded subscription no longer disrupts the rest.** When a
+  WebSocket subscription can't keep up, Lasso closes only that client's
+  connection, with code 1011, while other clients' subscriptions and pending
+  RPC responses keep flowing. Reconnect and resubscribe the affected client.
   [WebSocket subscriptions](/cloud/rpc-behavior#websocket-subscriptions)
-- **Route around expired provider credentials.** Reads can now fail over when
-  an upstream HTTP 401 or 403 describes a credential refusal as an invalid
-  request or parse error. Fix the provider credential while Lasso uses an
-  eligible alternative.
+- **Requests fail over when a provider refuses your key.** Some providers
+  answer a bad or expired key with HTTP 401 or 403 and a body that looks like
+  an invalid request. Lasso now reads the status, sends the request to another
+  eligible provider and counts the refusal against that provider's health.
   [Rate limits and failover](/cloud/guides/rpc-outages-and-rate-limits)
 
 </Update>

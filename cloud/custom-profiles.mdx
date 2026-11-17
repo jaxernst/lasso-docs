@@ -91,19 +91,19 @@ changed provider before storing anything. Identity-check results are:
 | `verifying` | Didn't answer; saved but kept out of routing, and rechecked every five minutes |
 | `failed` | Definitely wrong, such as another chain. The whole `PUT` is rejected with `provider_check_failed`, naming the provider |
 
-A light check that finds an empty or malformed latest block keeps that
-provider out of routing, even when its chain ID matches. The dashboard shows
-**Not routing**, and the API reports the provider as `failed`. Run a light
-check again after the endpoint recovers; a check that reads a usable latest
-block clears this finding. A deep check of history or range limits alone
-doesn't clear it.
+A matching chain ID alone doesn't make a provider routable. If a light check
+reads an empty or malformed latest block, Lasso keeps the provider out of
+routing until a later light check reads a usable one. The dashboard shows
+**Not routing** and the API reports the provider as `failed`. A deep check of
+history or log range doesn't clear it, so run the light check again once the
+endpoint recovers.
 
-In the dashboard, **Activating…** stays visible while Lasso checks that the
-profile is ready to serve. If you see **Profile activated. Publication is still
-finishing.**, read `GET /api/v1/profiles/{slug}` until it reports `live` before
-moving traffic. When your account's free Custom days are used and you need a
-subscription, the footer says **Your free days have been used.** and
-**Subscribe & activate** takes you to Checkout.
+In the dashboard, **Activating…** stays up until Lasso is serving the profile,
+so the endpoint you copy routes to your providers. If you see **Profile
+activated. Publication is still finishing.**, read `GET /api/v1/profiles/{slug}`
+until it reports `live` before moving traffic. Once your free Custom days are
+used, the footer says **Your free days have been used.** and
+**Subscribe & activate** opens Checkout.
 
 A newly created profile has no live revision yet: it reports `activating` with
 `retry_after_seconds` until its first revision is ready, and RPC on it refuses
@@ -213,7 +213,7 @@ instead; it works without protection.
   A Stripe subscription whose payment is past due still serves as `premium`,
   marked `x-lasso-fallback: profile`, while Stripe retries the payment.
 - `block_protection` holds per Lasso server.
-- Chain identity and a usable latest block do not establish archive coverage.
+- Onboarding checks confirm the chain and a current block, not history depth.
   Test your exact archive queries through the profile.
 
 ## Next
