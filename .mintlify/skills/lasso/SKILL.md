@@ -23,11 +23,12 @@ metadata:
 
 # Lasso
 
-Lasso is an aggregated EVM JSON-RPC router: one standard endpoint routes across
-providers by measured latency and health, with failover for replay-safe reads
-and per-request evidence. Custom profiles route over your own nodes and provider
-accounts. This skill covers creating, installing, funding, handing off, rotating
-and customizing that endpoint over plain HTTP.
+Lasso is an aggregated EVM JSON-RPC router. One standard endpoint routes each
+request across several providers per chain by measured latency and health,
+fails over on replay-safe reads and returns per-request routing evidence.
+Custom profiles route over your own nodes and provider accounts. This skill
+covers creating, installing, funding, handing off, rotating and customizing
+that endpoint over plain HTTP.
 
 See [plans and pricing](https://lasso.sh/pricing).
 
@@ -488,11 +489,12 @@ access lapses, the profile is kept and its URLs return 402
 
 ## Streams: ordered contract events
 
-Streams delivers ordered contract logs or block headers with reorg corrections
-from one URL. Access belongs to the account: an existing Streams entitlement or
-granted beta access authorizes its enabled RPC keys. Ordinary RPC funding does
-not grant Streams access. The management Bearer token manages saved recipes. A saved stream is optional and
-holds no key or consumer position. RPC profile/strategy URL segments do not apply to Streams.
+Streams delivers ordered contract logs or block headers from one URL, with
+reorg corrections in order. Access belongs to the account: with a Streams
+entitlement or beta access, any of its enabled RPC keys can read. Ordinary RPC
+funding does not grant Streams access. The management Bearer token manages
+saved recipes. A saved stream is optional and holds no key or consumer position.
+RPC profile/strategy URL segments do not apply to Streams.
 
 ```bash
 # Keep this credential-bearing URL in the app's secret store.
@@ -791,8 +793,8 @@ page writes are free; successful replay deliveries bill again.
 ### Saved streams and usage
 
 Use the account's management Bearer token for these JSON APIs. Profile-scoped agents cannot manage Streams; read-only agents can read.
-All these routes require account Streams access; management refusal is
-`403 not_in_beta` (the API code also covers missing Streams entitlement).
+These routes require account Streams access. An account with neither a
+Streams entitlement nor beta access gets `403 not_in_beta`.
 
 | Method | Path | Body/result |
 |---|---|---|
