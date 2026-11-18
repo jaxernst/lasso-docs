@@ -28,9 +28,12 @@ Transaction dispatch differs between the hosted service and self-hosted engine:
 ## Current reads
 
 Methods such as `eth_blockNumber`, balances, receipts and most contract calls
-fail over to another eligible provider when an error is safe to retry. Your app
-still handles ordinary reorgs, and providers can differ by a block or two at
-the head. For a latest block that never goes backwards on a Custom profile, set
+fail over to another eligible provider when an error is safe to retry. Lasso
+sends latest reads, receipt and transaction lookups by hash, and calls that
+leave out the block parameter to providers at the chain head first; a provider
+it knows is behind serves only when no fresher one can. Your app still handles
+ordinary reorgs, and providers can differ by a block or two at the head. For
+a latest block that never goes backwards on a Custom profile, set
 [block protection](/cloud/custom-profiles#block-protection). For several reads
 at the same block, use [read at one block](/advanced/read-at-one-block).
 
@@ -122,7 +125,10 @@ methods without failover; see [supported methods](/api/supported-methods).
 
 Lasso shares upstream subscriptions across your clients and moves them to
 another provider in the same profile when one fails, backfilling missed
-`newHeads` and `logs` over HTTP and suppressing duplicates. When no alternate
+`newHeads` and `logs` over HTTP and suppressing duplicates. The backfill comes
+from a provider other than the replacement when one is available, and if the
+replacement also fails mid-backfill, recovery moves to the next provider within
+the same deadline. When no alternate
 provider is configured, Lasso instead retries reconnecting to that same
 provider within the recovery deadline, rather than ending the subscription.
 Pending-transaction subscriptions aren't served. The engine's behavior is

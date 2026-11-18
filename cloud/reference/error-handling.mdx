@@ -40,7 +40,9 @@ Lasso tries a bounded number of providers. If every one fails, you get one Lasso
 error instead of whichever provider happened to answer last:
 
 - When every provider rejected an `eth_getLogs` range, `data.code` is
-  `log_range_limit` and `next_action` says to reduce the block range.
+  `log_range_limit` and `next_action` says to reduce the block range. When no
+  smaller range would fit, `data.action` is `narrow_filter` and `next_action`
+  says to narrow the address or topics filter.
 - When every provider refused an address-less `eth_getLogs` filter, `data.code`
   is `log_filter_refused` and `next_action` says to add an address filter. A mix
   of that refusal with other failures does not use this code.
