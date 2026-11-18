@@ -18,7 +18,7 @@ The full machine-readable contract is in [OpenAPI](https://lasso.sh/openapi.json
 
 | Method | Path | Items |
 |---|---|---|
-| GET | `/streams/k/{key}/{chain}/logs` | `eth_getLogs` objects plus validated-header `blockTimestamp`, without `removed` |
+| GET | `/streams/k/{key}/{chain}/logs` | `eth_getLogs` objects plus `blockTimestamp`, without `removed`. Each block's hash, timestamp and logs are bound through a validated header |
 | GET | `/streams/k/{key}/{chain}/blocks` | Block headers without transaction, uncle or withdrawal lists |
 
 | Parameter | Location | Contract |
@@ -26,7 +26,7 @@ The full machine-readable contract is in [OpenAPI](https://lasso.sh/openapi.json
 | `key` | Path | Enabled account RPC API key. Keep the URL private. |
 | `chain` | Path | `ethereum` / `1`, `base` / `8453`, `arbitrum` / `42161` in the beta. |
 | `from` | Query, required | `latest`, unsigned 64-bit decimal block number, or opaque `next` from a page. Maximum 512 characters. |
-| `wait` | Query | Integer seconds, 0 to 30, default 20. Use 0 to drain available pages. |
+| `wait` | Query | Integer seconds, 0 to 30, default 20: how long to long-poll past the tip for new blocks, capped at 25 s. Use 0 to drain available pages. |
 | `label` | Query | 1 to 100 characters; dashboard display name only. Does not affect data, billing identity or position. |
 | `address` | Query, logs only | Up to 100 comma-separated addresses, matched as alternatives. |
 | `topic0` through `topic3` | Query, logs only | Comma-separated alternatives at each position. Positions are ANDed. Omitted filters match anything. |
@@ -36,6 +36,11 @@ The full machine-readable contract is in [OpenAPI](https://lasso.sh/openapi.json
 Block headers accept no address or topic filters. `latest` includes the current
 published tip block. `cursor=` is invalid; send `next` as `from`.
 
+A read at or below the tip waits up to 25 s for Lasso to fetch those blocks
+regardless of `wait`, so set client timeouts above 30 s. A cron job draining
+with `wait=0` retries a 503 `chain_unavailable` with the same `from` after
+`Retry-After`.
+
 ## Page response
 
 Polling returns one page with status 200, never 204. SSE returns a sequence of
@@ -44,6 +49,7 @@ also sent. Quiet SSE waits after the first page have a one-second minimum.
 
 | Field | Type | Meaning |
 |---|---|---|
+| `completeness` | `"reported"` | Logs as the upstream reported them, after identity, schema and canonical checks. |
 | `from` | Integer | First block to replace in this source. |
 | `through` | Block mark or null | Last covered block: `{number, hash}`. |
 | `tip` | Integer or null | Published tip block number. |
@@ -92,8 +98,14 @@ to the account: never sum the repeated `days` charges across saved recipes.
 ## Limits
 
 At most 100 saved recipes per account; exceeding the cap returns
-`409 stream_limit`. Read limits are 10 concurrent readers and two history builds
-per key. Page boundaries are at most 10,000 whole blocks, targeting 1 MiB of items
+`409 stream_limit`. A key admits 10 concurrent readers (`429 too_many_readers`).
+An account can read 10 distinct streams at once, including live tip reads; a
+stream is one key, chain, source and filter, and its slot frees 60 seconds
+after its last read. A node holds at most 16 distinct streams. These stream
+limits return `429 rate_limit_exceeded` with reason `busy`. The node also caps
+in-flight Streams requests at 300; at that cap, `429 too_many_readers` carries
+reason `node_capacity` and `Retry-After: 5`.
+Page boundaries are at most 10,000 whole blocks, targeting 1 MiB of items
 with a 4 MiB ceiling; a larger single block is served alone or returns 503.
 
 ## Next

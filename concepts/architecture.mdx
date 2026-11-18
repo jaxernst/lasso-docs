@@ -9,7 +9,7 @@ Lasso RPC Core is an Elixir/Phoenix application. Clients use HTTP JSON-RPC or We
 
 A request resolves its profile and chain, applies transport and method policy, filters eligible providers, and selects an upstream using the requested strategy. Execution safety and a request deadline bound further attempts. A supported method is still subject to the selected provider's plan, parameters, history, and current capacity.
 
-Signed transaction submission receives one upstream dispatch. A lost response can be indeterminate; clients reconcile the transaction hash. See [Supported methods](/api/supported-methods).
+Signed transaction submission receives one upstream dispatch; with a chain's [transaction providers](/configuration/profiles#transaction-providers), a registered send goes as the same bytes to up to three of them in turn. A lost response can be indeterminate; clients reconcile the transaction hash. See [Supported methods](/api/supported-methods).
 
 ## Runtime ownership
 
