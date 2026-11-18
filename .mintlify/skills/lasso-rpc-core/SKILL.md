@@ -71,7 +71,8 @@ require an archival provider.
 ## Limits
 
 History depth, log ranges and method support depend on your upstreams. Lasso
-forwards signed transactions once and does not manage nonces or rebroadcast.
+forwards a signed transaction once, or as the same bytes to up to three of a
+chain's declared transaction providers in turn, and does not manage nonces.
 HTTP filter IDs are provider-local. WebSocket failover backfills `newHeads` and
 logs within bounds.
 

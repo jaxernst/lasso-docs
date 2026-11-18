@@ -25,14 +25,17 @@ re-sent this way.
 If the provider is the problem, such as being rate limited, missing the data,
 not supporting the method, rejecting the range, timing out or failing
 internally, Lasso tries the next provider. This applies to reads that are safe
-to repeat. A signed transaction goes to up to three providers in turn, and only
-provider faults move it on; a sender fault such as nonce too low or insufficient
-funds stops at the first and is returned to you.
+to repeat. A signed transaction goes to the next provider, within an allowance
+of three sends, and only provider faults move it on; a sender fault such as
+nonce too low or insufficient funds stops at the first and is returned to you.
 
 Lasso also [learns from these errors](/concepts/provider-learning): a provider that
 keeps refusing a method, history or span is moved behind alternatives for
-matching requests. Quota exhaustion and plan refusals take the affected
-credential out of rotation until revalidation succeeds, keeping the last route.
+matching requests, keeping the last route. A plan refusal takes the affected
+credential out of rotation until revalidation succeeds. A spent quota takes it
+out until revalidation succeeds or about 30 minutes pass, with no last route
+kept: when every provider's quota is spent, a routing fallback serves the
+request on another profile or you get the error below.
 
 ## When no provider can serve the request
 

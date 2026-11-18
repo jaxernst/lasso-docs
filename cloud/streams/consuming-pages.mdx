@@ -49,7 +49,8 @@ instead reads and commits one page at a time.
 
 Apply only complete pages. On a truncated body, incomplete SSE frame or network
 failure, discard the partial page and retry the saved position. SSE writes a
-page at least every 30 seconds; reconnect after 60 seconds of silence.
+page, or a `: pending` comment while blocks are being fetched, at least every
+30 seconds; reconnect after 60 seconds of silence.
 
 ## Handle refusals
 
@@ -61,14 +62,15 @@ page at least every 30 seconds; reconnect after 60 seconds of silence.
 | 403 | `not_entitled` | Stop; request beta access from the dashboard's Streams page. |
 | 404 | `chain_not_served` | Choose a supported chain. |
 | 409 | `resync_required` | Clear this source's rows and checkpoint together, then rebuild from your own start block. |
-| 429 | `too_many_readers`, `rate_limit_exceeded` | Close extra readers and back off; honor `Retry-After` when present. |
+| 429 | `too_many_readers`, `rate_limit_exceeded` | Close extra readers and back off, honoring `Retry-After`. Reason `node_capacity` means the node's 300 in-flight cap was hit; retry after 5 seconds. Reason `busy` means the account's 10-distinct-stream limit was hit. |
 | 503 | `chain_unavailable` | Retry the same position after `Retry-After`, always 1 to 30 seconds. |
 
 A 409 is not a transient failure. For a durable rebuild, keep a numeric start
 block; restarting from `latest` cannot reconstruct earlier materialized history.
 Refusals do not advance your position.
 
-Before the first SSE page, failures return HTTP status and JSON. After SSE has
+Before the first SSE write (a page or a `: pending` comment), failures return
+HTTP status and JSON. After SSE has
 started, failures arrive as `event: error` controls with no ID, then the connection
 closes. Controls are not pages. Retry `chain_unavailable` from your saved position,
 using `retry_after`; rebuild on `resync_required` and stop on auth or funding errors.

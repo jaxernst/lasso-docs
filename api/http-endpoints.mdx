@@ -167,8 +167,10 @@ A profile selects configuration; it does not authenticate clients or isolate ten
 
 ## Method and transport policy
 
-Core forwards supported reads and can send `eth_sendRawTransaction` to one
-upstream. It rejects `eth_subscribe` and `eth_unsubscribe` over HTTP and
+Core forwards supported reads and sends `eth_sendRawTransaction` to one
+upstream, or as the same bytes to up to three of a chain's
+[transaction providers](/configuration/profiles#transaction-providers) in turn.
+It rejects `eth_subscribe` and `eth_unsubscribe` over HTTP and
 provides a WebSocket route hint. Unknown methods and provider-local filter
 methods have separate dispatch and affinity limits. See the released
 [supported-methods contract](/api/supported-methods) for the complete method
