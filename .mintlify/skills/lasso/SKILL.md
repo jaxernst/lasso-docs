@@ -163,8 +163,10 @@ notifications have no response item.
   capability and outage fallback; Premium can fall back to Public.
 - Each `eth_getLogs` call is served by one provider. When a block range is
   wider than the serving providers accept, Lasso returns `log_range_limit` with
-  `error.data.max_block_range`; split the range into parts of that size, or
-  halve it when the value is null, and send each part.
+  `error.data.max_block_range`; split the range into parts of that size and
+  send each part. When the field is null or absent, halve the range. When
+  `error.data.action` is `narrow_filter`, Lasso has no smaller range to
+  suggest, so narrow the address or topics filter instead.
 - Every response carries `x-lasso-request-id`; quote it when reporting a
   problem. Served requests add `x-lasso-access` (`premium`, `public` or
   `custom`), `x-lasso-cu`, `x-lasso-usd` (this request's charge),
