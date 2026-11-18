@@ -18,6 +18,30 @@ MIX_ENV=prod mix release
 
 Or build a Docker image using the included `Dockerfile`.
 
+### Launching a native release
+
+A release reads profiles from `$LASSO_DATA_DIR/config/profiles` and writes
+benchmark snapshots to `$LASSO_DATA_DIR/benchmark_snapshots`. From the source
+checkout:
+
+```bash
+export LASSO_DATA_DIR="$HOME/lasso-data"
+mkdir -p "$LASSO_DATA_DIR/config/profiles" "$LASSO_DATA_DIR/benchmark_snapshots"
+cp config/profiles/*.yml "$LASSO_DATA_DIR/config/profiles/"
+
+export SECRET_KEY_BASE="$(openssl rand -base64 64)"
+export PHX_HOST="rpc.example.com"
+export LASSO_NODE_ID="node-1"
+
+_build/prod/rel/lasso/bin/lasso start
+```
+
+`LASSO_PROFILES_DIR` and `LASSO_SNAPSHOTS_DIR` override either path. To run the
+release on another machine, copy the whole `_build/prod/rel/lasso` directory and
+your profile files, set the same variables there, and keep `SECRET_KEY_BASE` the
+same across restarts. The runtime user needs read access to the profiles and
+write access to the snapshots directory.
+
 ### Production environment variables
 
 | Variable | Description |
@@ -60,6 +84,8 @@ upstream-backed RPC check for your actual method and provider pool.
 
 Lasso serves HTTP. Terminate TLS at your reverse proxy or load balancer. Set `PHX_HOST` to your public hostname. Production URL generation defaults to HTTPS; set `PHX_SCHEME=http` when serving locally without a TLS proxy.
 
+Put a reverse proxy that speaks HTTP/1.1 to Lasso in front of any public node. Cowboy has no release yet that fixes [EEF-CVE-2026-115701](https://osv.dev/vulnerability/EEF-CVE-2026-115701) (HTTP/1.1 pipelining) or [EEF-CVE-2026-113431](https://osv.dev/vulnerability/EEF-CVE-2026-113431) (HTTP/2 headers in Cowlib), and both can exhaust a directly exposed node's memory. The [Caddy](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/deployment/proxy/Caddyfile) and [nginx](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/deployment/proxy/nginx.conf) examples in the repository do this.
+
 ---
 
 ## Production Checklist
@@ -73,7 +99,7 @@ Lasso serves HTTP. Terminate TLS at your reverse proxy or load balancer. Set `PH
 - [ ] Health check (`GET /api/health`) monitored by orchestrator
 - [ ] Profile YAML validated with `bin/lasso check-config` before `bin/lasso reload`; unresolved `${ENV_VAR}` prevents readiness at cold start
 - [ ] Client request limits enforced at the reverse proxy; profile rate settings only configure the dashboard tester
-- [ ] TLS terminated at reverse proxy / load balancer
+- [ ] TLS terminated at reverse proxy / load balancer, and the proxy speaks HTTP/1.1 to Lasso
 - [ ] Console log drain configured; set `LOG_FORMAT=json` if your collector requires JSON
 - [ ] Each node's `GET /metrics` scrape restricted to the collector and labeled by instance
 - [ ] RPC and dashboard protected by reverse-proxy authentication or a private network boundary (Lasso OSS has no built-in client authentication)

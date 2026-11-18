@@ -3,42 +3,10 @@ title: Profile configuration
 description: Every field of an RPC Core profile file, from metadata to chain monitoring, selection and WebSocket settings.
 ---
 
-## Profile File Structure
-
-```yaml
-# config/profiles/<slug>.yml
-
-# --- Frontmatter (YAML document separator) ---
----
-name: "My Profile"           # Display name
-slug: "my-profile"           # URL identifier (used in /rpc/profile/:slug/...)
-rps_limit: 100               # Dashboard tester maximum RPS
-burst_limit: 500             # Metadata; not enforced by OSS
----
-
-# --- Body: Chain configurations ---
-chains:
-  ethereum:
-    chain_id: 1
-    providers:
-      - id: "my_provider"
-        url: "https://..."
-```
-
-**Frontmatter fields:**
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | Yes | Human-readable profile name |
-| `slug` | string | Yes | URL-safe identifier. Must be unique across profiles |
-| `rps_limit` | integer | No | Maximum RPS offered by dashboard tester controls (default: 100) |
-| `burst_limit` | integer | No | Profile metadata (default: 500); no OSS ingress enforcement |
-
-OSS does not authenticate clients or enforce per-client request quotas. Configure authentication and inbound rate limiting at your reverse proxy. Provider quota and circuit-breaker backoff are separate routing controls.
-
-Unknown YAML fields and invalid types are rejected. Use booleans (`false`), not quoted strings (`"false"`). A failed reload keeps the previous active configuration. Errors identify the field without printing credential values.
-
-Profile slugs must match their `.yml` filenames. Files beginning with `_` or `.` are skipped. Keep a `public.yml` profile: routes without a profile use `public`, and it is required at startup. `unlisted: true` hides a profile from the selector; its endpoints remain accessible.
+Each profile file has frontmatter (`name`, `slug`, dashboard tester limits) and
+a `chains` body. [Configuration overview](/configuration/overview) shows the file
+layout, the frontmatter fields and how validation reports errors. This page
+covers the chain settings.
 
 ## Chain Configuration
 
@@ -81,7 +49,7 @@ chains:
 |-------|------|----------|-------------|
 | `chain_id` | integer | Yes | EIP-155 chain ID |
 | `name` | string | No | Display name (defaults to chain key) |
-| `block_time_ms` | integer | No | Average block time in milliseconds. Used for optimistic lag calculation and the continuity freshness bound |
+| `block_time_ms` | integer | No | Average block time in milliseconds. Sets the profile-head reference window for lag checks, default observation intervals and the continuity freshness bound |
 | `head_policy` | string | No | `off` (default), `local` (one process), or `global` (enrolled fleet). Global mode requires the [publication journal and fleet setup](/deployment/block-continuity) |
 | `transactions` | object | No | `{providers: [provider_id], fallback: none}` restricts signed-transaction sends on this chain to the named providers; reads, subscriptions and block recovery keep using the rest. Added in v0.8.0 |
 
@@ -127,8 +95,8 @@ send, the request fails rather than reaching a read provider. Set `fallback`
 to `read_providers` to add an explicit second phase over the chain's other
 providers once the transaction providers are exhausted, within the same
 deadline and dispatch budget; the two sides are never ranked together. See
-the [transaction providers configuration](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/docs/CONFIGURATION.md#transaction-providers)
-and [routing behavior](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/docs/ROUTING.md#transaction-providers)
+the [transaction providers configuration](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/docs/CONFIGURATION.md#transaction-providers)
+and [routing behavior](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/docs/ROUTING.md#transaction-providers)
 for the full contract, including the private-send example profile.
 
 ### WebSocket

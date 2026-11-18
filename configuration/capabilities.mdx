@@ -6,7 +6,7 @@ description: Declare method restrictions, historical limits, and provider error 
 ## Provider Capabilities
 
 Capabilities declare what a provider supports and its limits. Lasso validates
-these declarations at startup and reload. In v0.8.0, `unsupported_methods`,
+these declarations at startup and reload. `unsupported_methods`,
 `unsupported_categories` and `limits.block_age_methods` must be lists: use `[]`
 for no declarations. A field left as YAML `null` fails validation; a rejected
 reload keeps the previous configuration.
@@ -32,15 +32,24 @@ capabilities:
 | `unsupported_methods` | list | Specific methods this provider doesn't support |
 | `limits.max_block_range` | integer | Max block range for `eth_getLogs` |
 | `limits.max_block_age` | integer | Max block age for state methods (pruned provider) |
-| `limits.block_age_methods` | list | Methods subject to `max_block_age` limit |
+| `limits.block_age_methods` | list | Methods subject to `max_block_age`; each must take a block number parameter, such as `eth_call`, `eth_getBalance`, `eth_getStorageAt` or `eth_getBlockByNumber` |
 | `error_rules` | list | Provider-specific error classification overrides (first match wins) |
 
 When `capabilities` is omitted, defaults to permissive (only `local_only` methods blocked, no limits).
 
+Unsupported methods and categories keep a provider out of a request while
+another provider supports the method. When none does, Lasso tries the
+unsupported providers as a last resort instead of refusing the request.
+
+`max_block_age` reads the request's block number parameter, so it can't limit
+`eth_getLogs`; cap log queries with `max_block_range`. Startup and reload reject
+a `block_age_methods` entry whose method has no readable block number parameter,
+and the error says to remove it.
+
 
 These declarations constrain routing; they are not a proof of universal upstream compatibility. Test representative successful requests and known failure cases before relying on a provider-specific rule. Use the narrowest reliable match. Provider APIs, plans, and error messages can change.
 
-RPC Core v0.8.0 also [learns method refusals, historical depth and log-span
+RPC Core also [learns method refusals, historical depth and log-span
 limits](/concepts/provider-learning) from traffic. Matching providers are moved
 behind alternatives; declarations take precedence over learned limits.
 

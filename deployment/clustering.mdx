@@ -52,15 +52,5 @@ not joined; check names, cookie equality, DNS results, and private connectivity.
 Setting discovery variables alone does not name a VM launched with plain
 `mix phx.server`; the release settings above apply to release/container startup.
 
-### Geo-Distributed Deployment
-
-For optimal performance, deploy one Lasso node per region and route application traffic to the nearest node (via GeoDNS, anycast, or your load balancer's geographic routing).
-
-Each node independently:
-- Measures latency to upstream providers from its region
-- Selects providers using its configured strategy and local observations
-- Maintains independent circuit breaker state
-
-The dashboard aggregates data across all nodes for unified observability with regional drill-down.
-
----
+For one node per region, see [geographic deployment](/deployment/geo-distributed).
+`/api/health` reports cluster coverage; see [health check](/api/health-check).

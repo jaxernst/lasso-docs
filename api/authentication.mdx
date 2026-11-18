@@ -17,7 +17,7 @@ Since Lasso doesn't have built-in authentication, use these strategies to secure
 
 ### Reverse Proxy Authentication
 
-Deploy Lasso behind a reverse proxy (nginx, Caddy, Traefik) with authentication. Apply the boundary to every exposed RPC, WebSocket, dashboard, and operational route. Core v0.8.0 exposes JSON metrics at `/api/metrics/:chain` and Prometheus text at `/metrics`; it does not expose a management API. For nginx, keep the authentication at the site level so it also covers WebSocket upgrades:
+Deploy Lasso behind a reverse proxy (nginx, Caddy, Traefik) with authentication. Apply the boundary to every exposed RPC, WebSocket, dashboard, and operational route. Core exposes JSON metrics at `/api/metrics/:chain` and Prometheus text at `/metrics`; it does not expose a management API. For nginx, keep the authentication at the site level so it also covers WebSocket upgrades:
 
 ```nginx
 map $http_upgrade $lasso_connection_upgrade {
@@ -48,7 +48,9 @@ server {
 
 Replace the hostname, certificate paths, and password file. Keep Core bound to
 loopback or a private network address so clients cannot bypass the proxy. A
-collector scraping the JSON metrics API must authenticate too.
+collector scraping the JSON metrics API must authenticate too. The proxy speaks
+HTTP/1.1 to Lasso (`proxy_http_version 1.1`), which keeps the open Cowboy
+advisories away from the node; see [HTTPS](/deployment/production-checklist#https).
 
 ### API Gateway
 
@@ -83,7 +85,9 @@ export INFURA_API_KEY=your_infura_key
 ```
 
 See [Environment Variables](/configuration/environment-variables) for how
-profile files substitute variables supplied by your deployment.
+profile files substitute variables supplied by your deployment. A provider URL
+can also carry HTTP Basic credentials; see
+[credentials in the URL](/configuration/providers#credentials-in-the-url).
 
 Core's self-hosted boundary does not include managed accounts, billing,
 or incoming client keys. Use [Lasso Cloud](/cloud/overview) when you need those

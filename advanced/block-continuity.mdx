@@ -28,7 +28,9 @@ All callers using the same profile and chain share this protection. After a
 server switch or restart, recovery is **best effort**: a lower height remains
 possible.
 
-Provider lag, stale blocks or reorganizations can cause retries or errors.
+Provider lag, stale blocks or reorganizations can cause retries or errors. At
+the same height, the provider that supplied the protected block can replace it
+after a reorg; other providers serve the accepted block but can't replace it.
 Retries and connection setup can add latency. Protected blocks must be within
 **60 seconds or four configured block intervals**, whichever is greater;
 protection does not promise the newest block or finality.

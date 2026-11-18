@@ -24,17 +24,29 @@ config/profiles/
 └── staging.yml      # Subset for testing
 ```
 
-The dashboard lists configured profiles and links to this guide. To add a profile, create its YAML file in the profiles directory on each node and reload Lasso. For containers, follow the [deployment instructions](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/docs/DEPLOYMENT.md#custom-profiles-and-credentials). New profiles reuse connected WebSocket upstreams after reload.
+The dashboard lists configured profiles and links to this guide. To add a profile, create its YAML file in the profiles directory on each node and reload Lasso. For containers, follow [Docker deployment](/deployment/docker#custom-profiles-and-credentials). New profiles reuse connected WebSocket upstreams after reload.
 
-For new profiles and YAML edits, reload the running release:
+## Reload
+
+Validate, then reload the running release:
 
 ```bash
-_build/prod/rel/lasso/bin/lasso rpc 'Lasso.Config.ConfigStore.reload()'
+_build/prod/rel/lasso/bin/lasso check-config
+_build/prod/rel/lasso/bin/lasso reload
 ```
 
-Confirm the reload returns `:ok`, then refresh the dashboard. Each node reads its own files; distribute the same configuration to every node.
+From source, run the same commands in the IEx session started with `iex -S mix phx.server`:
 
-Access via URL: `/rpc/profile/:slug/:chain`
+```elixir
+Lasso.Operator.Commands.check_config!()
+Lasso.Operator.Commands.reload!()
+```
+
+`check-config` reads the profile files without changing the active routes. Both commands exit nonzero on invalid configuration, and a rejected reload keeps the active configuration. A successful reload prints `:ok`; refresh the dashboard to see the change. Each node reads its own files, so distribute the same configuration to every node and reload each one.
+
+## Routes
+
+Access a profile at `/rpc/profile/:slug/:chain`:
 
 ```bash
 # Included public profile
