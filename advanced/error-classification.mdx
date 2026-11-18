@@ -11,13 +11,19 @@ original `code`, `message`, and optional `data` in the caller response.
 
 ## Decision order
 
-The released [classifier](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/lib/lasso/core/support/error_classification.ex)
+The released [classifier](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/lib/lasso/core/support/error_classification.ex)
 checks structural revert evidence and definitive codes before message patterns.
 For ambiguous codes, it uses bounded message evidence for execution errors,
 provider limits, authentication, and capabilities, then falls back to the code.
 For example, a provider may use `-32603` for a capability restriction; that code
 alone is not a definitive internal-error verdict. An EVM revert is a
 request-caused outcome, even when provider wording also mentions a limit.
+
+HTTP status decides before the body. Every HTTP 429 is a `rate_limit`, and a
+401 or 403 whose body is a JSON-RPC invalid-request or parse error is an
+`auth_error`, so a replay-safe read fails over instead of returning a bad
+request. A 429's quota wording and retry hint stay with the error, so a quota
+refusal keeps its longer [cooldown](/concepts/circuit-breakers#rate-limit-cooldowns).
 
 ## Failover and breaker behavior
 

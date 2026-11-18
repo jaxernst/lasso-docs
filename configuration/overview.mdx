@@ -38,9 +38,20 @@ chains:
 
 OSS does not authenticate clients or enforce per-client request quotas. Configure authentication and inbound rate limiting at your reverse proxy. Provider quota and circuit-breaker backoff are separate routing controls.
 
-Unknown YAML fields and invalid types are rejected. Use booleans (`false`), not quoted strings (`"false"`). A failed reload keeps the previous active configuration. Errors identify the field without printing credential values.
-
 Profile slugs must match their `.yml` filenames. Files beginning with `_` or `.` are skipped. Keep a `public.yml` profile: routes without a profile use `public`, and it is required at startup. `unlisted: true` hides a profile from the selector; its endpoints remain accessible.
+
+## Validation
+
+Unknown YAML fields and invalid types are rejected. Use booleans (`false`), not quoted strings (`"false"`). A failed reload keeps the previous active configuration.
+
+An error names the profile, chain and provider (by `id`, or by position when it has none), the failing field, what was expected and what type was found:
+
+```text
+profile.public.chains.local.providers.primary.priority:
+expected nonnegative integer (>= 0); found string (value withheld)
+```
+
+An unsupported field lists the supported ones. Values, credentials and header names stay out of the message. Providers added at runtime are checked against the same rules as profile files. Run `bin/lasso check-config` to see these errors before a reload; see [Profiles and reload](/concepts/profiles#reload).
 
 
 ## Next steps

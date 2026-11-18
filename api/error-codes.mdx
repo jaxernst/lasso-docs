@@ -23,6 +23,8 @@ batch returns HTTP 204. Core routes batch items independently.
 | `-32602` | Invalid params | A method's parameters are invalid. |
 | `-32603` | Internal error | An error reported by Lasso or preserved from an upstream. |
 | `-32000` | Server error | Routing exhausted its eligible attempts. |
+| `-32005` | Limit exceeded | An `eth_getLogs` range a provider refused, or Lasso's response-size cap; see [large queries](#large-eth_getlogs-queries). |
+| `-32008` | Local capacity | Lasso had no local transport capacity before dispatch; retry a replay-safe request. |
 
 These are categories, not a promise that every example uses exactly that code.
 For instance, a valid upstream error can carry its own server-defined code.
@@ -40,7 +42,7 @@ permits, with one dispatch and no cross-request affinity. Cloud rejects its
 
 ## Core routing exhaustion
 
-When no eligible attempt can serve a request, Core v0.8.0 returns a JSON-RPC
+When no eligible attempt can serve a request, Core returns a JSON-RPC
 `-32000` error over **HTTP 200**, preserving the request ID. `data` has
 `reason`, `retry_after_ms`, and `upstream_attempts`. `retry_after_ms` can be
 non-null only for `no_eligible_providers`.
@@ -74,20 +76,22 @@ on current circuit state:
 ```
 
 The shape comes from the released
-[controller regression](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/test/lasso_web/controllers/rpc_controller_test.exs)
-and [request pipeline](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/lib/lasso/core/request/request_pipeline.ex).
+[controller regression](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/test/lasso_web/controllers/rpc_controller_test.exs)
+and [request pipeline](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/lib/lasso/core/request/request_pipeline.ex).
 When every upstream a request reached rejected the method, Core returns that
 upstream's `-32601` with its message and data instead. If another outcome
 occurred, such as a provider failure, quota exhaustion or timeout, you get that
-outcome's error or the availability error above.
+outcome's error or the availability error above. An `eth_getLogs` request that
+any provider refused as too wide returns the
+[range error](#large-eth_getlogs-queries) instead, whatever happened after it.
 
 Request [metadata](/observability/request-metadata) can show recorded attempts
 when available. It does not promise an exhaustive provider diagnostic schema.
 
 ## Large `eth_getLogs` queries
 
-Core v0.8.0 turns a recognized provider block-range or result-size limit, or
-its own bounded response-size rejection, into one JSON-RPC error:
+Core turns a recognized provider block-range or result-size limit, or its own
+bounded response-size rejection, into one JSON-RPC error:
 
 ```json
 {
@@ -98,27 +102,38 @@ its own bounded response-size rejection, into one JSON-RPC error:
     "message": "eth_getLogs result exceeds a range or size limit; reduce the block range",
     "data": {
       "reason": "log_range_too_large",
-      "action": "reduce_block_range"
+      "action": "reduce_block_range",
+      "max_block_range": 2000
     }
   }
 }
 ```
 
-Retry with a smaller `fromBlock`–`toBlock` span and collect the ranges in your
-application. Lasso does not automatically split the query. An upstream range
-or result-size refusal can fail over to another eligible provider within the
-request budget; if none succeeds, Core returns the range action. Core's own
-bounded response-size rejection is terminal. A timeout without a recognized limit
-does not imply that reducing the range is the only remedy. Other malformed
-filter arguments retain their original error rather than this action.
+`max_block_range` is the smallest
+[`capabilities.limits.max_block_range`](/configuration/capabilities) among the
+providers that refused the range. It appears only when you configured that limit;
+otherwise the error carries `reason` and `action` alone. Lasso never takes the
+number from provider error text.
+
+Split the query into spans no wider than `max_block_range`, or narrower spans
+when it is absent, and collect the results in your application. Lasso does not
+split the query for you. An upstream range or result-size refusal fails over to
+another eligible provider within the request budget, and a successful fallback
+returns its result. When no provider completes the request, Core returns this
+error even if later attempts timed out or were rate limited, and without their
+retry delays: waiting does not fix a range refusal, so retrying the same range
+fails again. Core's own bounded response-size rejection is terminal. Other
+malformed filter arguments keep their original error.
 
 ## Upstream errors and retry safety
 
 An upstream can return a JSON-RPC error body with any HTTP status, but the
-released Core HTTP client validates and preserves that body only for a 2xx
-response. HTTP 429, 408, other 4xx, and 5xx statuses are classified as
-transport or upstream-status failures, even if their body contains a JSON-RPC
-error. A structurally valid, request-correlated error in a 2xx response keeps
+Core HTTP client validates and preserves that body only for a 2xx response.
+HTTP status decides first: 429, 408, other 4xx, and 5xx statuses are transport
+or upstream-status failures, even when their body contains a JSON-RPC error, so
+a replay-safe read moves to another provider. A 429 is always a rate limit;
+[its cooldown](/concepts/circuit-breakers#rate-limit-cooldowns) follows the
+provider's `Retry-After`. A structurally valid, request-correlated error in a 2xx response keeps
 its provider code and wording. Gateway text, HTML, and malformed 2xx envelopes
 are not authoritative JSON-RPC errors.
 

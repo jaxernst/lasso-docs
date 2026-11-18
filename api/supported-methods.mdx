@@ -31,11 +31,11 @@ Relay-native submission methods, bundle methods, simulations of signed
 transactions, and any other method whose params carry signed transaction
 bytes are classified the same way and also run once. A chain's
 [`transactions` configuration](/configuration/profiles#transaction-providers)
-(v0.8.0) restricts sends to the providers it names. Registered send methods may
+restricts sends to the providers it names. Registered send methods may
 then resend the same bytes to another of those providers, up to three dispatches
 within the request deadline; a method classified only by its signed bytes still
 runs once. Profiles without the block keep ordinary one-dispatch routing. Opt-in metadata reports the
-chosen [execution class](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/docs/RPC_STANDARDS.md#execution-classes)
+chosen [execution class](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/docs/RPC_STANDARDS.md#execution-classes)
 as `execution_safety` and how it was decided as `classified_by`.
 
 ## Node-local methods
@@ -47,7 +47,7 @@ Do not treat a profile as an authentication or authorization boundary.
 
 ## Stateful filters and extensions
 
-RPC Core v0.8.0 can forward provider-local filter methods when capability policy
+RPC Core can forward provider-local filter methods when capability policy
 permits them. They receive one dispatch per request and have **no cross-request
 affinity guarantee**. A filter ID created on one upstream may be invalid on a
 later selected upstream. Prefer `eth_getLogs` or supported WebSocket subscriptions;
@@ -79,7 +79,7 @@ replay and a replacement live stream. Recovery beyond its time, replay, attempt,
 or buffer limits terminates the affected downstream connection explicitly; it
 does not promise unbounded or lossless delivery through arbitrary outages.
 
-In Core v0.8.0, `subscribe_new_heads` controls automatic block monitoring **and**
+`subscribe_new_heads` controls automatic block monitoring **and**
 client `newHeads` eligibility. Providers inherit the chain setting, which
 defaults to `true`; override it per provider when needed. New profiles
 can reuse an already-connected upstream after a successful configuration reload.

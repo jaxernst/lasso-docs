@@ -60,8 +60,8 @@ chains:
 
 `selection` belongs under the chain. The profile body accepts only the `chains`
 mapping. A `routing.method_overrides` block is not supported. See the released
-[file schema](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/lib/lasso/config/file_schema.ex)
-and [configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/docs/CONFIGURATION.md#provider-capabilities).
+[file schema](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/lib/lasso/config/file_schema.ex)
+and [configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/docs/CONFIGURATION.md#provider-capabilities).
 
 ## Strategy ranking
 
@@ -100,8 +100,11 @@ controls, evidence and restart behavior.
 
 Core checks live admission before dispatch, so a selected channel may be rejected
 if its state has changed. Replay-safe requests can continue through eligible
-channels within the three-dispatch limit and absolute deadline. Unsafe and
-unknown methods do not inherit that replay behavior. See the
+channels within the three-dispatch limit and absolute deadline. After a
+provider explicitly refuses a method, the next attempt goes to a route from an
+independent provider in the same tier before more routes from the one that
+refused; hosts Lasso can't attribute to a provider don't count as independent.
+Unsafe and unknown methods do not inherit that replay behavior. See the
 [method contract](/api/supported-methods).
 
 The dispatch budget can run out before every eligible channel is tried. When

@@ -72,10 +72,11 @@ Check its result before shifting application traffic.
 
 ## Exercise each route
 
-Send an upstream-backed read through each chain. In the released Core version,
-`fastest` uses qualified recent latency evidence from client requests across
-methods for each provider and transport; the default route is
-`load-balanced`. Neither strategy promises that one provider always wins.
+Send an upstream-backed read through each chain. `fastest` ranks providers by
+recent qualified latency from client requests, per transport and kind of
+request (basic reads, state, logs, trace, transactions, subscriptions); the
+default route is `load-balanced`. Either can pick a different provider from one
+request to the next.
 
 ```bash
 for chain in ethereum base arbitrum; do

@@ -23,19 +23,34 @@ for the number of distinct filters, not the number of clients.
 ## Recovery behavior
 
 Recovery establishes a replacement live subscription, buffers incoming events,
-and uses HTTP to replay the missing range. HTTP replay and WebSocket delivery
-can use different eligible upstreams. The coordinator merges replay with its
-buffered live events and suppresses overlap within retained deduplication state.
+and uses HTTP to replay the missing range. The coordinator merges replay with
+its buffered live events and suppresses overlap within retained deduplication
+state.
 
-Recovery has a deadline, a replay allowance, an attempt budget, and a memory
-bound. Buffer exhaustion terminates the affected downstream connection; it does
-not silently discard the oldest buffered event and claim uninterrupted delivery.
-Unavailable history, failed replay, or exhausted recovery can also terminate
-continuity. The application must reconnect and reconcile its durable checkpoint.
+- **One 30-second window.** Every recovery attempt shares a 30-second deadline.
+  A brief upstream disconnect keeps the subscription: when the original provider
+  or a sole upstream reconnects inside the window, the stream resumes with the
+  missed heads replayed, including when the drop happens mid-replay.
+- **Replay sources.** Lasso replays from another eligible HTTP provider first,
+  and from the replacement provider's own HTTP endpoint when none is left, so a
+  two-provider profile survives losing either one. When the chosen source is
+  behind, Lasso tries another source that has caught up.
+- **Complete replay.** Replay runs through the highest block the subscription
+  has seen. The replacement provider's first event reaches the client, and
+  events from a replacement attempt that fails are discarded before the next
+  attempt.
+- **Contained pressure.** When node-local ingress pressure refuses a frame, only
+  that subscription recovers; unrelated requests and subscriptions keep their
+  shared upstream connection.
 
-Use the [v0.8.0 configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/docs/CONFIGURATION.md)
+Recovery also has a replay allowance, an attempt budget and a memory bound.
+When no source covers the missed range in time, or replay, history or buffer
+limits run out, Lasso closes the client with `1011` instead of delivering a
+gap. The application reconnects and reconciles its durable checkpoint.
+
+Use the [v0.8.4 configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/docs/CONFIGURATION.md)
 for supported configuration keys. The released
-[stream coordinator](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/lib/lasso/core/streaming/stream_coordinator.ex)
+[stream coordinator](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/lib/lasso/core/streaming/stream_coordinator.ex)
 is the implementation reference. Internal process defaults are not necessarily
 YAML settings, and increasing a limit cannot supply missing provider history.
 
@@ -46,7 +61,7 @@ connection. Handle reconnection and `removed` log events. Reconcile your state
 against canonical blocks after an outage or reorg; block height alone cannot
 distinguish a replacement block from the one your application processed.
 
-In v0.8.0, buffered orphan-log additions and removals drain in their original
+Buffered orphan-log additions and removals drain in their original
 per-log order before replacement-block additions, including across block heights.
 Positive and removed events have separate deduplication state. Repeated removal
 and re-addition of the same log within that window is not fully modeled; reconcile

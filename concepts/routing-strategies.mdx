@@ -18,7 +18,7 @@ Select a strategy in the request URL:
 | `/rpc/fastest/:chain` | Recent reliability-qualified latency |
 | `/rpc/balanced-fast/:chain` | Random order weighted toward lower recent latency; `latency-weighted` is a permanent alias |
 | `/rpc/priority/:chain` | Configured provider `priority` order |
-| `/rpc/round-robin/:chain` | Alias for `load-balanced`; not deterministic round-robin rotation |
+| `/rpc/round-robin/:chain` | Alias for `load-balanced`: randomized order per request, reported as `load_balanced` in metadata |
 | `/rpc/profile/:profile/fastest/:chain` | Explicit file profile and strategy |
 | `/rpc/provider/:provider_id/:chain` | One configured provider; see [provider override](#provider-override) |
 
@@ -61,8 +61,12 @@ dispatch budget can reach. Qualify historical reads against your actual upstream
 
 Fastest places reliability-qualified channels first, ordered by recent mean
 successful-attempt latency. Successful p95 and provider/transport identity break
-ties. Evidence is local to the routing node and partitioned by a bounded workload
-key, rather than a separate unbounded history for every method string.
+ties. Evidence is local to the routing node and kept per transport and kind of
+request: basic reads, state, logs, trace, transactions and subscriptions, with
+unknown methods sharing one group. A fast `eth_blockNumber` qualifies a provider
+for basic reads, not for `eth_getBalance` or `eth_getLogs`. Lasso's own
+background requests can seed cold-start order within a kind but never qualify
+client traffic.
 
 Unqualified channels remain available after qualified channels. When no channel
 qualifies, Core reports availability degradation and uses its available latency
@@ -148,7 +152,7 @@ may fail over are defined in
 [provider selection](/concepts/provider-selection#execution-and-failover) and
 the [method contract](/api/supported-methods).
 
-This contract is grounded in the released [routing guide](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/docs/ROUTING.md),
-[Fastest](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/lib/lasso/core/selection/strategies/fastest.ex),
-[BalancedFast](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/lib/lasso/core/selection/strategies/balanced_fast.ex)
-and [execution envelope](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/lib/lasso/core/request/execution_envelope.ex).
+This contract is grounded in the released [routing guide](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/docs/ROUTING.md),
+[Fastest](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/lib/lasso/core/selection/strategies/fastest.ex),
+[BalancedFast](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/lib/lasso/core/selection/strategies/balanced_fast.ex)
+and [execution envelope](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/lib/lasso/core/request/execution_envelope.ex).

@@ -39,7 +39,7 @@ Returns a JSON object containing instance health information:
   
   <Expandable title="cluster properties">
     <ResponseField name="enabled" type="boolean" required>
-      Whether clustering is enabled for this instance
+      `true` when clustering is configured (`LASSO_EXPECTED_CLUSTER_NODES` above 1 or a libcluster topology) or peers are connected. A standalone node reports `false`, even with Erlang distribution on
     </ResponseField>
     
     <ResponseField name="nodes_connected" type="integer" required>
@@ -71,7 +71,7 @@ Returns a JSON object containing instance health information:
   "status": "healthy",
   "timestamp": "2026-03-03T21:45:30.123456Z",
   "uptime_seconds": 86400,
-  "version": "0.6.0",
+  "version": "0.8.4",
   "cluster": {
     "enabled": true,
     "nodes_configured": 3,
@@ -111,8 +111,8 @@ exceeds five seconds. `snapshot_status` and `snapshot_age_ms` expose that
 freshness. `nodes_configured` reports the configured expected count when set;
 `nodes_total` is at least the connected count. These diagnostics do not make a
 live request to every upstream. This is the behavior of the released
-[health controller](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/lib/lasso_web/controllers/health_controller.ex)
-and [topology status function](https://github.com/jaxernst/lasso-rpc/blob/v0.8.0/lib/lasso/cluster/health_topology.ex).
+[health controller](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/lib/lasso_web/controllers/health_controller.ex)
+and [topology status function](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/lib/lasso/cluster/health_topology.ex).
 
 ## Readiness
 
@@ -143,12 +143,14 @@ separately.
 
 ## Use Cases
 
-### Load Balancer Health Checks
+### Liveness and readiness probes
 
-Configure your load balancer to poll this endpoint:
+Use `/api/health` as the liveness probe and `/api/ready` as the readiness probe
+your load balancer routes by:
 
 ```bash
-curl http://localhost:4000/api/health
+curl --fail http://localhost:4000/api/health
+curl --fail http://localhost:4000/api/ready
 ```
 
 ### Monitoring and Alerts

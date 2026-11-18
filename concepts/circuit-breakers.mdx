@@ -17,6 +17,23 @@ Connection state, rate-limit cooldowns, lag, method restrictions and request par
 
 Rate-limit backoff is a separate signal from circuit failure. A provider can be temporarily rate limited while its circuit remains closed. Identical upstreams shared across profiles share runtime signals; creating another profile does not bypass the provider's real quota.
 
+### Rate-limit cooldowns
+
+An HTTP 429 moves the provider behind healthy ones for as long as it asks.
+Lasso reads the delay in this order:
+
+1. A `Retry-After` header, in seconds or as an HTTP date.
+2. `data.retry_after_ms` in the JSON-RPC error body.
+3. `data.retry_after` in whole seconds. Values with units, such as `120ms`, are ignored.
+4. A delay in the error message, such as `Try again in 120 seconds`.
+
+Without any of these, the default cooldown is 30 seconds. Every delay is capped
+at ten minutes. A zero or past `Retry-After` falls through to the body hint or
+the default, so it can't send traffic straight back to a provider that is still
+refusing. Lasso keeps the 429's JSON-RPC code and up to 1,000 bytes of its
+message, and discards the rest of the body. A quota refusal keeps its longer
+cooldown.
+
 Inspect the affected transport and region. An aggregate warning may represent only part of the deployment. Do not interpret a regional problem as proof that every region is unavailable.
 
 ## Configuration
