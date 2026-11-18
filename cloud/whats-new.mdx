@@ -9,6 +9,44 @@ explains it. To check what's serving right now, read `source_sha` from
 [`/api/health`](https://lasso.sh/api/health). RPC Core releases have their own
 notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
 
+<Update label="November 18, 2026" description="Release 318" tags={["Routing", "Custom profiles", "Subscriptions", "Reliability"]}>
+
+- **Reads go to providers at the chain head, with no lag setting to tune.**
+  Lasso ranks providers it knows are behind after those at the head. Receipt
+  and transaction lookups by hash, and calls that leave out the block
+  parameter, such as `eth_call` and `eth_estimateGas`, follow the same rule,
+  so a lookup for a transaction that just landed reaches a provider that has
+  it. A provider that's behind still serves when it's the only one that can.
+  The `max_lag_blocks` setting is retired: Custom profiles drop it when you
+  save, so existing documents keep working.
+  [Current reads](/cloud/rpc-behavior#current-reads)
+- **getLogs errors size your next request from evidence.** When a range is too
+  wide, `error.data.max_block_range` is the largest range Lasso has evidence
+  it can serve: the part of your request it already served, or one slice of a
+  provider's known limit. When no smaller range would fit, the error carries
+  `data.action: "narrow_filter"`; narrow the address or topics filter instead.
+  Retryable `-32005` advice comes only when the same request can fit on retry.
+  [Range errors](/cloud/guides/getlogs-rate-limits-pay-with-x402)
+- **Subscriptions recover through any healthy provider.** When a WebSocket
+  subscription's provider drops, Lasso fills the missed blocks from a provider
+  other than the replacement when one is available, so a slow replacement
+  can't hold up recovery. If the replacement also drops while filling the gap,
+  recovery moves on to the next provider within the same 30-second deadline.
+  [WebSocket subscriptions](/cloud/rpc-behavior#websocket-subscriptions)
+- **Rate-limited providers get the pause they ask for.** When a provider
+  answers HTTP 429 with a retry time in its JSON-RPC body, Lasso rests it for
+  that long, up to 10 minutes, including when the 429 answers Lasso's own head
+  tracking. Your requests go to other providers in the meantime. Lasso's
+  method checks stop as soon as a provider says its quota is spent.
+  [Rate limits and failover](/cloud/guides/rpc-outages-and-rate-limits)
+- **A new home page at lasso.sh.** Start from one of two buttons:
+  **Bring your own providers** opens a new Custom profile, and
+  **Explore public RPC** opens the live dashboard for the public profile.
+  **Use with your agent** copies a setup prompt for your agent, and on wide
+  screens an index beside the page shows where you are.
+
+</Update>
+
 <Update label="November 17, 2026" description="Release 317" tags={["Custom profiles", "Dashboard", "Reliability"]}>
 
 - **Your Custom endpoint routes to your providers from its first request.**

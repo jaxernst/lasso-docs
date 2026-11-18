@@ -33,7 +33,10 @@ A funded key gets its own rate limit of 100 requests per second, with bursts to 
 Each provider caps how many blocks one `eth_getLogs` may span, and Lasso learns those caps from live traffic. When a range is still too large, Lasso answers with a standard JSON-RPC error your loop can act on:
 
 - `code: -32602`, `error.data.code: "log_range_limit"`;
-- `error.data.max_block_range` with a size that fits, or `null` when unknown.
+- `error.data.max_block_range`, the largest range Lasso has evidence it can
+  serve; when it's null or absent, halve the range;
+- `error.data.action: "narrow_filter"` when no smaller range would fit; narrow
+  the address or topics filter instead.
 
 ```ts
 async function getLogs(from: bigint, to: bigint, filter: object): Promise<unknown[]> {

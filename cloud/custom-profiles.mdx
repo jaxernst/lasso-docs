@@ -47,7 +47,6 @@ other field is optional:
 | `headers` | provider | The provider authenticates with secret request headers, shared by its HTTP and WebSocket endpoints |
 | List order | provider | You use the `priority` strategy; first is preferred |
 | `block_protection` | chain | The app polls the latest block and shouldn't see it go backwards |
-| `max_lag_blocks` | chain | The app tolerates less (or more) staleness than the chain default |
 | `heads`: `live`, `standby`, `passive`, `off` | provider | You want to choose how Lasso tracks a provider's head; see [head tracking](#head-tracking) |
 | `background_observations` | provider | `false` stops background checks and idle recovery on a provider you're not actively using; defaults to `true`. `heads: off` only stops head observation |
 | `health_checks`: `standard` or `light` | chain | Lasso's checks should spend less of your provider quota |
@@ -186,7 +185,7 @@ instead; it works without protection.
 | Workload | Profile | URL strategy |
 |---|---|---|
 | User-facing reads | Two or more providers; `block_protection: true` | `balanced-fast` |
-| Latency-critical trading | Fast providers first; `block_protection: true`; `max_lag_blocks: 1` | `fastest` |
+| Latency-critical trading | Fast providers first; `block_protection: true` | `fastest` |
 | Indexer or backfill | Include an archive-capable provider | `load-balanced` |
 | Transaction submission | Preferred broadcast provider first | `priority` |
 | Subscriptions | `ws_url` on at least two providers | Any |
