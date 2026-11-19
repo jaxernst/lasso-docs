@@ -111,7 +111,12 @@ with a retryable 503 (`service_initializing`) until then. Read
 `GET /api/v1/profiles/{slug}` until it reports `live` before moving traffic.
 
 Saving a replacement to an already-live profile is different: RPC keeps
-serving the previous revision while the replacement activates. A chain whose
+serving the previous revision until the replacement publishes, then routes to
+the new providers. Each new provider connects as soon as its address resolves,
+retried about once a second, and the profile reports `activating` until every
+chain can connect. Until then, reads on a chain with no connectable provider
+return HTTP 200 with a retryable `-32000` and reason `admission_unavailable`,
+and sends return reason `transaction_providers_unavailable`; retry them. A chain whose
 providers are all still `verifying` keeps its previously verified configuration,
 settings included, until a later identity check verifies one. A chain with both
 verified and `verifying` providers publishes the verified subset and its new
