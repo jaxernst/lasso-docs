@@ -210,7 +210,7 @@ instead; it works without protection.
 |---|---|
 | `GET /api/v1/profiles`, `GET /api/v1/profiles/{slug}` | Document, revision, provider status and knowledge; URLs and header values are never returned |
 | `GET /api/v1/profiles/{slug}` with `Accept: application/yaml` | A Lasso RPC Core YAML file with secrets replaced by environment references. Core has no `standby` mode, so a profile using it returns 422 `invalid_config` |
-| `DELETE /api/v1/profiles/{slug}` | Removes the profile; URLs naming it serve as `premium` with `x-lasso-fallback: profile` |
+| `DELETE /api/v1/profiles/{slug}` | Removes the profile with its providers and revisions ([what deletion removes](/cloud/data-handling#how-lasso-holds-your-provider-credentials)); URLs naming it serve as `premium` with `x-lasso-fallback: profile` |
 
 ## Limits
 
@@ -237,3 +237,5 @@ instead; it works without protection.
   the URL and scope keys to it.
 - [Profiles in RPC Core](/concepts/profiles): the engine's profile model, for
   self-hosting.
+- [How Lasso holds your provider credentials](/cloud/data-handling#how-lasso-holds-your-provider-credentials): encryption, logs and
+  deletion.

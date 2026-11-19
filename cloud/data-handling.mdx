@@ -1,6 +1,6 @@
 ---
 title: Data handling
-description: What Lasso Cloud records for each RPC request, where it lives and how long it is kept. Usage is kept as daily totals per key; request params and results are not logged.
+description: What Lasso Cloud records for each RPC request, where it lives and how long it is kept, and how it holds the provider credentials in a Custom profile.
 ---
 
 # Data handling
@@ -42,10 +42,31 @@ JSON-RPC params or results.
   dashboard access. The counters live in memory and expire within two hours.
   IPs aren't logged or stored.
 - **API keys** are stored encrypted, with a SHA-256 hash for lookup.
-- **Provider URLs, keys and headers** in a Custom profile are stored encrypted
-  with AES-256-GCM. The API never returns provider URLs.
+- **Provider URLs, keys and headers** in a Custom profile: see
+  [how Lasso holds your provider credentials](#how-lasso-holds-your-provider-credentials).
 - **Feedback** sent to `/api/v1/feedback` keeps your message and a SHA-256
   digest of the key or IP that sent it, for 180 days.
+
+## How Lasso holds your provider credentials
+
+A Custom profile holds the URLs, API keys and headers you give it for your
+providers. Many providers put the key in the URL path or query, so Lasso
+treats the whole URL as a credential.
+
+| Where | What Lasso does |
+| --- | --- |
+| Database | Provider URLs, WebSocket URLs, API keys and headers are encrypted with AES-256-GCM by the application before they're written. Lasso decrypts them in memory to send your requests |
+| API responses | Provider names, status and learned knowledge only. URLs and header values are never returned, and the YAML export replaces them with environment references |
+| Revisions | Each saved revision keeps an encrypted snapshot of the document. Snapshots are never printed in logs |
+| Logs and error reports | A provider appears as its origin (`https://host:port`). The path, query and user info are removed before a log line or error report is written |
+| Metrics | Custom providers count as `custom`; no provider URL or host is a metric label |
+| Deletion | `DELETE /api/v1/profiles/{slug}` removes the profile with its chains, providers and every revision, and every Lasso server drops its in-memory copy |
+
+> **Owner answer needed: staff access.** Who at Lasso can access decrypted
+> provider credentials, how that access is granted, and whether it is logged.
+
+> **Owner answer needed: backups.** How long database backups keep a deleted
+> profile's encrypted credentials before they expire.
 
 ## Limits
 
