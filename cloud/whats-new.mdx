@@ -9,6 +9,37 @@ explains it. To check what's serving right now, read `source_sha` from
 [`/api/health`](https://lasso.sh/api/health). RPC Core releases have their own
 notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
 
+<Update label="November 18, 2026, second release" description="Release 319" tags={["Custom profiles", "Performance", "Routing", "Dashboard"]}>
+
+- **Custom profile changes route as soon as they publish.** When you replace
+  providers, the new set takes over right away and each new provider starts
+  serving once its address resolves, retried about once a second. While a
+  chain has no connectable provider yet, its reads return a retryable `-32000`
+  with reason `admission_unavailable`, and other chains and profiles keep
+  serving.
+  [Custom profiles](/cloud/custom-profiles#onboarding-what-lasso-checks)
+- **Faster profile saves and reads.** A save returns once your document is
+  stored, and Lasso publishes it in the background; read
+  `GET /api/v1/profiles/{slug}` until it reports `live`. Lasso checks up to
+  eight provider URLs at once when you save, and profile reads take fewer
+  steps.
+- **Wide public log scans can't crowd out your other calls.** On the `public`
+  profile, an `eth_getLogs` range wider than 10,000 blocks counts as bulk work
+  from its first attempt and shares a separate allowance on each provider.
+  Ranges of 10,000 blocks or fewer, and every other call, keep flowing while
+  wide scans run.
+  [Indexers and backfills](/cloud/indexer-backfills#limits)
+- **Gateway method refusals read as capability errors.** When a provider's
+  gateway turns a method away with an HTTP 406 page, Lasso returns it as a
+  `-32002` capability error you can safely retry, and the refusal doesn't
+  count against that provider's health.
+- **The lag warning appears only when lag can slip past.** A polled provider's
+  head stays usable for 1.5 poll intervals, so **Active monitoring** in the
+  chain editor warns only when polls are slower than three times the chain's
+  freshness window, or polling is off.
+
+</Update>
+
 <Update label="November 18, 2026" description="Release 318" tags={["Routing", "Custom profiles", "Subscriptions", "Reliability"]}>
 
 - **Reads go to providers at the chain head, with no lag setting to tune.**
