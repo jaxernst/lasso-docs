@@ -68,7 +68,9 @@ has no request price.
 
 ## 4. Save it and route the key over it
 
-Repeat the `PUT` without `dry_run`. Then point the app at the profile's URL:
+Repeat the `PUT` without `dry_run`. Lasso stores the provider URLs encrypted
+and never returns them; see [how Lasso holds your provider credentials](/cloud/data-handling#how-lasso-holds-your-provider-credentials).
+Then point the app at the profile's URL:
 use the template's base with `/profile/prod-base` in place of `/profile/premium/{chain}`.
 
 ```bash
@@ -136,3 +138,5 @@ the incoming one is renamed and the app's URL keeps reaching it.
   whether the trial worked.
 - [Accounts, people and agents](/cloud/accounts-and-agents): what the claim
   does.
+- [How Lasso holds your provider credentials](/cloud/data-handling#how-lasso-holds-your-provider-credentials): encryption, logs and
+  deletion.
