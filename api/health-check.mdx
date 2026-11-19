@@ -71,7 +71,7 @@ Returns a JSON object containing instance health information:
   "status": "healthy",
   "timestamp": "2026-03-03T21:45:30.123456Z",
   "uptime_seconds": 86400,
-  "version": "0.8.4",
+  "version": "0.8.5",
   "cluster": {
     "enabled": true,
     "nodes_configured": 3,
@@ -111,8 +111,8 @@ exceeds five seconds. `snapshot_status` and `snapshot_age_ms` expose that
 freshness. `nodes_configured` reports the configured expected count when set;
 `nodes_total` is at least the connected count. These diagnostics do not make a
 live request to every upstream. This is the behavior of the released
-[health controller](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/lib/lasso_web/controllers/health_controller.ex)
-and [topology status function](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/lib/lasso/cluster/health_topology.ex).
+[health controller](https://github.com/jaxernst/lasso-rpc/blob/v0.8.5/lib/lasso_web/controllers/health_controller.ex)
+and [topology status function](https://github.com/jaxernst/lasso-rpc/blob/v0.8.5/lib/lasso/cluster/health_topology.ex).
 
 ## Readiness
 

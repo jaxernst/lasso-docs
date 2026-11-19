@@ -37,6 +37,19 @@ capabilities:
 
 When `capabilities` is omitted, defaults to permissive (only `local_only` methods blocked, no limits).
 
+Category names must be ones Lasso knows; an unknown name fails the profile load,
+and the error names the field.
+
+- `unsupported_categories` takes method categories: `core`, `state`, `network`,
+  `node_admin`, `mempool`, `filters`, `subscriptions`, `extended_reads`,
+  `debug`, `trace`, `txpool` and `local_only`.
+- `error_rules[].category` takes error categories: `rate_limit`,
+  `capability_violation`, `block_not_available`, `server_error`,
+  `requires_archival`, `auth_error`, `timeout`, `network_error`,
+  `client_error`, `invalid_params`, `method_not_found`, `parse_error`,
+  `internal_error`, `unknown_error`, `method_error`, `chain_error` and
+  `user_error`.
+
 Unsupported methods and categories keep a provider out of a request while
 another provider supports the method. When none does, Lasso tries the
 unsupported providers as a last resort instead of refusing the request.

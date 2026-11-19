@@ -30,6 +30,7 @@ providers:
 | `ws_url` | string | No | WebSocket RPC endpoint URL. Required for subscriptions |
 | `archival` | boolean | No | Whether this provider serves historical data (default: true) |
 | `subscribe_new_heads` | boolean | No | Override chain-level `subscribe_new_heads` for this provider |
+| `request_budget` | map | No | Cap on what each node sends this upstream: `requests_per_second` and an optional `burst` (see [outbound request budget](#outbound-request-budget)) |
 | `background_observations` | boolean | No | Disable this reference's periodic observations without disabling client routing |
 | `observation_overrides` | map | No | Sparse overrides for background observations, automatic head feeds, HTTP head and backup intervals, and chain identity intervals |
 | `capabilities` | map | No | Provider capabilities (see Capabilities below) |
@@ -38,7 +39,49 @@ providers:
 | `headers` | map | No | HTTP request and WebSocket handshake headers, overriding defaults |
 | `auth_headers` | map | No | Headers with precedence over `headers` and `api_key` |
 
-*At least one of `url` or `ws_url` is required.
+*At least one of `url` or `ws_url` is required. A provider with only a `ws_url`
+serves requests over WebSocket; omit `url` rather than setting it to `null`.
+
+## Outbound request budget
+
+Give a provider a `request_budget` to keep Lasso inside that upstream's
+published rate limit:
+
+```yaml
+providers:
+  - id: example_public
+    url: https://rpc.example.org
+    request_budget:
+      requests_per_second: 3
+      burst: 20
+```
+
+Both values are positive integers. The budget starts full at `burst` requests and
+refills at `requests_per_second`; omit `burst` to allow one second's worth.
+Without `request_budget`, Lasso sends as much as traffic needs.
+
+Every outbound JSON-RPC request to that upstream costs one: client requests,
+retries and fallbacks, WebSocket calls and subscribe or unsubscribe frames, and
+background head polls and chain-identity checks. Pushed subscription
+notifications, WebSocket upgrades and ping frames cost nothing. Every profile
+that references the same upstream (same chain, endpoints and authentication)
+shares one budget, including `sharing_mode: isolated` references, and a
+reference without `request_budget` uses the one another reference declares. Two
+references that declare different budgets for the same upstream fail validation.
+Each node keeps its own budget, so a three-node deployment can send up to three
+times the rate in total; divide the provider's limit across your nodes.
+
+When the budget is spent:
+
+- Requests move to another eligible provider. The refusal sends nothing, so it
+  doesn't open a circuit, start a cooldown or count against the provider.
+- Background checks skip their turn.
+- When every eligible provider is spent, the client gets `-32005` with
+  `data.retry_after_ms`; see [error codes](/api/error-codes#outbound-request-budget).
+
+The dashboard's provider details show this node's budget and its admitted and
+refused totals. Reloading an unchanged budget keeps its state; a changed budget
+or a node restart starts a full one.
 
 ## Environment Variable Substitution
 
@@ -102,9 +145,9 @@ Provider declarations describe intended support; validate the exact method, para
 
 ## Chainstack template
 
-RPC Core includes a [Chainstack profile template](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/config/examples/chainstack.yml)
+RPC Core includes a [Chainstack profile template](https://github.com/jaxernst/lasso-rpc/blob/v0.8.5/config/examples/chainstack.yml)
 for Ethereum, Base and Arbitrum. Set `CHAINSTACK_MULTICHAIN_TOKEN`, copy the
 template into your profiles directory and reload. Use
 `/rpc/profile/chainstack/priority/:chain` to keep Chainstack primary with public
 fallbacks. Review its historical and log-span declarations against your plan;
-see the released [template setup](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/docs/CONFIGURATION.md#chainstack).
+see the released [template setup](https://github.com/jaxernst/lasso-rpc/blob/v0.8.5/docs/CONFIGURATION.md#chainstack).

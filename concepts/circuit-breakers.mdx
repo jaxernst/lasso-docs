@@ -13,9 +13,26 @@ Circuit breakers temporarily exclude failing upstream transports and admit recov
 
 Connection state, rate-limit cooldowns, lag, method restrictions and request parameters can exclude a provider even when its circuit is closed.
 
+## Connection failures
+
+When an HTTP endpoint refuses connections, three failed connection attempts open
+its circuit. The first recovery test comes after 1 second, and each failed test
+doubles the wait up to 4 seconds, plus jitter. One successful request closes the
+circuit, so a recovered endpoint is back in rotation within seconds. While it is
+half-open, the endpoint keeps its usual place in the strategy's order, so ordinary
+traffic tests it even when background observations are off. Subscription replay
+works normally during that time.
+
+Chain-identity probes record identity and health; routed requests and head polls
+decide when a circuit opens and recovers.
+
 ## Rate limits and shared providers
 
 Rate-limit backoff is a separate signal from circuit failure. A provider can be temporarily rate limited while its circuit remains closed. Identical upstreams shared across profiles share runtime signals; creating another profile does not bypass the provider's real quota.
+
+To stay under a provider's published limit before it starts refusing, give it an
+[outbound request budget](/configuration/providers#outbound-request-budget). A
+spent budget sends nothing, so it never opens a circuit or starts a cooldown.
 
 ### Rate-limit cooldowns
 
