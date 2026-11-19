@@ -26,22 +26,21 @@ JSON-RPC params or results.
 ## Request contents
 
 - **Params and results** are sent to the provider that serves the request and
-  returned to you. Lasso keeps neither; params can appear only in the server
-  error reports below. On a Custom profile, that provider is one you configured.
+  returned to you. Lasso keeps neither. On a Custom profile, that provider is
+  one you configured.
 - **Signed transactions** are forwarded as the same bytes and not logged.
   When a provider rejects one with an error Lasso doesn't recognize, Lasso
   logs up to 512 bytes of the provider's error text, with any values from your
   request masked out.
-- **Server errors:** when a request causes an error inside Lasso, the
-  error report can include the request body and the client IP address. Keys,
-  cookies and authorization headers are removed. Reports are kept by the
-  error-tracking service.
+- **Server errors:** when a request causes an error inside Lasso, the error
+  report sent to the error-tracking service holds no request body, request
+  headers or client IP address.
 
 ## IP addresses and credentials
 
 - **Client IP addresses** rate-limit keyless key creation, purchases and guest
   dashboard access. The counters live in memory and expire within two hours.
-  Apart from the server error reports above, IPs aren't logged or stored.
+  IPs aren't logged or stored.
 - **API keys** are stored encrypted, with a SHA-256 hash for lookup.
 - **Provider URLs, keys and headers** in a Custom profile are stored encrypted
   with AES-256-GCM. The API never returns provider URLs.

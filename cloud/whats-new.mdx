@@ -9,6 +9,37 @@ explains it. To check what's serving right now, read `source_sha` from
 [`/api/health`](https://lasso.sh/api/health). RPC Core releases have their own
 notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
 
+<Update label="November 19, 2026" description="Release 320" tags={["Custom profiles", "Dashboard", "Privacy", "Performance"]}>
+
+- **A clearer Custom profile overview.** Each chain endpoint gets one row,
+  and the row opens that chain's details, with its key, strategies and copy
+  buttons in one place. In edit mode, each chain shows whether it's ready to
+  route, and **Reorder** sets provider priority with arrows. A deep check
+  shows its progress and ends with a coverage summary per chain: throughput,
+  history and log range. A retest that finds nothing new says
+  **No changes detected** and stages nothing.
+  [Custom profiles](/cloud/custom-profiles#onboarding-what-lasso-checks)
+- **Set up more of a profile before you sign in.** On a new Custom profile you
+  can reorder providers and set each one's **Enabled**,
+  **Historical requests**, **Subscribe to new heads** and **Max logs range**
+  before signing in. The new-profile screen links Chainlist for public
+  fallback URLs and points to where provider keys come from.
+- **Use public RPC from the home page.** The lasso.sh home page button that
+  opens the live public dashboard now reads **Use public RPC**.
+- **Dashboards stay responsive with many tabs open.** Provider updates that
+  only refresh a timestamp no longer rebuild every open tab, and each tab
+  pulls less data from other regions while you watch. Updates keep streaming
+  at the same pace.
+- **Error reports leave out your request.** When a request causes an error
+  inside Lasso, the error report no longer includes the request body, any
+  request headers or your IP address.
+  [Data handling](/cloud/data-handling#request-contents)
+- **Less work per block on busy chains.** Lasso spends less server work on
+  each new block head, most on chains with many providers, which leaves more
+  room for your requests.
+
+</Update>
+
 <Update label="November 18, 2026, second release" description="Release 319" tags={["Custom profiles", "Performance", "Routing", "Dashboard"]}>
 
 - **Custom profile changes route as soon as they publish.** When you replace
