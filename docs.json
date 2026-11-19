@@ -58,6 +58,15 @@
     ]
   },
   "navigation": {
+    "global": {
+      "anchors": [
+        {
+          "anchor": "Status",
+          "icon": "signal",
+          "href": "https://lasso-rpc-status.checkly-status-page.com/"
+        }
+      ]
+    },
     "products": [
       {
         "product": "Lasso Cloud",
@@ -115,6 +124,7 @@
               "cloud/reference/error-handling",
               "cloud/reference/chains-and-prices",
               "cloud/reference/agent-entry-points",
+              "cloud/data-handling",
               {
                 "group": "Benchmarks",
                 "pages": [
