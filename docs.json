@@ -63,7 +63,7 @@
         {
           "anchor": "Status",
           "icon": "signal",
-          "href": "https://lasso-rpc-status.checkly-status-page.com/"
+          "href": "https://status.lasso.sh/"
         }
       ]
     },
