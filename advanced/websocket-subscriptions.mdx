@@ -30,7 +30,8 @@ state.
 - **One 30-second window.** Every recovery attempt shares a 30-second deadline.
   A brief upstream disconnect keeps the subscription: when the original provider
   or a sole upstream reconnects inside the window, the stream resumes with the
-  missed heads replayed, including when the drop happens mid-replay.
+  missed heads replayed, including when the drop happens mid-replay or cancels
+  a replacement that was still starting.
 - **Replay sources.** Lasso replays from another eligible HTTP provider first,
   and from the replacement provider's own HTTP endpoint when none is left, so a
   two-provider profile survives losing either one. When the chosen source is
@@ -48,10 +49,11 @@ When no source covers the missed range in time, or replay, history or buffer
 limits run out, Lasso closes the client with `1011` instead of delivering a
 gap. The application reconnects and reconciles its durable checkpoint.
 
-Use the [v0.8.4 configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/docs/CONFIGURATION.md)
+Use the [v0.8.5 configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.8.5/docs/CONFIGURATION.md)
 for supported configuration keys. The released
-[stream coordinator](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/lib/lasso/core/streaming/stream_coordinator.ex)
-is the implementation reference. Internal process defaults are not necessarily
+[stream coordinator](https://github.com/jaxernst/lasso-rpc/blob/v0.8.5/lib/lasso/core/streaming/stream_coordinator.ex)
+and [backfill](https://github.com/jaxernst/lasso-rpc/blob/v0.8.5/lib/lasso/core/streaming/backfill.ex)
+are the implementation references. Internal process defaults are not necessarily
 YAML settings, and increasing a limit cannot supply missing provider history.
 
 ## Application checkpoints and reorgs

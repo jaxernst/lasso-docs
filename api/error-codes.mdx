@@ -23,7 +23,8 @@ batch returns HTTP 204. Core routes batch items independently.
 | `-32602` | Invalid params | A method's parameters are invalid. |
 | `-32603` | Internal error | An error reported by Lasso or preserved from an upstream. |
 | `-32000` | Server error | Routing exhausted its eligible attempts. |
-| `-32005` | Limit exceeded | An `eth_getLogs` range a provider refused, or Lasso's response-size cap; see [large queries](#large-eth_getlogs-queries). |
+| `-32005` | Limit exceeded | Every eligible provider's [outbound request budget](#outbound-request-budget) is spent, an `eth_getLogs` range a provider refused, or Lasso's response-size cap; see [large queries](#large-eth_getlogs-queries). |
+| `-32006` | Capability refusal | No provider could serve a one-block `eth_getLogs` query; see [one-block queries](#one-block-eth_getlogs-queries). |
 | `-32008` | Local capacity | Lasso had no local transport capacity before dispatch; retry a replay-safe request. |
 
 These are categories, not a promise that every example uses exactly that code.
@@ -76,8 +77,8 @@ on current circuit state:
 ```
 
 The shape comes from the released
-[controller regression](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/test/lasso_web/controllers/rpc_controller_test.exs)
-and [request pipeline](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/lib/lasso/core/request/request_pipeline.ex).
+[controller regression](https://github.com/jaxernst/lasso-rpc/blob/v0.8.5/test/lasso_web/controllers/rpc_controller_test.exs)
+and [request pipeline](https://github.com/jaxernst/lasso-rpc/blob/v0.8.5/lib/lasso/core/request/request_pipeline.ex).
 When every upstream a request reached rejected the method, Core returns that
 upstream's `-32601` with its message and data instead. If another outcome
 occurred, such as a provider failure, quota exhaustion or timeout, you get that
@@ -87,6 +88,33 @@ any provider refused as too wide returns the
 
 Request [metadata](/observability/request-metadata) can show recorded attempts
 when available. It does not promise an exhaustive provider diagnostic schema.
+
+## Outbound request budget
+
+When every eligible provider's
+[`request_budget`](/configuration/providers#outbound-request-budget) is spent,
+Lasso sends nothing and returns `-32005` over HTTP 200:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "client-request-42",
+  "error": {
+    "code": -32005,
+    "message": "Upstream request budget exhausted",
+    "data": {
+      "reason": "upstream_request_budget_exhausted",
+      "retry_after_ms": 340
+    }
+  }
+}
+```
+
+`retry_after_ms` is the time until the earliest provider's budget refills; no
+request reached an upstream. Wait that long and retry. When some attempts reached a provider
+and failed, the response follows the ordinary rules above, and a range refusal
+still returns the [range error](#large-eth_getlogs-queries). With
+`include_meta`, `budget_refusals` lists the providers Lasso skipped.
 
 ## Large `eth_getLogs` queries
 
@@ -124,6 +152,27 @@ error even if later attempts timed out or were rate limited, and without their
 retry delays: waiting does not fix a range refusal, so retrying the same range
 fails again. Core's own bounded response-size rejection is terminal. Other
 malformed filter arguments keep their original error.
+
+### One-block `eth_getLogs` queries
+
+A query for exactly one block, with equal `fromBlock` and `toBlock` or a
+`blockHash`, can't be narrowed. When a provider refuses one, usually because it
+no longer holds that history, Lasso tries the other providers. If none serves
+it, Core returns a capability refusal with no narrowing advice:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "client-request-42",
+  "error": {
+    "code": -32006,
+    "message": "This provider cannot serve eth_getLogs for this block; history may not be retained"
+  }
+}
+```
+
+Add a provider that retains that block's history, or query a more recent block.
+A query from block N through N+1 covers two blocks and still gets range advice.
 
 ## Upstream errors and retry safety
 

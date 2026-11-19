@@ -43,7 +43,7 @@ docker compose exec -T lasso /app/bin/lasso check-config
 ```
 
 Point your application at `http://localhost:4000/rpc/profile/private-sends/ethereum`.
-The [example profile](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/config/examples/private-sends.yml)
+The [example profile](https://github.com/jaxernst/lasso-rpc/blob/v0.8.5/config/examples/private-sends.yml)
 fills this in with public relay endpoints.
 
 To confirm a send stayed inside the set, add `?include_meta=body` to the URL.
@@ -106,7 +106,7 @@ inclusion, so manage nonces in your client. Lasso keeps no pending overlay.
 
 After a failed `eth_sendRawTransaction`, Lasso looks up the hash among the
 providers of the phase that sent it, never outside it. The
-[API reference](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/docs/API_REFERENCE.md#transaction-send-errors-and-metadata)
+[API reference](https://github.com/jaxernst/lasso-rpc/blob/v0.8.5/docs/API_REFERENCE.md#transaction-send-errors-and-metadata)
 has the full contract.
 
 ## Limits
@@ -114,7 +114,7 @@ has the full contract.
 - Each listed provider must exist on the chain and be able to send, with no
   duplicates, and at least one other provider must remain to serve reads.
 - The policy covers every
-  [send method](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/docs/RPC_STANDARDS.md#execution-classes),
+  [send method](https://github.com/jaxernst/lasso-rpc/blob/v0.8.5/docs/RPC_STANDARDS.md#execution-classes),
   including relay-native and bundle methods, simulations of signed transactions,
   and unregistered methods whose params carry a signed transaction.
 - Lasso doesn't forward caller headers such as `X-Flashbots-Signature`, so methods
@@ -129,6 +129,6 @@ has the full contract.
 
 - [Profile configuration](/configuration/profiles#transaction-providers): the
   field reference.
-- [Routing behavior](https://github.com/jaxernst/lasso-rpc/blob/v0.8.4/docs/ROUTING.md#transaction-providers):
+- [Routing behavior](https://github.com/jaxernst/lasso-rpc/blob/v0.8.5/docs/ROUTING.md#transaction-providers):
   how requests use each side.
 - [Custom profiles](/cloud/custom-profiles): the same policy on Lasso Cloud.

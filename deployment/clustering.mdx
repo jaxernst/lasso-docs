@@ -31,6 +31,7 @@ For each release/container instance, set:
 | `CLUSTER_DNS_QUERY` | `lasso.internal` | DNS A record containing all node IPs |
 | `CLUSTER_NODE_BASENAME` | `lasso` | Must match the name before `@` |
 | `LASSO_NODE_ID` | `us-east-1` | Unique observability identity |
+| `LASSO_EXPECTED_CLUSTER_NODES` | `3` | Fleet size, so health and dashboard coverage count missing nodes |
 
 Replace the example IP and DNS name with your network's values. For a second
 node at `10.0.0.12`, use `RELEASE_NODE=lasso@10.0.0.12` and a different
