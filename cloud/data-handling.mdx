@@ -61,12 +61,8 @@ treats the whole URL as a credential.
 | Logs and error reports | A provider appears as its origin (`https://host:port`). The path, query and user info are removed before a log line or error report is written |
 | Metrics | Custom providers count as `custom`; no provider URL or host is a metric label |
 | Deletion | `DELETE /api/v1/profiles/{slug}` removes the profile with its chains, providers and every revision, and every Lasso server drops its in-memory copy |
-
-> **Owner answer needed: staff access.** Who at Lasso can access decrypted
-> provider credentials, how that access is granted, and whether it is logged.
-
-> **Owner answer needed: backups.** How long database backups keep a deleted
-> profile's encrypted credentials before they expire.
+| Backups | Database backups expire on the database host's retention schedule. Credentials stay encrypted in them |
+| Staff access | Encryption is done by the application. Only Lasso's operator holds production access, and customer credentials are not read outside an incident you report |
 
 ## Limits
 
