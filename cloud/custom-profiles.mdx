@@ -147,6 +147,13 @@ and a light background poll. Choose a mode per provider:
 Head modes don't change which providers serve client subscriptions. Omitting
 `heads` when you replace the document resets it to `passive`.
 
+The dashboard's chain editor has an **Active monitoring** control (Off, Light,
+Standard, or a custom poll interval) for the same policy. A polled provider's
+head stays usable for 1.5 poll intervals before routing treats it as stale, so
+the editor only warns "Lag can go unnoticed between polls" when the configured
+interval is slower than three times the chain's freshness window, or polling
+is off.
+
 ## Lasso learns your providers
 
 You supply URLs and intent. Lasso works out the rest from health checks and
