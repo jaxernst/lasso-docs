@@ -6,14 +6,16 @@ description: Start the RPC Core container, send an HTTP request and a WebSocket 
 # Quickstart
 
 Run Lasso RPC Core locally and route your first requests. The bundled `public`
-profile uses free public providers, so you need no provider keys. You need
+profile serves Ethereum, Base and Arbitrum (mainnet and Sepolia), Optimism,
+Unichain, World Chain and Robinhood Chain from free public providers, so you
+need no provider keys. You need
 Docker Compose and OpenSSL.
 
 ## 1. Start the container
 
 ```bash
 mkdir lasso && cd lasso
-curl --fail --location https://github.com/jaxernst/lasso-rpc/releases/download/v0.8.5/compose.yml --output compose.yml
+curl --fail --location https://github.com/jaxernst/lasso-rpc/releases/download/v0.8.6/compose.yml --output compose.yml
 (umask 077; printf 'SECRET_KEY_BASE=%s\nRELEASE_COOKIE=%s\n' "$(openssl rand -hex 64)" "$(openssl rand -hex 32)" > .env)
 docker compose up -d --wait
 ```

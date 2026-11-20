@@ -42,7 +42,7 @@ Lasso.Operator.Commands.check_config!()
 Lasso.Operator.Commands.reload!()
 ```
 
-`check-config` reads the profile files without changing the active routes. Both commands exit nonzero on invalid configuration, and a rejected reload keeps the active configuration. A successful reload prints `:ok`; refresh the dashboard to see the change. Each node reads its own files, so distribute the same configuration to every node and reload each one.
+`check-config` reads the profile files without changing the active routes, prints how many profiles it read, and warns about each `.yaml` file, which is never loaded because profile files end in `.yml`. Both commands exit nonzero on invalid configuration, and a rejected reload keeps the active configuration. A successful reload prints `:ok`; refresh the dashboard to see the change. Each node reads its own files, so distribute the same configuration to every node and reload each one.
 
 ## Routes
 

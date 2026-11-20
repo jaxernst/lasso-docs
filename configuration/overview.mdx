@@ -38,7 +38,7 @@ chains:
 
 OSS does not authenticate clients or enforce per-client request quotas. Configure authentication and inbound rate limiting at your reverse proxy. Provider quota and circuit-breaker backoff are separate routing controls.
 
-Profile slugs must match their `.yml` filenames. Files beginning with `_` or `.` are skipped. Keep a `public.yml` profile: routes without a profile use `public`, and it is required at startup. `unlisted: true` hides a profile from the selector; its endpoints remain accessible.
+Profile slugs must match their `.yml` filenames. A `.yaml` file is never loaded; the loader and `lasso check-config` print a warning naming it. Files beginning with `_` or `.` are skipped. Keep a `public.yml` profile: routes without a profile use `public`, and it is required at startup. `unlisted: true` hides a profile from the selector; its endpoints remain accessible.
 
 ## Validation
 

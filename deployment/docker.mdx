@@ -3,7 +3,7 @@ title: Docker deployment
 description: Run, verify, configure, upgrade, and roll back the public RPC Core image.
 ---
 
-The example below installs the v0.8.5 container. Its image digest and
+The example below installs the v0.8.6 container. Its image digest and
 verification reports are on [versions and evidence](/releases-and-availability).
 
 The primary distribution is `ghcr.io/jaxernst/lasso-rpc`, with native Linux AMD64
@@ -12,7 +12,7 @@ requires Docker Compose and OpenSSL for generating local secrets:
 
 ```bash
 mkdir lasso && cd lasso
-curl --fail --location https://github.com/jaxernst/lasso-rpc/releases/download/v0.8.5/compose.yml --output compose.yml
+curl --fail --location https://github.com/jaxernst/lasso-rpc/releases/download/v0.8.6/compose.yml --output compose.yml
 (umask 077; printf 'SECRET_KEY_BASE=%s\nRELEASE_COOKIE=%s\n' "$(openssl rand -hex 64)" "$(openssl rand -hex 32)" > .env)
 docker compose up -d --wait
 curl --fail http://localhost:4000/api/health
@@ -56,7 +56,7 @@ gh attestation verify oci://ghcr.io/jaxernst/lasso-rpc@sha256:DIGEST \
 The signed attestation identifies the publication workflow. Platform BuildKit
 provenance records the pinned public source used for the build; the index also
 contains SBOMs. Source and publication-tooling revisions are recorded separately
-in `container-release.json`. See [Releasing](https://github.com/jaxernst/lasso-rpc/blob/v0.8.5/docs/RELEASING.md) for the verification
+in `container-release.json`. See [Releasing](https://github.com/jaxernst/lasso-rpc/blob/v0.8.6/docs/RELEASING.md) for the verification
 scope, first-publication access setup, and retry behavior.
 
 #### Custom profiles and credentials
@@ -88,16 +88,28 @@ services:
 ```
 
 Edit the YAML in `profiles/`, retaining a valid `public.yml`. Additional profiles
-need matching filenames and frontmatter slugs. See [Configuration](https://github.com/jaxernst/lasso-rpc/blob/v0.8.5/docs/CONFIGURATION.md)
+need matching filenames and frontmatter slugs: a profile with `slug: my-app` must
+be saved as `my-app.yml`. Lasso loads a profile only from a file named
+`<slug>.yml`; a file under any other name, such as `my-app.yaml`, is not loaded.
+See [Configuration](https://github.com/jaxernst/lasso-rpc/blob/v0.8.6/docs/CONFIGURATION.md)
 for supported settings. Files must be readable by UID 10001 and directories
 traversable by that UID; host directories used for writable history must also be
 writable by UID 10001. Keep credential values in `.env` and reference them as
-`${VARIABLE_NAME}` in provider URLs or headers.
+`${VARIABLE_NAME}` in provider URLs or headers. Add the variables to `.env`
+before recreating the container; the container reads `.env` only when it is
+created, and a profile with an unresolved variable is rejected.
 
 Apply mount changes or environment changes:
 
 ```bash
 docker compose up -d --force-recreate --wait
+```
+
+Then confirm the node accepts every file, including new ones. The profile count
+it prints includes each file it read:
+
+```bash
+docker compose exec -T lasso /app/bin/lasso check-config
 ```
 
 For new profiles and YAML-only edits, validate and reload the running node
@@ -140,8 +152,18 @@ and reloading; application-side configuration saves need a writable mount.
 
 Do not run `down --volumes` as an upgrade step.
 
-Upgrading from v0.8.x to v0.8.5 needs no journal or history migration; secrets
+Upgrading from v0.8.x to v0.8.6 needs no journal or history migration; secrets
 and data carry over. Before you switch:
+
+- Rename any `*.yaml` profile file to `.yml`. Lasso never loads a `.yaml` file;
+  `check-config` and the profile load log now name each one.
+- HTTP 402 and 406 refusals no longer open circuits. They appear as rate limits
+  and [capability refusals](/api/error-codes#gateway-refusals), so alerts keyed
+  on those circuit openings stop firing.
+- `LASSO_COWBOY_TELEMETRY_ENABLED` has no effect: Cowboy request telemetry is
+  always on. Remove the variable when convenient.
+
+From an earlier v0.8 release, also check these changes from v0.8.1 through v0.8.5:
 
 - Check that every `capabilities.unsupported_categories` and
   `error_rules[].category` name is one Lasso knows (see

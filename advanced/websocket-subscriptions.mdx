@@ -49,10 +49,10 @@ When no source covers the missed range in time, or replay, history or buffer
 limits run out, Lasso closes the client with `1011` instead of delivering a
 gap. The application reconnects and reconciles its durable checkpoint.
 
-Use the [v0.8.5 configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.8.5/docs/CONFIGURATION.md)
+Use the [v0.8.6 configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.8.6/docs/CONFIGURATION.md)
 for supported configuration keys. The released
-[stream coordinator](https://github.com/jaxernst/lasso-rpc/blob/v0.8.5/lib/lasso/core/streaming/stream_coordinator.ex)
-and [backfill](https://github.com/jaxernst/lasso-rpc/blob/v0.8.5/lib/lasso/core/streaming/backfill.ex)
+[stream coordinator](https://github.com/jaxernst/lasso-rpc/blob/v0.8.6/lib/lasso/core/streaming/stream_coordinator.ex)
+and [backfill](https://github.com/jaxernst/lasso-rpc/blob/v0.8.6/lib/lasso/core/streaming/backfill.ex)
 are the implementation references. Internal process defaults are not necessarily
 YAML settings, and increasing a limit cannot supply missing provider history.
 

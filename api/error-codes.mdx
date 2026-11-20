@@ -23,8 +23,8 @@ batch returns HTTP 204. Core routes batch items independently.
 | `-32602` | Invalid params | A method's parameters are invalid. |
 | `-32603` | Internal error | An error reported by Lasso or preserved from an upstream. |
 | `-32000` | Server error | Routing exhausted its eligible attempts. |
-| `-32005` | Limit exceeded | Every eligible provider's [outbound request budget](#outbound-request-budget) is spent, an `eth_getLogs` range a provider refused, or Lasso's response-size cap; see [large queries](#large-eth_getlogs-queries). |
-| `-32006` | Capability refusal | No provider could serve a one-block `eth_getLogs` query; see [one-block queries](#one-block-eth_getlogs-queries). |
+| `-32005` | Limit exceeded | Every eligible provider's [outbound request budget](#outbound-request-budget) is spent, the providers rate limited the request or reported a spent plan allowance ([details](#rate-limits-and-spent-allowances)), an `eth_getLogs` range a provider refused, or Lasso's response-size cap; see [large queries](#large-eth_getlogs-queries). |
+| `-32006` | Capability refusal | No provider could serve a one-block `eth_getLogs` query, or a gateway refused the request with HTTP 406; see [one-block queries](#one-block-eth_getlogs-queries) and [gateway refusals](#gateway-refusals). |
 | `-32008` | Local capacity | Lasso had no local transport capacity before dispatch; retry a replay-safe request. |
 
 These are categories, not a promise that every example uses exactly that code.
@@ -77,8 +77,8 @@ on current circuit state:
 ```
 
 The shape comes from the released
-[controller regression](https://github.com/jaxernst/lasso-rpc/blob/v0.8.5/test/lasso_web/controllers/rpc_controller_test.exs)
-and [request pipeline](https://github.com/jaxernst/lasso-rpc/blob/v0.8.5/lib/lasso/core/request/request_pipeline.ex).
+[controller regression](https://github.com/jaxernst/lasso-rpc/blob/v0.8.6/test/lasso_web/controllers/rpc_controller_test.exs)
+and [request pipeline](https://github.com/jaxernst/lasso-rpc/blob/v0.8.6/lib/lasso/core/request/request_pipeline.ex).
 When every upstream a request reached rejected the method, Core returns that
 upstream's `-32601` with its message and data instead. If another outcome
 occurred, such as a provider failure, quota exhaustion or timeout, you get that
@@ -174,15 +174,49 @@ it, Core returns a capability refusal with no narrowing advice:
 Add a provider that retains that block's history, or query a more recent block.
 A query from block N through N+1 covers two blocks and still gets range advice.
 
+## Rate limits and spent allowances
+
+An upstream answers HTTP 429 when it throttles and HTTP 402 when its plan
+allowance is spent. Lasso handles both the same way: it moves the request to
+the next eligible provider, holds the refusing provider back for
+[the wait it asks for](/concepts/circuit-breakers#rate-limit-cooldowns), and
+never counts the refusal toward its circuit. When every provider the request
+reached refused it this way, Core returns `-32005` over HTTP 200. `data` carries
+only `retry_after_ms`, when the provider asked for a wait, and none of the
+upstream's response body. Wait that long before retrying a replay-safe request.
+
+## Gateway refusals
+
+Some gateways refuse a method with HTTP 406 and a non-JSON-RPC body, such as an
+HTML page, before their RPC handler runs. Lasso treats that as a refusal of this
+request only: it tries the next eligible provider and leaves the refusing
+provider's circuit closed, so its other methods keep serving. When no provider
+serves the request, Core returns a capability refusal with no upstream body:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "client-request-42",
+  "error": {
+    "code": -32006,
+    "message": "Provider refused the request (HTTP 406)",
+    "data": {"status": 406}
+  }
+}
+```
+
+A 406 that carries a JSON-RPC error is classified by that error's code. Add a
+provider that serves the method, or send the request to a route that has one.
+
 ## Upstream errors and retry safety
 
 An upstream can return a JSON-RPC error body with any HTTP status, but the
 Core HTTP client validates and preserves that body only for a 2xx response.
-HTTP status decides first: 429, 408, other 4xx, and 5xx statuses are transport
+HTTP status decides first: 429, 402, 408, other 4xx, and 5xx statuses are transport
 or upstream-status failures, even when their body contains a JSON-RPC error, so
-a replay-safe read moves to another provider. A 429 is always a rate limit;
-[its cooldown](/concepts/circuit-breakers#rate-limit-cooldowns) follows the
-provider's `Retry-After`. A structurally valid, request-correlated error in a 2xx response keeps
+a replay-safe read moves to another provider. A 429 or 402 is always a
+[rate limit](#rate-limits-and-spent-allowances), and a 406 whose body isn't a
+JSON-RPC error is a [gateway refusal](#gateway-refusals). A structurally valid, request-correlated error in a 2xx response keeps
 its provider code and wording. Gateway text, HTML, and malformed 2xx envelopes
 are not authoritative JSON-RPC errors.
 
