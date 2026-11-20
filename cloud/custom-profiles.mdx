@@ -80,6 +80,24 @@ Editing rules:
   profile since you read it. After a lost response, re-read the revision
   rather than repeating the `PUT` blindly.
 
+## The dashboard edit view
+
+Editing a profile in the dashboard shows an **Endpoints** list: one row per
+chain, opening that chain's own detail panel, with its providers listed below
+it. **Reorder** swaps each provider row for priority arrows that move it up
+or down; this only matters for chains using the `priority` strategy. Each
+chain also reads its failover readiness: shared public capacity only, best
+effort under load; one provider, with nothing to fail over to; or failing
+over across however many providers are ready.
+
+A **Capacity and coverage** panel reads the latest deep check of the
+profile's providers: tested throughput (summed across providers that were
+load tested; shared public providers are never load tested), historical
+depth, and the widest `eth_getLogs` range any provider served. Run
+**Check *n* providers** (or **Check again** once it's run) to refresh it. A
+retest that finds nothing new to change reports **No changes detected** and
+leaves the profile as is.
+
 ## Onboarding: what Lasso checks
 
 When you save, Lasso checks the chain identity (`eth_chainId`) of every new or
