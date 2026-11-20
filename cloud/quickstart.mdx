@@ -106,8 +106,8 @@ The strategy is a URL segment, so each call site can choose its own:
 
 | Strategy | Use it for | Premium price |
 |---|---|---|
-| `balanced-fast` (the default) | User-facing reads | 1.5x |
-| `fastest` | Trading and other latency-critical paths | 2x |
+| `balanced-fast` (the default) | User-facing reads | 1.25x |
+| `fastest` | Trading and other latency-critical paths | 1.75x |
 | `load-balanced` | Backends and indexers | 1x |
 | `priority` | A preferred primary with backups, on a Custom profile | 1x |
 
