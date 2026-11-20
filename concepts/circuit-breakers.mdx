@@ -26,6 +26,22 @@ works normally during that time.
 Chain-identity probes record identity and health; routed requests and head polls
 decide when a circuit opens and recovers.
 
+## Refusals that leave the circuit closed
+
+Some refusals say nothing about a provider's health, so they never count toward
+its circuit:
+
+- HTTP 429, a rate limit.
+- HTTP 402, a spent plan allowance.
+- HTTP 406 with a body that isn't a JSON-RPC error: a gateway refusing the
+  request before its RPC handler runs.
+
+Lasso moves the request to the next eligible provider. A 429 or 402 also
+starts a [cooldown](#rate-limit-cooldowns). A 406 affects only the request it
+refused, so the provider keeps serving its other methods.
+See [error codes](/api/error-codes#rate-limits-and-spent-allowances) for what
+the client receives when every provider refuses.
+
 ## Rate limits and shared providers
 
 Rate-limit backoff is a separate signal from circuit failure. A provider can be temporarily rate limited while its circuit remains closed. Identical upstreams shared across profiles share runtime signals; creating another profile does not bypass the provider's real quota.
@@ -36,7 +52,7 @@ spent budget sends nothing, so it never opens a circuit or starts a cooldown.
 
 ### Rate-limit cooldowns
 
-An HTTP 429 moves the provider behind healthy ones for as long as it asks.
+An HTTP 429 or 402 moves the provider behind healthy ones for as long as it asks.
 Lasso reads the delay in this order:
 
 1. A `Retry-After` header, in seconds or as an HTTP date.
@@ -47,7 +63,7 @@ Lasso reads the delay in this order:
 Without any of these, the default cooldown is 30 seconds. Every delay is capped
 at ten minutes. A zero or past `Retry-After` falls through to the body hint or
 the default, so it can't send traffic straight back to a provider that is still
-refusing. Lasso keeps the 429's JSON-RPC code and up to 1,000 bytes of its
+refusing. Lasso keeps the refusal's JSON-RPC code and up to 1,000 bytes of its
 message, and discards the rest of the body. A quota refusal keeps its longer
 cooldown.
 
