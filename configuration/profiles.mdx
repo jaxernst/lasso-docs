@@ -24,7 +24,6 @@ chains:
       lag_alert_threshold_blocks: 5
 
     selection:
-      max_lag_blocks: 1
       archival_threshold: 128
 
     websocket:
@@ -78,8 +77,12 @@ Controls provider eligibility filtering during request routing.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `max_lag_blocks` | integer | unset | Filter routes proven more than N blocks behind a qualified profile reference. Missing or ambiguous evidence stays eligible; if every route lags, Core keeps them available |
 | `archival_threshold` | integer | 128 | Blocks before data is considered "archival". Requests for blocks older than `head - threshold` are only routed to archival providers |
+
+`max_lag_blocks` was removed in v0.9.0. A profile that still sets it keeps
+loading; the field has no effect, and each load logs a warning naming the
+profile and chains. Head freshness is now automatic and scales with
+`block_time_ms` — see [Head freshness](/advanced/block-sync#head-freshness).
 
 ### Transaction providers
 

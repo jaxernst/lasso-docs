@@ -28,7 +28,10 @@ non-retriable [`archive_required`](/api/error-codes#core-routing-exhaustion)
 error without contacting an upstream. An `archival: true` flag is configuration,
 not measured proof of state, receipts, logs or every selector shape.
 
-Lag selection uses Core's head observations and configured lag allowance.
+A route behind the chain's freshest observed head is deferred, not excluded,
+for requests that need the moving head; its need comes from the request's own
+parameters, and the deferral band scales with `block_time_ms`. See
+[Head freshness](/advanced/block-sync#head-freshness) for the full rule.
 Unknown or stale evidence must not be interpreted as verified head agreement.
 See [block regression protection](/advanced/block-continuity) for the separate
 request-level policy and its evidence boundaries.
@@ -45,7 +48,6 @@ chains:
   ethereum:
     chain_id: 1
     selection:
-      max_lag_blocks: 2
       archival_threshold: 128
     providers:
       - id: local_node
@@ -60,8 +62,8 @@ chains:
 
 `selection` belongs under the chain. The profile body accepts only the `chains`
 mapping. A `routing.method_overrides` block is not supported. See the released
-[file schema](https://github.com/jaxernst/lasso-rpc/blob/v0.8.6/lib/lasso/config/file_schema.ex)
-and [configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.8.6/docs/CONFIGURATION.md#provider-capabilities).
+[file schema](https://github.com/jaxernst/lasso-rpc/blob/v0.9.0/lib/lasso/config/file_schema.ex)
+and [configuration reference](https://github.com/jaxernst/lasso-rpc/blob/v0.9.0/docs/CONFIGURATION.md#provider-capabilities).
 
 ## Strategy ranking
 

@@ -84,7 +84,7 @@ upstream-backed RPC check for your actual method and provider pool.
 
 Lasso serves HTTP. Terminate TLS at your reverse proxy or load balancer. Set `PHX_HOST` to your public hostname. Production URL generation defaults to HTTPS; set `PHX_SCHEME=http` when serving locally without a TLS proxy.
 
-Put a reverse proxy that speaks HTTP/1.1 to Lasso in front of any public node. Cowboy has no release yet that fixes [EEF-CVE-2026-115701](https://osv.dev/vulnerability/EEF-CVE-2026-115701) (HTTP/1.1 pipelining) or [EEF-CVE-2026-113431](https://osv.dev/vulnerability/EEF-CVE-2026-113431) (HTTP/2 headers in Cowlib), and both can exhaust a directly exposed node's memory. The [Caddy](https://github.com/jaxernst/lasso-rpc/blob/v0.8.6/deployment/proxy/Caddyfile) and [nginx](https://github.com/jaxernst/lasso-rpc/blob/v0.8.6/deployment/proxy/nginx.conf) examples in the repository do this.
+Put a reverse proxy that speaks HTTP/1.1 to Lasso in front of any public node. Cowboy has no release yet that fixes [EEF-CVE-2026-115701](https://osv.dev/vulnerability/EEF-CVE-2026-115701) (HTTP/1.1 pipelining) or [EEF-CVE-2026-113431](https://osv.dev/vulnerability/EEF-CVE-2026-113431) (HTTP/2 headers in Cowlib), and both can exhaust a directly exposed node's memory. The [Caddy](https://github.com/jaxernst/lasso-rpc/blob/v0.9.0/deployment/proxy/Caddyfile) and [nginx](https://github.com/jaxernst/lasso-rpc/blob/v0.9.0/deployment/proxy/nginx.conf) examples in the repository do this.
 
 ---
 

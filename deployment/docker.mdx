@@ -3,7 +3,7 @@ title: Docker deployment
 description: Run, verify, configure, upgrade, and roll back the public RPC Core image.
 ---
 
-The example below installs the v0.8.6 container. Its image digest and
+The example below installs the v0.9.0 container. Its image digest and
 verification reports are on [versions and evidence](/releases-and-availability).
 
 The primary distribution is `ghcr.io/jaxernst/lasso-rpc`, with native Linux AMD64
@@ -12,7 +12,7 @@ requires Docker Compose and OpenSSL for generating local secrets:
 
 ```bash
 mkdir lasso && cd lasso
-curl --fail --location https://github.com/jaxernst/lasso-rpc/releases/download/v0.8.6/compose.yml --output compose.yml
+curl --fail --location https://github.com/jaxernst/lasso-rpc/releases/download/v0.9.0/compose.yml --output compose.yml
 (umask 077; printf 'SECRET_KEY_BASE=%s\nRELEASE_COOKIE=%s\n' "$(openssl rand -hex 64)" "$(openssl rand -hex 32)" > .env)
 docker compose up -d --wait
 curl --fail http://localhost:4000/api/health
@@ -56,7 +56,7 @@ gh attestation verify oci://ghcr.io/jaxernst/lasso-rpc@sha256:DIGEST \
 The signed attestation identifies the publication workflow. Platform BuildKit
 provenance records the pinned public source used for the build; the index also
 contains SBOMs. Source and publication-tooling revisions are recorded separately
-in `container-release.json`. See [Releasing](https://github.com/jaxernst/lasso-rpc/blob/v0.8.6/docs/RELEASING.md) for the verification
+in `container-release.json`. See [Releasing](https://github.com/jaxernst/lasso-rpc/blob/v0.9.0/docs/RELEASING.md) for the verification
 scope, first-publication access setup, and retry behavior.
 
 #### Custom profiles and credentials
@@ -91,7 +91,7 @@ Edit the YAML in `profiles/`, retaining a valid `public.yml`. Additional profile
 need matching filenames and frontmatter slugs: a profile with `slug: my-app` must
 be saved as `my-app.yml`. Lasso loads a profile only from a file named
 `<slug>.yml`; a file under any other name, such as `my-app.yaml`, is not loaded.
-See [Configuration](https://github.com/jaxernst/lasso-rpc/blob/v0.8.6/docs/CONFIGURATION.md)
+See [Configuration](https://github.com/jaxernst/lasso-rpc/blob/v0.9.0/docs/CONFIGURATION.md)
 for supported settings. Files must be readable by UID 10001 and directories
 traversable by that UID; host directories used for writable history must also be
 writable by UID 10001. Keep credential values in `.env` and reference them as
@@ -152,8 +152,23 @@ and reloading; application-side configuration saves need a writable mount.
 
 Do not run `down --volumes` as an upgrade step.
 
-Upgrading from v0.8.x to v0.8.6 needs no journal or history migration; secrets
-and data carry over. Before you switch:
+Upgrading from v0.8.x to v0.9.0 needs no storage format changes; the container
+deployment, including the downloadable Compose file, upgrades with the new
+image alone and keeps its distribution behavior and data paths. Before you
+switch:
+
+- Remove `selection.max_lag_blocks` from your profiles to silence its warning.
+  A profile that still sets it keeps loading; the field has no effect, and
+  each load logs a warning naming the profile and chains. Freshness preference
+  is now automatic and follows `block_time_ms` — see
+  [Head freshness](/advanced/block-sync#head-freshness).
+- Expect traffic to move: requests for the latest block try lagging providers
+  after current ones, `balanced-fast` spreads each method family across
+  reliable upstreams, and an upstream whose health probe times out twice in a
+  row has its HTTP circuit opened ([fastest and balanced-fast](/concepts/routing-strategies),
+  [circuit breaker timeouts](/concepts/circuit-breakers#timeouts)).
+
+From an earlier v0.8 release, also check these changes in v0.8.6:
 
 - Rename any `*.yaml` profile file to `.yml`. Lasso never loads a `.yaml` file;
   `check-config` and the profile load log now name each one.
@@ -163,7 +178,7 @@ and data carry over. Before you switch:
 - `LASSO_COWBOY_TELEMETRY_ENABLED` has no effect: Cowboy request telemetry is
   always on. Remove the variable when convenient.
 
-From an earlier v0.8 release, also check these changes from v0.8.1 through v0.8.5:
+From v0.8.1 through v0.8.5, also check these changes:
 
 - Check that every `capabilities.unsupported_categories` and
   `error_rules[].category` name is one Lasso knows (see
