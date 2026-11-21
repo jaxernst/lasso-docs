@@ -33,6 +33,9 @@ to use these signals together, read [routing evidence](/cloud/observability).
 | `RateLimit-Policy`, `RateLimit` | IETF rate-limit fields, named after the bucket that bound the request: `managed`, `public` or the Custom profile's slug |
 | `x-lasso-meta` | With `include_meta=headers`: unpadded base64url JSON of `lasso_meta` |
 | `x-lasso-fallback-profile` | Present only when a routing fallback served the request on a different profile than `service_profile_id` named |
+| `x-lasso-routing-capacity` | Whose capacity served the request: `shared` (the managed pool, or a public endpoint a Custom provider also uses), `customer-owned`, or `mixed` for a batch that used both |
+| `x-lasso-shared-fallback-throttled` | `true` when a shared-capacity candidate inside a Custom profile was skipped because that capacity boundary was constrained |
+| `x-lasso-shared-fallback-throttled-count` | How many shared candidates were skipped across the response |
 
 | `x-lasso-fallback` | Why |
 |---|---|
