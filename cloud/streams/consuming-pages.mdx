@@ -58,7 +58,7 @@ page, or a `: pending` comment while blocks are being fetched, at least every
 |---|---|---|
 | 400 | `invalid_parameter` | Fix the request. Pass `next` as `from`, not `cursor`. Start fresh after changing filters. |
 | 401 | `unauthorized` | Stop; use an enabled current key. |
-| 402 | `balance_exhausted` | Stop; fund within your budget, then resume the saved position. |
+| 402 | `balance_exhausted` | Stop; fund within your budget, then resume the saved position. A confirmed (200) credit can reach Streams after your next read: if that read still answers `balance_exhausted`, retry the same position after a short wait instead of paying again. |
 | 403 | `not_entitled` | Stop; request beta access from the dashboard's Streams page. |
 | 404 | `chain_not_served` | Choose a supported chain. |
 | 409 | `resync_required` | Clear this source's rows and checkpoint together, then rebuild from your own start block. |
