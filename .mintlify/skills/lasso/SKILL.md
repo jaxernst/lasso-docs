@@ -224,8 +224,8 @@ To switch profiles, replace the profile segment; do not append another one.
 | Strategy | Behavior | Use for | Price factor |
 |---|---|---|---|
 | `load-balanced` | Random within the healthiest providers | Backends, indexers | 1x |
-| `balanced-fast` (default on Premium) | Spreads traffic, favoring recently fast providers | User-facing reads | 1.5x |
-| `fastest` | Lowest recent latency per provider, kind of request and transport; concentrates traffic | Latency-critical paths | 2x |
+| `balanced-fast` (default on Premium) | Spreads traffic, favoring recently fast providers | User-facing reads | 1.25x |
+| `fastest` | Lowest recent latency per provider, kind of request and transport; concentrates traffic | Latency-critical paths | 1.75x |
 | `priority` | Configured order within the healthy providers | Custom profiles with a preferred primary | 1x |
 
 Health and known capability steer candidates first. Premium and Custom serve all four strategies; `public`,
