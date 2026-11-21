@@ -59,12 +59,12 @@ When you want your own provider accounts or nodes in the mix, a Custom profile l
 
 ## 4. Estimate the cost
 
-Each method has a flat compute-unit (CU) rate at $0.000005 per CU, multiplied by the strategy: load-balanced 1×, balanced-fast 1.5×, fastest 2×. `eth_call` is 3 CU.
+Each method has a flat compute-unit (CU) rate at $0.000005 per CU, multiplied by the strategy: load-balanced 1×, balanced-fast 1.25×, fastest 1.75×. `eth_call` is 3 CU.
 
 | 2M `eth_call` a month | CU | From a balance | On Pro |
 | --- | --- | --- | --- |
 | load-balanced | 6M | $30 | inside Pro's 10M included CU, $20 a month |
-| balanced-fast | 9M | $45 | inside Pro's 10M included CU, $20 a month |
+| balanced-fast | 7.5M | $37.50 | inside Pro's 10M included CU, $20 a month |
 
 A new key starts with a $0.025 balance. To fund it, subscribe to Pro from the dashboard after claiming, or add credit with `POST /api/v1/accounts/<id>/credit`, which any x402 or MPP client can pay. Other methods have their own rates; every method's price per strategy is in [agent.json](https://lasso.sh/agent.json). A paid account keeps serving on public providers for 30 days if its balance runs out, so the app doesn't go dark on an empty balance.
 
