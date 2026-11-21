@@ -209,7 +209,7 @@ instead; it works without protection.
 | Call | Result |
 |---|---|
 | `GET /api/v1/profiles`, `GET /api/v1/profiles/{slug}` | Document, revision, provider status and knowledge; URLs and header values are never returned |
-| `GET /api/v1/profiles/{slug}` with `Accept: application/yaml` | A Lasso RPC Core YAML file with secrets replaced by environment references. Core has no `standby` mode, so a profile using it returns 422 `invalid_config` |
+| `GET /api/v1/profiles/{slug}` with `Accept: application/yaml` | A Lasso RPC Core YAML file with secrets replaced by environment references. Standby providers are included; turned-off providers are left out and listed in the file's header comment |
 | `DELETE /api/v1/profiles/{slug}` | Removes the profile with its providers and revisions ([what deletion removes](/cloud/data-handling#how-lasso-holds-your-provider-credentials)); URLs naming it serve as `premium` with `x-lasso-fallback: profile` |
 
 ## Limits
