@@ -9,6 +9,37 @@ explains it. To check what's serving right now, read `source_sha` from
 [`/api/health`](https://lasso.sh/api/health). RPC Core releases have their own
 notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
 
+<Update label="November 21, 2026, second release" description="Release 323" tags={["Pricing", "Custom profiles", "Keys", "Routing"]}>
+
+- **Lower prices for faster routing.** `balanced-fast` now costs 1.25x a
+  load-balanced request, down from 1.5x, and `fastest` costs 1.75x, down from
+  2x. Load-balanced and priority stay at 1x. An `eth_call` on `balanced-fast`
+  is $0.00001875, and on `fastest` $0.00002625.
+  [Pricing](/cloud/serving-access-and-pricing)
+- **WebSocket URLs for Custom providers.** Set or change a provider's
+  WebSocket URL while you draft a Custom profile. Paste a WebSocket URL and it
+  attaches to its provider; a key for a supported vendor also fills in that
+  vendor's WebSocket URL. Before a socket goes live, Lasso checks that it
+  serves the provider's chain. If it doesn't, the provider runs on HTTP and
+  its panel says the socket is unused.
+- **Provider credentials stay on their origin.** A provider's headers go to
+  its WebSocket only when the socket shares the HTTP URL's host and port. For
+  a socket on another host, put its credentials in the socket URL.
+- **Keys on provider-pinned URLs.** Provider-pinned URLs take your key as a
+  path segment too: `/rpc/k/<key>/provider/<id>/<chain>`, and the same under a
+  profile. A 401 names the three ways to send a key: a `/k/<key>` path
+  segment, a `key=` parameter or an `x-lasso-api-key` header.
+- **Hung providers leave rotation.** When a request to a provider times out,
+  Lasso probes that provider on its own budget. A provider that accepts
+  connections but never answers fails those probes, its circuit opens, and
+  traffic moves to healthy routes.
+- **Smarter fastest and latest reads.**
+  - `fastest` tries routes with recent failures last.
+  - Latest reads judge a provider's lag against how old its last head report
+    is, so a provider that is always behind stays out of latest reads.
+
+</Update>
+
 <Update label="November 21, 2026" description="Release 322" tags={["Custom profiles", "Pricing", "Agents"]}>
 
 - **Bring any RPC vendor to a Custom profile.** The new-profile picker lists
