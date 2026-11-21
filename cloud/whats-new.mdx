@@ -9,6 +9,32 @@ explains it. To check what's serving right now, read `source_sha` from
 [`/api/health`](https://lasso.sh/api/health). RPC Core releases have their own
 notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
 
+<Update label="November 21, 2026" description="Release 322" tags={["Custom profiles", "Pricing", "Agents"]}>
+
+- **Bring any RPC vendor to a Custom profile.** The new-profile picker lists
+  every common RPC vendor. Paste an endpoint from any of them, or build the
+  URLs from a single key where the vendor supports it.
+  [Custom profiles](/cloud/custom-profiles)
+- **See what each provider has shown Lasso.** A provider's deep check now
+  sends a few known-bad requests and records how the provider answers them.
+  The evidence list shows the widest log range each provider has served.
+  [Lasso learns your providers](/cloud/custom-profiles#lasso-learns-your-providers)
+- **Take a Custom profile with you.** Export any Custom profile as a Lasso RPC
+  configuration file, including standby and turned-off providers, and run the
+  same setup on your own infrastructure.
+  [Other operations](/cloud/custom-profiles#other-operations)
+- **Custom plans and trials.**
+  - Lasso commits to advance notice and refunds if the hosted service ever
+    shuts down. [Terms](https://lasso.sh/terms)
+  - You get a warning before free Custom days end.
+  - Agents can redeem a Custom trial link with their management token.
+  - Higher rate limits on the Custom plan are available on request.
+    [Pricing](https://lasso.sh/pricing)
+  - The [Resilience](https://lasso.sh/#resilience) page links to an
+    independent uptime monitor.
+
+</Update>
+
 <Update label="November 19, 2026" description="Release 320" tags={["Custom profiles", "Dashboard", "Privacy", "Performance"]}>
 
 - **A clearer Custom profile overview.** Each chain endpoint gets one row,
