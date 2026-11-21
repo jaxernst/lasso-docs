@@ -51,6 +51,7 @@ other field is optional:
 | `background_observations` | provider | `false` stops background checks and idle recovery on a provider you're not actively using; defaults to `true`. `heads: off` only stops head observation |
 | `health_checks`: `standard` or `light` | chain | Lasso's checks should spend less of your provider quota |
 | `error_interpretation` | profile | You opt in to Lasso interpreting your providers' error messages |
+| `log_ranges`: `single` (default) or `split` | profile | A wide `eth_getLogs` range should serve as block-range slices across the chain's providers, returned as one response, instead of going whole to one provider |
 | `limits`: `archival`, `logs_span`, `methods_blocked` | provider | You know a limit Lasso hasn't learned, such as your plan's log-span cap |
 | `transactions`: `{providers, fallback}` | chain | Signed transactions on this chain should only reach specific providers |
 | `enabled` | provider | You want to stop routing and background observation on a provider while keeping its settings and credentials; defaults to `true`. Omitting it on `PUT` resets it to `true` |
@@ -234,7 +235,7 @@ instead; it works without protection.
 | Call | Result |
 |---|---|
 | `GET /api/v1/profiles`, `GET /api/v1/profiles/{slug}` | Document, revision, provider status and knowledge; URLs and header values are never returned |
-| `GET /api/v1/profiles/{slug}` with `Accept: application/yaml` | A Lasso RPC Core YAML file with secrets replaced by environment references. Standby providers are included; turned-off providers are left out and listed in the file's header comment |
+| `GET /api/v1/profiles/{slug}` with `Accept: application/yaml` | A Lasso RPC Core YAML file with secrets replaced by environment references. A `standby` provider exports with a comment: it subscribes as Core's own fallback only when no provider on the chain is live. A turned-off provider is left out and named in the header comment. Returns 422 `invalid_config` only when a send policy would lose every relay, or every provider outside the policy, to turned-off providers |
 | `DELETE /api/v1/profiles/{slug}` | Removes the profile with its providers and revisions ([what deletion removes](/cloud/data-handling#how-lasso-holds-your-provider-credentials)); URLs naming it serve as `premium` with `x-lasso-fallback: profile` |
 
 ## Limits
