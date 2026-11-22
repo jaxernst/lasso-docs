@@ -9,6 +9,21 @@ explains it. To check what's serving right now, read `source_sha` from
 [`/api/health`](https://lasso.sh/api/health). RPC Core releases have their own
 notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
 
+<Update label="November 22, 2026" description="Release 324" tags={["Routing", "Custom profiles", "Dashboard", "Reliability"]}>
+
+- **Balanced-fast is the default everywhere but Public.** A URL with no
+  strategy segment now routes `balanced-fast` on Custom profiles too, not only
+  Premium; a pinned provider and Public still use `load-balanced`.
+  [Routing](/cloud/routing)
+- **Provider lag shows by time, not blocks.** The dashboard marks a provider
+  **Lagging** once it trails the chain's reference head by more than 10
+  seconds, converted to blocks at the chain's measured cadence, so a fast
+  chain like Base doesn't trip the warning early.
+  [Custom profiles](/cloud/custom-profiles#head-tracking)
+- Routing, historical-read and `eth_getLogs` reliability improvements.
+
+</Update>
+
 <Update label="November 21, 2026, second release" description="Release 323" tags={["Pricing", "Custom profiles", "Keys", "Routing"]}>
 
 - **Lower prices for faster routing.** `balanced-fast` now costs 1.25x a

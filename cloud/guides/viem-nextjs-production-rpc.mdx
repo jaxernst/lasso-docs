@@ -18,7 +18,7 @@ curl -fsS https://lasso.sh/api/v1/keys \
 
 The response holds `key`, `rpc_url_template`, a `management_token` and a `claim_url`. There is no signup: open `claim_url` within 24 hours to attach the account to your login, and every URL keeps working. Store the key and token in your secret store, not in the repo.
 
-`rpc_url_template` contains `{chain}`. Replace it with `ethereum` and `base`. These URLs use `balanced-fast`, the Premium default for user-facing reads: it spreads traffic across providers, favoring the recently fast ones.
+`rpc_url_template` contains `{chain}`. Replace it with `ethereum` and `base`. These URLs use `balanced-fast`, the default strategy for user-facing reads: it spreads traffic across providers, favoring the recently fast ones.
 
 ## 2. Wire it into env config
 

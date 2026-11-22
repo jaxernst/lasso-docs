@@ -155,7 +155,7 @@ notifications have no response item.
 
 - `include_meta=body` adds `lasso_meta`: strategy used, candidates,
   `selected_provider`, retries (candidate advances), dispatches (physical upstream sends of the request's own method, excluding auxiliary lookups),
-  and upstream and overhead latency.
+  and upstream and overhead latency (overhead is end-to-end time minus upstream time; for a split `eth_getLogs`, upstream time is an estimate of the time at least one slice was waiting on a provider).
   `fallback_profile` names the serving profile when it differs from
   `service_profile_id` and is absent otherwise.
   `include_meta=headers` leaves the body unchanged and adds `x-lasso-meta`.
@@ -224,7 +224,7 @@ To switch profiles, replace the profile segment; do not append another one.
 | Strategy | Behavior | Use for | Price factor |
 |---|---|---|---|
 | `load-balanced` | Random within the healthiest providers | Backends, indexers | 1x |
-| `balanced-fast` (default on Premium) | Spreads traffic, favoring recently fast providers | User-facing reads | 1.25x |
+| `balanced-fast` (default) | Spreads traffic, favoring recently fast providers | User-facing reads | 1.25x |
 | `fastest` | Lowest recent latency per provider, kind of request and transport; concentrates traffic | Latency-critical paths | 1.75x |
 | `priority` | Configured order within the healthy providers | Custom profiles with a preferred primary | 1x |
 
@@ -235,7 +235,7 @@ explicit strategy URL, metadata also names `requested_strategy` and
 `strategy_adjusted`; Public `/fastest/` reports `fastest` requested and
 `load-balanced` applied. Response headers expose `x-lasso-requested-strategy`
 for explicit strategy URLs and `x-lasso-strategy` for the applied strategy. A URL without a strategy uses
-`balanced-fast` on Premium and `load-balanced` on Custom profiles.
+`balanced-fast` on Premium and Custom profiles.
 `latency-weighted` is an alias of `balanced-fast`. `agent.json` lists exact USD
 prices per method and strategy.
 
