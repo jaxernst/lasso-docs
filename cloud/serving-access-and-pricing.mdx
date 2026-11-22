@@ -29,9 +29,9 @@ x-lasso-usd: 0.00001
 
 | Serving access | Providers | Strategies | Price | Rate limit |
 |---|---|---|---|---|
-| `premium` | Lasso's premium pool | All four | Charged per request | 100 RPS |
+| `premium` | Lasso's premium pool | All four | Charged per request | 100 RPS, bursts to 200 |
 | `public` | Lasso's public pool | `load-balanced` only | Uncharged | 30 RPS, bursts to 60 |
-| `custom` | Your Custom profile's providers | All four | Uncharged; your Custom subscription covers it | 1,000 RPS per profile |
+| `custom` | Your Custom profile's providers | All four | Uncharged; your Custom subscription covers it | 1,000 RPS per profile, bursts to 2,000 |
 
 Your URL names the profile, and your account's payment state decides how it is
 served:
@@ -109,7 +109,8 @@ Limits apply per account, not per key:
 - `public` requests also draw on a **public bucket** inside it: 30 RPS with
   bursts to 60. Public traffic can never take more than 30 of your 100
   premium RPS.
-- Each Custom profile has its own 1,000 RPS bucket while it serves `custom`.
+- Each Custom profile has its own bucket while it serves `custom`: 1,000 RPS
+  with bursts to 2,000.
 
 Every response carries the IETF `RateLimit-Policy` and `RateLimit` headers,
 named after the bucket that bound the request: `managed`, `public` or the
