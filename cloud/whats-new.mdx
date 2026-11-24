@@ -9,6 +9,22 @@ explains it. To check what's serving right now, read `source_sha` from
 [`/api/health`](https://lasso.sh/api/health). RPC Core releases have their own
 notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
 
+<Update label="November 24, 2026" description="Release 326" tags={["Dashboard", "Reliability"]}>
+
+- **Provider evidence shows load-balanced deferrals and head lag.** The
+  dashboard's provider evidence panel adds a **Load share** row while
+  load-balanced routing moves a route back for failing clearly more than its
+  peers, and a **Head** row while a route is judged behind the chain's newest
+  observed block or on another branch; both show since when.
+  [Custom profiles](/cloud/custom-profiles#lasso-learns-your-providers)
+- **Activation confirms live.** Once every node serves an activated profile,
+  the dashboard replaces **Profile activated. Publication is still
+  finishing.** with its live message instead of leaving the notice up.
+  [Custom profiles](/cloud/custom-profiles#onboarding-what-lasso-checks)
+- Routing, rate-limit and `eth_getLogs` reliability improvements.
+
+</Update>
+
 <Update label="November 23, 2026" description="Release 325" tags={["Reliability"]}>
 
 - Routing, `eth_getLogs` range-splitting, log-range retry and WebSocket

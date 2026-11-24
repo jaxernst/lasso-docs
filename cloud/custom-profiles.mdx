@@ -119,8 +119,10 @@ endpoint recovers.
 
 In the dashboard, **Activating…** stays up until Lasso is serving the profile,
 so the endpoint you copy routes to your providers. If you see **Profile
-activated. Publication is still finishing.**, read `GET /api/v1/profiles/{slug}`
-until it reports `live` before moving traffic. Once your free Custom days are
+activated. Publication is still finishing.**, the dashboard keeps checking
+every node and replaces it with the live message within about a minute; or
+read `GET /api/v1/profiles/{slug}` until it reports `live` before moving
+traffic. Once your free Custom days are
 used, the footer says **Your free days have been used.** and
 **Subscribe & activate** opens Checkout.
 
@@ -175,7 +177,9 @@ is off.
 
 A provider's dashboard status also shows **Lagging** once it trails the
 chain's reference head by more than 10 seconds, converted to blocks at the
-chain's measured cadence.
+chain's measured cadence. The evidence panel adds a **Head** row on a route
+judged behind the chain's newest observed block, or on another branch; that
+route is tried last for reads at the head until a fresher observation clears it.
 
 ## Lasso learns your providers
 
@@ -207,6 +211,11 @@ succeeds. Both behaviors keep one last route when every candidate is excluded.
 Declare `limits` only for what you know better than Lasso; declared limits
 outrank learned ones. [How Lasso learns your providers](/concepts/provider-learning)
 explains how learning works and stays correct.
+
+While load-balanced routing moves a route back because its failure rate stays
+clearly above its peers', the dashboard's evidence panel shows a **Load
+share** row with the failure rate, the peer limit, its share and since when;
+it clears once the rate falls back.
 
 To correct what Lasso learned, call
 `DELETE /api/v1/profiles/{slug}/providers/{name}/knowledge`, or use the
