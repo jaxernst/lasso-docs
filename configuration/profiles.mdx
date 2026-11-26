@@ -73,7 +73,7 @@ reference does not disable another profile's observations.
 
 ### Selection
 
-Controls provider eligibility filtering during request routing.
+Controls archival routing.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -98,8 +98,8 @@ send, the request fails rather than reaching a read provider. Set `fallback`
 to `read_providers` to add an explicit second phase over the chain's other
 providers once the transaction providers are exhausted, within the same
 deadline and dispatch budget; the two sides are never ranked together. See
-the [transaction providers configuration](https://github.com/jaxernst/lasso-rpc/blob/v0.8.6/docs/CONFIGURATION.md#transaction-providers)
-and [routing behavior](https://github.com/jaxernst/lasso-rpc/blob/v0.8.6/docs/ROUTING.md#transaction-providers)
+the [transaction providers configuration](https://github.com/jaxernst/lasso-rpc/blob/v0.9.0/docs/CONFIGURATION.md#transaction-providers)
+and [routing behavior](https://github.com/jaxernst/lasso-rpc/blob/v0.9.0/docs/ROUTING.md#transaction-providers)
 for the full contract, including the private-send example profile.
 
 ### WebSocket

@@ -77,8 +77,8 @@ on current circuit state:
 ```
 
 The shape comes from the released
-[controller regression](https://github.com/jaxernst/lasso-rpc/blob/v0.8.6/test/lasso_web/controllers/rpc_controller_test.exs)
-and [request pipeline](https://github.com/jaxernst/lasso-rpc/blob/v0.8.6/lib/lasso/core/request/request_pipeline.ex).
+[controller regression](https://github.com/jaxernst/lasso-rpc/blob/v0.9.0/test/lasso_web/controllers/rpc_controller_test.exs)
+and [request pipeline](https://github.com/jaxernst/lasso-rpc/blob/v0.9.0/lib/lasso/core/request/request_pipeline.ex).
 When every upstream a request reached rejected the method, Core returns that
 upstream's `-32601` with its message and data instead. If another outcome
 occurred, such as a provider failure, quota exhaustion or timeout, you get that
