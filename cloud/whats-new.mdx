@@ -9,6 +9,26 @@ explains it. To check what's serving right now, read `source_sha` from
 [`/api/health`](https://lasso.sh/api/health). RPC Core releases have their own
 notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
 
+<Update label="November 25, 2026" description="Release 327" tags={["Custom profiles", "Transactions", "Reliability"]}>
+
+- **Custom profiles split wide `eth_getLogs` ranges by default.** A profile
+  document that omits `log_ranges` now serves a range wider than any provider
+  accepts as block-range slices across the chain's providers, instead of
+  sending it whole to one provider; set `log_ranges: single` to keep the old
+  behavior. A range refusal also advises the widest span a provider was seen
+  to accept, not just its declared cap.
+  [Custom profiles](/cloud/custom-profiles#the-document)
+- **Sends confirm across more upstreams before reporting an unknown
+  outcome.** After a send that may have broadcast, Lasso now checks each
+  upstream that could hold the transaction, not just the one that answered
+  last. When none can confirm or rule it out in time, the response is
+  `indeterminate_dispatch` instead of the prior rejection, so a genuinely
+  unknown outcome reads differently from a confirmed one.
+  [Transactions](/cloud/rpc-behavior#transactions)
+- Batch request and admission reliability improvements.
+
+</Update>
+
 <Update label="November 24, 2026" description="Release 326" tags={["Dashboard", "Reliability"]}>
 
 - **Provider evidence shows load-balanced deferrals and head lag.** The

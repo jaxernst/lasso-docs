@@ -507,10 +507,11 @@ and their pending nonce excludes it, so manage nonces client-side. Caller header
 such as `X-Flashbots-Signature` are not forwarded. Only `eth_sendRawTransaction`
 gets a post-error hash lookup.
 
-Set `log_ranges: split` at the document's root to serve a wide `eth_getLogs`
-range as block-range slices across the chain's providers, returned as one
-response, so a range wider than one provider's log-span limit can complete.
-Omitted or `single`, each range goes whole to one provider.
+A wide `eth_getLogs` range is served as block-range slices across the chain's
+providers, returned as one response, so a range wider than one provider's
+log-span limit can complete. Set `log_ranges: single` at the document's root
+to send every range whole to one provider; omitted or `split`, wide ranges are
+sliced.
 
 `Accept: application/yaml` exports compatible head policies for self-hosted Lasso RPC
 Core. A provider with `heads: standby` exports with Core subscription settings and a

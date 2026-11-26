@@ -112,7 +112,10 @@ The upstream rejection's code and message stay, with scalar upstream data
 under `upstream_data`. Honor any `Retry-After`. When `retryable` is `true`,
 resend identical signed bytes; changing fees or nonces creates a replacement
 your app must manage. When `retryable` is `false`, check the hash for a
-receipt before signing a new one. See
+receipt before signing a new one. When an earlier send may have broadcast and
+a post-error hash lookup can't confirm or rule that out in time, Lasso returns
+`indeterminate_dispatch` instead of the last rejection: check the hash for a
+receipt before resending. See
 [transaction behavior](/cloud/rpc-behavior#transactions).
 
 ## WebSocket close reasons

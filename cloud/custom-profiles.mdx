@@ -51,7 +51,7 @@ other field is optional:
 | `background_observations` | provider | `false` stops background checks and idle recovery on a provider you're not actively using; defaults to `true`. `heads: off` only stops head observation |
 | `health_checks`: `standard` or `light` | chain | Lasso's checks should spend less of your provider quota |
 | `error_interpretation` | profile | You opt in to Lasso interpreting your providers' error messages |
-| `log_ranges`: `single` (default) or `split` | profile | A wide `eth_getLogs` range should serve as block-range slices across the chain's providers, returned as one response, instead of going whole to one provider |
+| `log_ranges`: `split` (default) or `single` | profile | A wide `eth_getLogs` range should go whole to one provider instead of serving as block-range slices across the chain's providers, returned as one response |
 | `limits`: `archival`, `logs_span`, `methods_blocked` | provider | You know a limit Lasso hasn't learned, such as your plan's log-span cap |
 | `transactions`: `{providers, fallback}` | chain | Signed transactions on this chain should only reach specific providers |
 | `enabled` | provider | You want to stop routing and background observation on a provider while keeping its settings and credentials; defaults to `true`. Omitting it on `PUT` resets it to `true` |
