@@ -50,12 +50,13 @@ Lasso handles them depends on the profile.
 
 Premium and Custom profiles split ranges. Send a range of up to 100,000 blocks
 whole: Lasso cuts it into slices each provider accepts, serves them one at a
-time inside the request and returns one response. The range shares one 16 MiB
-response limit and one 30 second deadline. When it can't be served, Lasso
-returns `-32602` `log_range_limit`: send parts the size of
-`data.max_block_range`, or narrow the address or topics filter when
-`data.action` is `narrow_filter`. A deadline with no such size returns
-retryable `-32007`. A range wider than 100,000 blocks goes whole to one
+time inside the request and returns one response. Dense filters can still need
+smaller ranges. The range shares one 16 MiB response limit and one 30 second
+deadline. When a range or result limit stops it, Lasso returns `-32602`
+`log_range_limit`: send parts the size of `data.max_block_range`, or narrow the
+address or topics filter when `data.action` is `narrow_filter`. A deadline
+returns retryable `-32007` and provider rate pressure retryable `-32005`; retry
+those unchanged. A range wider than 100,000 blocks goes whole to one
 provider. A Custom profile set to `log_ranges: single` is served like Public.
 The widest spans each chain and profile served in Lasso's fixed scenarios are
 published in [llms.txt](https://lasso.sh/llms.txt).
@@ -65,8 +66,8 @@ by provider, so Lasso tries the same query on the remaining candidates first;
 it returns `-32602` with `data.reason: "log_range_too_large"` and
 `data.action: "reduce_block_range"` only once none of them can serve it. Split
 a returned range error into smaller `fromBlock`–`toBlock` spans in your app. Lasso's own response-size cap applies
-to every provider alike and returns that `-32602` at once. A provider that
-refuses `eth_getLogs` for plan reasons is treated the same way. Qualify your
+to every provider alike and returns that `-32602` at once. A provider whose
+plan caps the range or result size is treated the same way. Qualify your
 exact queries with [indexer backfills](/cloud/indexer-backfills).
 
 An address-less `eth_getLogs` filter, such as a topic-only scan, can hit a
@@ -79,9 +80,9 @@ keeps the ordinary exhaustion error instead.
 ### Log completeness
 
 A successful `eth_getLogs` response on Public is one provider's answer, and
-each slice of a split range is too. Lasso doesn't check the
-returned rows against your query or another provider, and a successful response
-can be incomplete: in a staging capture, a provider returned a successful
+each slice of a split range is too. Lasso doesn't prove that
+every matching log was returned or compare the result with another provider,
+and a successful response can be incomplete: in a staging capture, a provider returned a successful
 response missing one log. A provider's range limit describes the query sizes it
 accepts, not that its results are complete. On Public, keep splitting wide
 ranges in your client. If your application needs every log, reconcile against a

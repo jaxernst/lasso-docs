@@ -46,10 +46,12 @@ test, not as a coverage promise.
 
 On `premium` and Custom profiles, send each `eth_getLogs` range whole, up to
 100,000 blocks: Lasso splits it across providers inside the request and returns
-one response. On `public`, Lasso sends the range whole to one provider and
-doesn't split it for you. On any profile, a range Lasso can't serve returns
-`-32602` with `data.code: "log_range_limit"`; follow its `next_action`: split
-the range and retry. A split range shares one 16 MiB response limit and one
+one response. Dense filters can still need smaller ranges. On `public`, Lasso
+sends the range whole to one provider and doesn't split it for you. On any
+profile, a range or result limit returns `-32602` with
+`data.code: "log_range_limit"`: split to `data.max_block_range` when it is set,
+or narrow the address or topics filter when `data.action` is `narrow_filter`.
+Deadlines (`-32007`) and rate limits (`-32005`) are retryable as sent. A split range shares one 16 MiB response limit and one
 30 second deadline ([RPC method behavior](/cloud/rpc-behavior#historical-state-and-logs)).
 Lasso learns each provider's span limit from these refusals
 and tries providers that accept a wider range first. On a Custom profile, the
