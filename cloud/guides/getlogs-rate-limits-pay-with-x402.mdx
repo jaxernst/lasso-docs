@@ -30,7 +30,7 @@ A funded key gets its own rate limit of 100 requests per second, with bursts to 
 
 ## 3. Split ranges on Lasso's range error
 
-Each provider caps how many blocks one `eth_getLogs` may span, and Lasso learns those caps from live traffic. When a range is still too large, Lasso answers with a standard JSON-RPC error your loop can act on:
+Each provider caps how many blocks one `eth_getLogs` may span, and Lasso learns those caps from live traffic. On the Premium profile this key uses, Lasso splits a range of up to 100,000 blocks across providers inside one request and returns one response, so send each range whole. When a range still can't be served, Lasso answers with a standard JSON-RPC error your loop can act on:
 
 - `code: -32602`, `error.data.code: "log_range_limit"`;
 - `error.data.max_block_range`, the largest range Lasso has evidence it can
@@ -58,7 +58,7 @@ async function getLogs(from: bigint, to: bigint, filter: object): Promise<unknow
 }
 ```
 
-Add an `address` to the filter when you can: when every provider refuses an address-less query, Lasso reports `log_filter_refused`. Each successful response is one provider's answer; if you need every log, reconcile against a second source.
+Add an `address` to the filter when you can: when every provider refuses an address-less query, Lasso reports `log_filter_refused`. Each successful response, or each slice of a split one, is one provider's answer; if you need every log, reconcile against a second source.
 
 ## 4. What it costs
 
