@@ -155,18 +155,14 @@ notifications have no response item.
 
 - `include_meta=body` adds `lasso_meta`: strategy used, candidates,
   `selected_provider`, retries (candidate advances), dispatches (physical upstream sends of the request's own method, excluding auxiliary lookups),
-  and upstream and overhead latency.
+  and upstream and overhead latency (overhead is end-to-end time minus upstream time; for a split `eth_getLogs`, upstream time is an estimate of the time at least one slice was waiting on a provider).
   `fallback_profile` names the serving profile when it differs from
   `service_profile_id` and is absent otherwise.
   `include_meta=headers` leaves the body unchanged and adds `x-lasso-meta`.
   Range refusals stay within the current profile. Ordinary calls, including block-hash `eth_getLogs`, can use configured
   capability and outage fallback; Premium can fall back to Public.
-- Each `eth_getLogs` call is served by one provider. When a block range is
-  wider than the serving providers accept, Lasso returns `log_range_limit` with
-  `error.data.max_block_range`; split the range into parts of that size and
-  send each part. When the field is null or absent, halve the range. When
-  `error.data.action` is `narrow_filter`, Lasso has no smaller range to
-  suggest, so narrow the address or topics filter instead.
+- How an `eth_getLogs` block range is served depends on the profile; see
+  [eth_getLogs ranges](#eth_getlogs-ranges).
 - Every response carries `x-lasso-request-id`; quote it when reporting a
   problem. Served requests add `x-lasso-access` (`premium`, `public` or
   `custom`), `x-lasso-cu`, `x-lasso-usd` (this request's charge),
@@ -178,6 +174,11 @@ notifications have no response item.
   outage; on a batch it lists every such profile, comma-separated. It appears with or without
   `include_meta`. The request keeps the named profile's price. A provider name
   alone does not show fallback: Premium and Public can use the same upstream.
+- `x-lasso-routing-capacity` says whose upstream capacity served the request:
+  `shared` for capacity shared across Lasso customers (the managed pool, or a public
+  endpoint it also uses), `customer-owned` for your own providers, or `mixed`. A
+  Custom provider whose URL matches a managed public endpoint, such as PublicNode,
+  reads `shared`: the header names the capacity, not who owns the profile.
 - `eth_chainId` can be answered without an upstream; use `eth_blockNumber` to
   show routing.
 
@@ -219,8 +220,8 @@ To switch profiles, replace the profile segment; do not append another one.
 | Strategy | Behavior | Use for | Price factor |
 |---|---|---|---|
 | `load-balanced` | Random within the healthiest providers | Backends, indexers | 1x |
-| `balanced-fast` (default on Premium) | Spreads traffic, favoring recently fast providers | User-facing reads | 1.5x |
-| `fastest` | Lowest recent latency per provider, kind of request and transport; concentrates traffic | Latency-critical paths | 2x |
+| `balanced-fast` (default) | Spreads traffic, favoring recently fast providers | User-facing reads | 1.25x |
+| `fastest` | Lowest recent latency per provider, kind of request and transport; concentrates traffic | Latency-critical paths | 1.75x |
 | `priority` | Configured order within the healthy providers | Custom profiles with a preferred primary | 1x |
 
 Health and known capability steer candidates first. Premium and Custom serve all four strategies; `public`,
@@ -230,9 +231,40 @@ explicit strategy URL, metadata also names `requested_strategy` and
 `strategy_adjusted`; Public `/fastest/` reports `fastest` requested and
 `load-balanced` applied. Response headers expose `x-lasso-requested-strategy`
 for explicit strategy URLs and `x-lasso-strategy` for the applied strategy. A URL without a strategy uses
-`balanced-fast` on Premium and `load-balanced` on Custom profiles.
+`balanced-fast` on Premium and Custom profiles.
 `latency-weighted` is an alias of `balanced-fast`. `agent.json` lists exact USD
 prices per method and strategy.
+
+### eth_getLogs ranges
+
+Premium and Custom profiles split ranges. Send an `eth_getLogs` range of up to
+100,000 blocks whole: Lasso cuts it into slices each provider accepts, serves
+them one at a time inside the request and returns one response. Dense filters
+can still need smaller ranges; the table below shows what was served. The
+range shares one 16 MiB response limit and one 30 second deadline. When a
+range or result limit stops it, Lasso returns `-32602` `log_range_limit`: send
+parts the size of `error.data.max_block_range`, or narrow the address or
+topics filter when `error.data.action` is `narrow_filter`. A deadline returns
+retryable `-32007` and provider rate pressure retryable `-32005`; retry those
+unchanged. A range wider than 100,000 blocks goes whole to one provider. A
+Custom profile set to `log_ranges: single` is served like Public.
+
+Public sends each range whole to one provider. When a block range is wider
+than the serving providers accept, Lasso returns `log_range_limit` with
+`error.data.max_block_range`; split the range into parts of that size and send
+each part. When the field is null or absent, halve the range.
+
+Measured served ranges (run 1: production, 2026-11-27, scoreboard at f04766b018). Generated by `scripts/getlogs_caps_table.mjs`.
+Each density column is the widest tested span (100 to 100,000 blocks) that succeeded on every repeat with the same result count within 16 MiB; `none` means no tested span did. Sparse filters one sender's transfers of a token, medium all of that token's transfers, dense nothing. Exact rows counts responses equal to recorded rows for a fixed historical range. A chain or profile not listed was not measured.
+
+| Chain | Profile | Sparse | Medium | Dense | Exact rows | Run |
+|---|---|---:|---:|---:|---|---:|
+| arbitrum | premium | 100,000 | 1,000 | 1,000 | - | 1 |
+| arbitrum | public | 100,000 | 1,000 | 1,000 | - | 1 |
+| base | premium | 100,000 | 1,000 | 100 | 1,000: 3/3 | 1 |
+| base | public | 100 | 100 | 100 | 1,000: 0/3 | 1 |
+| ethereum | premium | 100,000 | 100 | none | - | 1 |
+| ethereum | public | 10,000 | 100 | none | - | 1 |
 
 ## Install into the app
 
@@ -397,7 +429,9 @@ minute; the request lasts 24 hours. An `approved` response means the same
 token is an agent of that account; polling alone does not grant authority.
 
 **Build a profile** with one document: each chain with its providers in
-preference order. `GET /api/v1/configuration-schema` lists every optional
+preference order. Lasso stores provider URLs, keys and headers encrypted and
+never returns them; [how Lasso holds your provider credentials](https://docs.lasso.sh/cloud/data-handling.md#how-lasso-holds-your-provider-credentials)
+covers logs, revisions and deletion. `GET /api/v1/configuration-schema` lists every optional
 field and recipes for common workloads.
 
 ```http
@@ -411,6 +445,10 @@ Content-Type: application/json
   "block_protection":true}}}
 ```
 
+Provider names are unique across the whole profile, not per chain: use names
+like `base-primary` and `arbitrum-primary`, or the document is rejected with
+`invalid_config` at `chains`.
+
 Set a provider entry to `enabled: false` to keep its settings and credentials while stopping routing and background observations. GET includes `enabled`; PUT omission resets it to `true`. Re-enable with `enabled: true`. If all providers are disabled, the chain stays stored with no route.
 
 Start with the provider URLs and omit `limits` unless you know a provider
@@ -423,9 +461,11 @@ Pasting a URL in the dashboard checks its chain identity. For unknown chains,
 the dashboard also estimates block cadence from recent blocks; document
 onboarding retains its existing defaults. A failed cadence check does not
 prevent adding a provider with the correct chain. The dashboard's deep check
-is a separate manual action that measures history depth and log range with at
-most eight HTTP requests per provider. It runs no method sweep; Lasso learns
-which methods a provider refuses from traffic.
+is a separate manual action that measures history depth and log range, and
+records the provider's error wording for known-bad requests, with at most 11
+HTTP requests per provider. With throughput measurement on, it adds a paced
+ramp of up to 75 `eth_blockNumber` requests, so at most 86. It runs no method
+sweep; Lasso learns which methods a provider refuses from traffic.
 
 Lasso tracks each provider's block height from the head reads routed through
 it and from background checks. A `ws_url` provides WebSocket capability;
@@ -444,18 +484,30 @@ polls and identity checks.
    storing anything, and needs no Custom access.
 2. Holding a profile needs Custom access. An account that has never had Custom
    access gets seven free days, with no payment, when it saves its first profile;
-   the `PUT` and `GET` responses' `trial_ends_at` says when they end. After that,
+   the `PUT` and `GET` responses' `trial_ends_at` says when they end, and in their
+   last 48 hours RPC responses carry `x-lasso-custom-access-ends` with the same
+   time. After that,
    requests to the profile return 402 `custom_access_expired`, whose `next_action`
    says how to pay. The configuration is kept, and the profile serves again once the
    account has Custom.
    To keep it, or after the free days, buy days with the same 402 exchange as a top-up: `POST /api/v1/accounts/<id>/custom-access` with
    `{"days":7}`, at `account_payments.custom_access.day_usd` in `/agent.json`.
    A signed offer keeps its price even if the tariff changes.
+   If a person gave you a Custom trial link (`https://lasso.sh/trial/<token>`), redeem it
+   with your management token: `POST /api/v1/accounts/current/trial-redemption` with
+   `{"token":"<token>"}`. Access runs to the later of the link's days from now and any
+   free days the account already has, so redeeming after the first save lengthens it.
+   The response has `status` and `trial_ends_at`; repeating it returns the same deadline.
+   Paid or open-ended access answers `already_has_access`, and a subscription with a
+   payment problem `custom_payment_due`; either leaves the link unused.
 3. The same `PUT` without `dry_run` stores it. `provider_check_failed` names a
    wrong provider and nothing changes; a provider that can't answer yet is
    saved as `verifying` and routes once a later check passes.
 4. Route the app over `https://lasso.sh/rpc/k/<key>/profile/prod-base/<strategy>/<chain>`.
    Replace the profile segment in an existing prefix rather than appending another.
+   A key issued earlier keeps the URL it was issued with, usually Premium. The saved
+   profile's `rpc_url_template` and `ws_url_template` carry the usable form: replace
+   `{key}` with the key secret and `{chain}` with a chain.
 5. Poll `GET /api/v1/profiles/prod-base` while status is `activating` or
    `verifying`: follow `status_detail` and honor `retry_after_seconds`.
    Completion is `live` when every chain is ready, `off` when every chain is
@@ -482,10 +534,19 @@ and their pending nonce excludes it, so manage nonces client-side. Caller header
 such as `X-Flashbots-Signature` are not forwarded. Only `eth_sendRawTransaction`
 gets a post-error hash lookup.
 
+A wide `eth_getLogs` range is served as block-range slices across the chain's
+providers, returned as one response, so a range wider than one provider's
+log-span limit can complete. Set `log_ranges: single` at the document's root
+to send every range whole to one provider; omitted or `split`, wide ranges are
+sliced.
+
 `Accept: application/yaml` exports compatible head policies for self-hosted Lasso RPC
-Core. A provider with `heads: standby` returns 422 `invalid_config` with its field
-path because the target Core YAML cannot represent elected fallback; the stored
-profile is unchanged. Chain-level `transactions` policies are included in the Core YAML export. `DELETE` removes it; URLs naming it then serve as `premium`. When Custom
+Core. A provider with `heads: standby` exports with Core subscription settings and a
+comment: the first standby provider subscribes when no provider on the chain is live.
+Turned-off providers are left out and listed in the header comment. Chain-level
+`transactions` policies are included, and `log_ranges` is left out because Core does not
+read it yet. The export returns 422 `invalid_config` only when
+a send policy would lose all its relays or all its providers outside the policy (the readers). `DELETE` removes it; URLs naming it then serve as `premium`. When Custom
 access lapses, the profile is kept and its URLs return 402
 `custom_access_expired` until access is renewed.
 
@@ -568,7 +629,7 @@ Both transports deliver the same pages. To read one:
 | 400 | `invalid_parameter` | Correct the request; `cursor=` is not a parameter, pass `next` as `from`. Changing a source/filter requires a fresh start |
 | 401 | `unauthorized` | An enabled current key; SSE sends an error and closes if authority expires |
 | 401 | `account_closed` | The account closed after it sat idle unused; create a new key with `POST /api/v1/keys` |
-| 402 | `balance_exhausted` | Fund within the user's budget, then resume with the saved `from` |
+| 402 | `balance_exhausted` | Fund within the user's budget, then resume with the saved `from`. If that read after a confirmed (200) credit still answers `balance_exhausted`, retry the same `from` without paying again |
 | 403 | `not_entitled` | Use a key from an account with Streams access |
 | 404 | `chain_not_served` | A chain supported by Streams |
 | 409 | `resync_required` | Rebuild this source from your own start block; this is not a transient upstream failure |
@@ -769,10 +830,17 @@ same `from` after `Retry-After`. Refusals carry no items and never move your
 position.
 
 A key has at most 10 concurrent readers (`429 too_many_readers`). An account
-can read 10 distinct streams at once, including live tip reads.
-A stream is one key, chain, source and filter; its slot frees 60 seconds after its last read.
-The node holds at most 16 distinct streams. These stream limits return `429 rate_limit_exceeded`
-with reason `busy`. The node also caps in-flight Streams requests at 300.
+can read 10 distinct streams at once, including live tip reads; a stream is one
+key, chain, source and filter. Each reading position holds a server buffer.
+Reading `next` from a numeric or cursor position reuses its buffer, and a
+different numeric `from` starts another; such a buffer expires 60 seconds after
+its last read. A `from=latest` request's buffer lasts only as long as that
+request or SSE connection. A node holds at most 16 buffers across all callers,
+so it can refuse a new start, `from=latest` included, even while you read one
+stream. The stream's account slot frees when its last buffer closes. Both limits
+return `429 rate_limit_exceeded` with reason `busy`; retry the same `from` after
+`Retry-After`.
+The node also caps in-flight Streams requests at 300.
 At that cap, `429 too_many_readers` has reason `node_capacity` and `Retry-After: 5`;
 retry after five seconds. Account request-rate limits and key revocation also apply.
 Delivery costs **$0.10 per million events**, with a **$0.10 minimum per account
@@ -848,9 +916,11 @@ is always safe.
 
 The app owns signing, nonces, replacement, receipts and finality. HTTP filter IDs are
 provider-local, so use `eth_getLogs` or subscriptions. Historical depth and
-`eth_getLogs` range caps vary by provider, so keep range splitting in
-indexers. A successful `eth_getLogs` response is one provider's answer and can
-be incomplete, so reconcile against a second source if you need every log.
+`eth_getLogs` range caps vary by provider, so on Public keep range splitting in
+indexers; on Premium and Custom, send the range whole and narrow it on
+`log_range_limit`. A successful `eth_getLogs` response, or each slice of a split
+one, is one provider's answer and can be incomplete, so reconcile against a
+second source if you need every log.
 
 Limits: 10 unauthenticated account creations per hour per IP; 100 active keys
 per account; Custom profiles up to the plan's limit. Rate limits are shared by all of an
@@ -858,7 +928,7 @@ account's keys. One managed bucket holds premium and public traffic: 100 RPS
 with bursts to 200 while the account has premium access, or 30 RPS with bursts
 to 60 while payment fallback or free access serves it. Public traffic also
 draws on a public bucket (30 RPS, bursts to 60), and each Custom profile has
-its own (1,000 RPS). `RateLimit-Policy`
+its own (1,000 RPS; email support@lasso.sh for higher). `RateLimit-Policy`
 names the bucket that bound the request.
 
 ## Troubleshooting
@@ -912,5 +982,7 @@ management routes answer gone (HTTP 410) with a `next_action` naming the
 - Product docs: https://docs.lasso.sh
 - Public dashboard: https://lasso.sh/dashboard/public
 - Open-source routing core (Apache-2.0): https://github.com/jaxernst/lasso-rpc
+- Privacy policy: https://lasso.sh/privacy
+- Terms of service: https://lasso.sh/terms
 
 Lasso Cloud is the managed service on lasso.sh; the routing core is open source.
