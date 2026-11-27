@@ -33,6 +33,7 @@ to use these signals together, read [routing evidence](/cloud/observability).
 | `RateLimit-Policy`, `RateLimit` | IETF rate-limit fields, named after the bucket that bound the request: `managed`, `public` or the Custom profile's slug |
 | `x-lasso-meta` | With `include_meta=headers`: unpadded base64url JSON of `lasso_meta` |
 | `x-lasso-fallback-profile` | Present only when a routing fallback served the request on a different profile than `service_profile_id` named |
+| `x-lasso-custom-access-ends` | Present only in the last 48 hours of free or granted Custom days: the ISO 8601 time they end. Paid Custom never carries it |
 
 | `x-lasso-fallback` | Why |
 |---|---|
