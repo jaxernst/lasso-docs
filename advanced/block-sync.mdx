@@ -39,17 +39,38 @@ observation before comparing heights. The reference is selected from the
 current, aligned provider samples; it is an operational routing estimate, not
 a consensus vote or proof of the canonical chain.
 
-A provider's lag is compared with that reference. If a profile sets
-`selection.max_lag_blocks`, sufficiently lagging candidates can be excluded.
 Unknown or stale data must not be read as verified head agreement. The
 dashboard's `monitoring.lag_alert_threshold_blocks` is a separate status
-threshold; it does not set the routing limit.
+threshold; it does not set a routing limit.
 
 The measured block interval uses an exponential moving average of increasing
 heights. Until five valid samples are available, Core uses the configured
 `block_time_ms` fallback. This helps account for observation delay on fast
 chains, but it cannot turn a stale or incorrect upstream response into a
 verified block.
+
+## Head freshness
+
+A request that needs the chain's moving head prefers routes with fresh
+evidence that they are at it. What a request needs comes from its own
+parameters: a `latest` selector, an omitted range upper bound, an omitted
+optional selector that a client resolves to its current state (such as
+`eth_call` or `eth_getBalance`), and a replay-safe read with no block
+parameter all need the moving head; a numeric selector needs that block;
+block hash, `earliest`, `safe`, `finalized`, `pending`, writes and
+subscriptions need nothing.
+
+Each route's latest HTTP and WebSocket head observation is compared with the
+highest fresh observation across the profile, less an agreement band — the
+blocks the chain produces in two seconds at its `block_time_ms`, bounded
+between 1 and 20 blocks, crediting the blocks a route could have produced
+since its own observation. A route proven short of that target, or one
+reporting the agreed height on a different block hash, is deferred behind the
+others in its health tier. Deferral never excludes a route: when every
+current route fails or lacks the method, a lagging one still serves, and a
+route a few blocks behind still serves historical reads. `selection.max_lag_blocks`
+was removed in v0.9.0 in favor of this automatic, per-chain behavior; a
+profile that still sets it keeps loading, but the field has no effect.
 
 ## Health probes
 
@@ -72,8 +93,8 @@ for the remaining admission checks.
 - Verify a representative upstream-backed request; a healthy application
   endpoint does not prove that every provider is usable.
 
-The released [block-sync worker](https://github.com/jaxernst/lasso-rpc/blob/v0.8.6/lib/lasso/core/block_sync/worker.ex),
-[registry](https://github.com/jaxernst/lasso-rpc/blob/v0.8.6/lib/lasso/core/block_sync/registry.ex),
-[lag calculation](https://github.com/jaxernst/lasso-rpc/blob/v0.8.6/lib/lasso/providers/lag_calculation.ex),
-and [probe coordinator](https://github.com/jaxernst/lasso-rpc/blob/v0.8.6/lib/lasso/providers/probe_coordinator.ex)
-are the implementation references for v0.8.6.
+The released [block-sync worker](https://github.com/jaxernst/lasso-rpc/blob/v0.9.0/lib/lasso/core/block_sync/worker.ex),
+[registry](https://github.com/jaxernst/lasso-rpc/blob/v0.9.0/lib/lasso/core/block_sync/registry.ex),
+[head suitability](https://github.com/jaxernst/lasso-rpc/blob/v0.9.0/lib/lasso/core/selection/head_suitability.ex),
+and [probe coordinator](https://github.com/jaxernst/lasso-rpc/blob/v0.9.0/lib/lasso/providers/probe_coordinator.ex)
+are the implementation references for v0.9.0.

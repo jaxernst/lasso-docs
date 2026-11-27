@@ -9,6 +9,64 @@ explains it. To check what's serving right now, read `source_sha` from
 [`/api/health`](https://lasso.sh/api/health). RPC Core releases have their own
 notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
 
+<Update label="November 25, 2026" description="Release 327" tags={["Custom profiles", "Transactions", "Reliability"]}>
+
+- **Custom profiles split wide `eth_getLogs` ranges by default.** A profile
+  document that omits `log_ranges` now serves a range wider than any provider
+  accepts as block-range slices across the chain's providers, instead of
+  sending it whole to one provider; set `log_ranges: single` to keep the old
+  behavior. A range refusal also advises the widest span a provider was seen
+  to accept, not just its declared cap.
+  [Custom profiles](/cloud/custom-profiles#the-document)
+- **Sends confirm across more upstreams before reporting an unknown
+  outcome.** After a send that may have broadcast, Lasso now checks each
+  upstream that could hold the transaction, not just the one that answered
+  last. When none can confirm or rule it out in time, the response is
+  `indeterminate_dispatch` instead of the prior rejection, so a genuinely
+  unknown outcome reads differently from a confirmed one.
+  [Transactions](/cloud/rpc-behavior#transactions)
+- Batch request and admission reliability improvements.
+
+</Update>
+
+<Update label="November 24, 2026" description="Release 326" tags={["Dashboard", "Reliability"]}>
+
+- **Provider evidence shows load-balanced deferrals and head lag.** The
+  dashboard's provider evidence panel adds a **Load share** row while
+  load-balanced routing moves a route back for failing clearly more than its
+  peers, and a **Head** row while a route is judged behind the chain's newest
+  observed block or on another branch; both show since when.
+  [Custom profiles](/cloud/custom-profiles#lasso-learns-your-providers)
+- **Activation confirms live.** Once every node serves an activated profile,
+  the dashboard replaces **Profile activated. Publication is still
+  finishing.** with its live message instead of leaving the notice up.
+  [Custom profiles](/cloud/custom-profiles#onboarding-what-lasso-checks)
+- Routing, rate-limit and `eth_getLogs` reliability improvements.
+
+</Update>
+
+<Update label="November 23, 2026" description="Release 325" tags={["Reliability"]}>
+
+- Routing, `eth_getLogs` range-splitting, log-range retry and WebSocket
+  lifecycle reliability improvements.
+
+</Update>
+
+<Update label="November 22, 2026" description="Release 324" tags={["Routing", "Custom profiles", "Dashboard", "Reliability"]}>
+
+- **Balanced-fast is the default everywhere but Public.** A URL with no
+  strategy segment now routes `balanced-fast` on Custom profiles too, not only
+  Premium; a pinned provider and Public still use `load-balanced`.
+  [Routing](/cloud/routing)
+- **Provider lag shows by time, not blocks.** The dashboard marks a provider
+  **Lagging** once it trails the chain's reference head by more than 10
+  seconds, converted to blocks at the chain's measured cadence, so a fast
+  chain like Base doesn't trip the warning early.
+  [Custom profiles](/cloud/custom-profiles#head-tracking)
+- Routing, historical-read and `eth_getLogs` reliability improvements.
+
+</Update>
+
 <Update label="November 21, 2026, second release" description="Release 323" tags={["Pricing", "Custom profiles", "Keys", "Routing"]}>
 
 - **Lower prices for faster routing.** `balanced-fast` now costs 1.25x a
@@ -75,7 +133,7 @@ notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
   shows its progress and ends with a coverage summary per chain: throughput,
   history and log range. A retest that finds nothing new says
   **No changes detected** and stages nothing.
-  [Custom profiles](/cloud/custom-profiles#onboarding-what-lasso-checks)
+  [Custom profiles](/cloud/custom-profiles#the-dashboard-edit-view)
 - **Set up more of a profile before you sign in.** On a new Custom profile you
   can reorder providers and set each one's **Enabled**,
   **Historical requests**, **Subscribe to new heads** and **Max logs range**
@@ -125,6 +183,7 @@ notes on [GitHub](https://github.com/jaxernst/lasso-rpc/releases).
   head stays usable for 1.5 poll intervals, so **Active monitoring** in the
   chain editor warns only when polls are slower than three times the chain's
   freshness window, or polling is off.
+  [Head tracking](/cloud/custom-profiles#head-tracking)
 
 </Update>
 

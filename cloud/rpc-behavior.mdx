@@ -108,10 +108,20 @@ insufficient funds, an invalid signature, a malformed transaction or invalid
 gas or fee limits. So does a response saying the node already knows the
 transaction. A provider pin sends to that provider only.
 
-Before returning an error, Lasso looks the transaction up by hash once, and
-returns the hash if the transaction is pending or mined. If the lookup can't
-run in time, the error stands and the outcome is uncertain: resend the same
-signed bytes, which is always safe, and reconcile by hash.
+Before returning an error, Lasso looks the transaction up by hash: first on
+the upstream that answered last, then on each earlier upstream that may have
+broadcast the bytes, one at a time within the remaining deadline. A send that
+got an unclassified error, an invalid response, a timeout or a connection lost
+after sending may have broadcast; a rate limit or quota refusal, an
+unsupported-method response, a refusal before dispatch and a recognized
+failover rejection such as replacement underpricing did not, so those
+upstreams aren't asked. The hash lookup returns the transaction only when its
+hash matches case-insensitively; wording alone never reports success. If an
+earlier send may have broadcast and no lookup finds the hash in time, Lasso
+returns `indeterminate_dispatch` (`-32000`, not retryable) instead of the
+last rejection: check the hash for a receipt before resending. With no earlier
+possible broadcast, an unresolved lookup keeps the original error, which is
+always safe to resend by resubmitting the same signed bytes.
 
 Final transaction errors carry `error.data.error_type: transaction_rejection`,
 `retryable`, `next_action` and `request_id`; honor any `Retry-After`. When

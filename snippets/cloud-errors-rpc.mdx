@@ -20,7 +20,7 @@
 | `unknown_chain` | 400 | No | Choose a chain whose profiles field in /agent.json chains includes the requested hosted profile. |
 | `account_closed` | 401 | No | The provisional account closed after it sat idle without payment or usage. Create a new key with POST /api/v1/keys. |
 | `key_revoked` | 401 | No | Use the current key. |
-| `unauthorized` | 401 | No | Replace &#123;chain&#125; in the key's rpc_url_template with a chain or &lt;strategy>/&lt;chain>, or create a key with POST /api/v1/keys; see /llms.txt. |
+| `unauthorized` | 401 | No | Send exactly one current RPC key with this request, as a /k/&lt;key> segment right after /rpc, a key=&lt;key> query parameter or an x-lasso-api-key header, and keep the rest of the URL. A Custom profile URL needs a key from the account that owns the profile. New to Lasso: run curl -fsS https://lasso.sh/api/v1/keys -H 'content-type: application/json' -d '&#123;"name":"agent"&#125;' to create a new account, with no Custom profiles and a small starting balance, and use its key field. See /llms.txt. |
 | `balance_exhausted` | 402 | No | Credit the account or restore its allowance. |
 | `custom_access_expired` | 402 | No | The profile's configuration is saved. Its owner buys Custom days with POST /api/v1/accounts/&#123;id&#125;/custom-access or subscribes at https://lasso.sh/pricing, then retries. |
 | `forbidden` | 403 | No | Use an allowed profile. |

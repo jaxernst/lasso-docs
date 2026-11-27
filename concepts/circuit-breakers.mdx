@@ -26,6 +26,17 @@ works normally during that time.
 Chain-identity probes record identity and health; routed requests and head polls
 decide when a circuit opens and recovers.
 
+## Timeouts
+
+A request timeout is neutral to the circuit on its own — it shows only that a
+provider was slower than that attempt's share of one request's budget. It asks
+the health prober to check that instance on its next tick instead. The
+prober runs one probe of an instance at a time and counts consecutive probe
+timeouts; at two (five seconds each) it opens the HTTP circuit, so an upstream
+that accepts requests and never answers leaves rotation. A probe success
+resets only that count, and no other probe outcome reaches the breaker.
+Routed requests and head polls still drive its recovery.
+
 ## Refusals that leave the circuit closed
 
 Some refusals say nothing about a provider's health, so they never count toward

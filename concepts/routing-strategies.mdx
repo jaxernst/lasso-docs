@@ -68,11 +68,15 @@ for basic reads, not for `eth_getBalance` or `eth_getLogs`. Lasso's own
 background requests can seed cold-start order within a kind but never qualify
 client traffic.
 
-Unqualified channels remain available after qualified channels. When no channel
-qualifies, Core reports availability degradation and uses its available latency
-priors and deterministic identity order. Missing or stale evidence does not
-become proof that a provider is fast or reliable. Lifetime dashboard averages
-are not the routing score.
+Unqualified channels remain available after qualified channels, in two groups:
+first those whose evidence isn't unreliable, then unreliable ones (three
+consecutive failures, or a recent success probability below 0.75, in evidence
+that hasn't gone stale). Each group orders by prior latency, then provider and
+transport identity — so a channel that's failing doesn't sort ahead of one
+that's merely untried. When no channel qualifies, Core reports availability
+degradation and uses that same two-group order. Missing or stale evidence does
+not become proof that a provider is fast or reliable. Lifetime dashboard
+averages are not the routing score.
 
 ## Balanced fast
 
@@ -86,10 +90,18 @@ ordering key = -log(U) / weight
 ```
 
 Lower ordering keys come first. Reliability determines qualification; it is not
-a multiplier in this formula. There is no latency floor, weight floor or
-implicit exploration share. Unmeasured channels are shuffled after measured
-channels. If nothing qualifies, available recent latency priors still order the
-fallback group; a wholly unmeasured group is shuffled uniformly.
+a multiplier in this formula. There is no latency floor or weight floor.
+Reliable channels order in four groups: (1) the weighted permutation of
+channels with current latency evidence, plus one channel with no evidence
+chosen at random and weighted like the quickest, so it earns a sample instead
+of being starved; (2) the remaining channels with no latency evidence; (3)
+channels whose evidence has gone stale; (4) unreliable channels (three
+consecutive failures, or a recent success probability below 0.75), ordered
+among themselves the same way. At most one unmeasured channel ranks ahead of
+measured ones — health tiering runs afterward and can still move a measured
+channel with a half-open circuit behind unmeasured ones. If nothing qualifies,
+available recent latency priors still order the fallback group; a wholly
+unmeasured group is shuffled uniformly.
 
 The latency exponent is `BALANCED_FAST_BETA`, a positive number with default
 `3.0`; higher values favor low latency more strongly:
@@ -152,7 +164,7 @@ may fail over are defined in
 [provider selection](/concepts/provider-selection#execution-and-failover) and
 the [method contract](/api/supported-methods).
 
-This contract is grounded in the released [routing guide](https://github.com/jaxernst/lasso-rpc/blob/v0.8.6/docs/ROUTING.md),
-[Fastest](https://github.com/jaxernst/lasso-rpc/blob/v0.8.6/lib/lasso/core/selection/strategies/fastest.ex),
-[BalancedFast](https://github.com/jaxernst/lasso-rpc/blob/v0.8.6/lib/lasso/core/selection/strategies/balanced_fast.ex)
-and [execution envelope](https://github.com/jaxernst/lasso-rpc/blob/v0.8.6/lib/lasso/core/request/execution_envelope.ex).
+This contract is grounded in the released [routing guide](https://github.com/jaxernst/lasso-rpc/blob/v0.9.0/docs/ROUTING.md),
+[Fastest](https://github.com/jaxernst/lasso-rpc/blob/v0.9.0/lib/lasso/core/selection/strategies/fastest.ex),
+[BalancedFast](https://github.com/jaxernst/lasso-rpc/blob/v0.9.0/lib/lasso/core/selection/strategies/balanced_fast.ex)
+and [execution envelope](https://github.com/jaxernst/lasso-rpc/blob/v0.9.0/lib/lasso/core/request/execution_envelope.ex).
